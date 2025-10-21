@@ -27,9 +27,8 @@ const __dirname  = path.dirname(__filename);
 // CORS
 const allowedOrigins = [
   'http://localhost:3000',
-  'http://localhost:5173',
   'http://localhost:5000',
-  'https://four-18.onrender.com/'
+  'https://four-18.onrender.com'
 ];
 app.use(cors({
   origin: (origin, callback) => {

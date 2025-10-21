@@ -1,20 +1,24 @@
-import axios from 'axios';
+  // src/api/axiosInstance.js
+  import axios from 'axios';
 
-const defaultBaseUrl =
-  process.env.NODE_ENV === 'production'
-    ? 'https://tienda-418brand.onrender.com'
-    : 'http://localhost:5000';
+  // ⬇️ COMENTA Y DESCOMENTA SEGÚN TU ENTORNO
 
-const baseURL = process.env.REACT_APP_API_URL || defaultBaseUrl;
+  // ✅ Localhost (DESARROLLO LOCAL)
+  //const baseURL = 'http://localhost:5000';
 
-const instance = axios.create({
-  baseURL,
-  withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
+  // ✅ Render (PRODUCCIÓN)
+  const baseURL = 'https://four-18.onrender.com/';
 
-export { baseURL };
-export default instance;
+  console.log('🌐 Usando baseURL:', baseURL);
 
+  const instance = axios.create({
+    baseURL,
+    withCredentials: true,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  export { baseURL }; // <-- Agrega esto
+
+  export default instance;

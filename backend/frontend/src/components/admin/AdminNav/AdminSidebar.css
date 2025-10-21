@@ -1,0 +1,25 @@
+/* AdminSidebar.css */
+
+/* Por defecto oculto en móvil */
+.admin-sidebar {
+  display: none;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 16rem;              /* 64 en Tailwind = 16rem */
+  background-color: #fff;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  flex-direction: column;
+  justify-content: space-between;
+  z-index: 50;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+/* A partir de 768px (md): mostramos el sidebar */
+@media (min-width: 768px) {
+  .admin-sidebar {
+    display: flex !important;
+  }
+}

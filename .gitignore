@@ -1,0 +1,23 @@
+# ⛔ No subir variables sensibles
+.env
+backend/.env
+frontend/.env
+
+# ⛔ No subir dependencias de Node
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# ⛔ No subir carpetas de build de React
+frontend/build/
+
+# 🧹 Archivos temporales o del sistema operativo
+.DS_Store
+Thumbs.db
+
+# 🐛 Logs
+*.log
+
+# ⚙️ Editor/IDE
+.vscode/
+.idea/

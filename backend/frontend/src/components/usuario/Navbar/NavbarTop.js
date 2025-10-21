@@ -1,0 +1,471 @@
+﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import axios from '../../../api/axiosInstance';
+import { useCart } from '../../../context/CartContext';
+import { useAuth } from '../../../context/AuthContext';
+import './navbar.css';
+import { buildProductFilterUrl } from '../../../utils/productFilters';
+import { FiMenu, FiSearch } from 'react-icons/fi';
+import { HiOutlineShoppingBag } from 'react-icons/hi';
+
+const createId = () => (window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
+
+const resolveHref = item => {
+  if (item.href) return item.href;
+
+  const filters = (() => {
+    switch (item.kind) {
+      case 'collection': {
+        const collection = item.settings?.collection || item.label;
+        if (collection) {
+          return { collection };
+        }
+        break;
+      }
+      case 'filter': {
+        const key = item.settings?.filterKey;
+        const value = item.settings?.filterValue;
+        if (key && value !== undefined && value !== null && value !== '') {
+          return { [key]: value };
+        }
+        break;
+      }
+      case 'category': {
+        const key = item.settings?.filterKey || 'type';
+        const value = item.settings?.filterValue ?? item.settings?.category ?? item.label;
+        if (value) {
+          return { [key]: value };
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    return null;
+  })();
+
+  if (filters) {
+    return buildProductFilterUrl(filters);
+  }
+
+  return '/productos';
+};
+
+const sortItems = items => [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+const NavbarTop = () => {
+  const { count } = useCart();
+  const { isAuthenticated, logout, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const [menu, setMenu] = useState({ rows: [] });
+  const [openItemId, setOpenItemId] = useState(null);
+  const [loadingMenu, setLoadingMenu] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const hoverTimerRef = useRef(null);
+
+  const isAdmin = Boolean(user?.isAdmin || user?.role === 'admin');
+
+  useEffect(() => {
+    const loadMenu = async () => {
+      setLoadingMenu(true);
+      try {
+        const { data } = await axios.get('/api/navigation');
+        setMenu({
+          title: data.title,
+          rows: Array.isArray(data.rows) ? data.rows : []
+        });
+      } catch (error) {
+        console.error('No se pudo cargar el menu de navegacion', error);
+        setMenu({
+          rows: []
+        });
+      } finally {
+        setLoadingMenu(false);
+      }
+    };
+    loadMenu();
+  }, []);
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false);
+  }, [location.pathname, location.search]);
+
+  const highlightRows = useMemo(
+    () => menu.rows.filter(row => row.type === 'highlight'),
+    [menu.rows]
+  );
+
+  const categoryRows = useMemo(
+    () => menu.rows.filter(row => row.type === 'category'),
+    [menu.rows]
+  );
+
+  const highlightItems = useMemo(
+    () => highlightRows.flatMap(row => sortItems(row.items || [])),
+    [highlightRows]
+  );
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/', { replace: true });
+  };
+
+  useEffect(() => () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+  }, []);
+
+  const handleMouseEnter = itemId => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setOpenItemId(itemId);
+    }, 120);
+  };
+
+  const handleMouseLeave = () => {
+    if (hoverTimerRef.current) {
+      clearTimeout(hoverTimerRef.current);
+    }
+    hoverTimerRef.current = setTimeout(() => {
+      setOpenItemId(null);
+    }, 120);
+  };
+
+  return (
+    <nav className="relative z-50 shadow-brand-sm">
+      <div className="bg-brand text-white">
+        <div className="container mx-auto flex flex-col gap-1 px-4 py-2 text-xs font-medium sm:flex-row sm:items-center sm:justify-between">
+          <span className="uppercase tracking-[0.35em] text-white/70">
+            Nueva coleccion Street Realism
+          </span>
+          <Link
+            to="/productos?collection=Street+Realism"
+            className="inline-flex items-center gap-2 font-semibold uppercase tracking-wide text-white hover:text-white/90"
+          >
+            Descubrela ahora
+            <span aria-hidden="true">-></span>
+          </Link>
+        </div>
+      </div>
+
+      <div className="navbar-top-custom bg-slate-900 text-white">
+        <div className="container mx-auto px-4">
+          <div className="flex flex-col">
+            <div className="flex items-center justify-between py-3 lg:hidden">
+              <button
+                type="button"
+                onClick={() => setIsMobileMenuOpen(prev => !prev)}
+                className="flex items-center justify-center rounded-md p-2 text-white transition-colors duration-150 hover:text-brand"
+                aria-label={isMobileMenuOpen ? 'Cerrar menu' : 'Abrir menu'}
+              >
+                <FiMenu className={`text-2xl ${isMobileMenuOpen ? 'text-brand' : 'text-white'}`} />
+              </button>
+
+              <Link to="/" className="flex-1 text-center" aria-label="Volver al inicio">
+                <span className="text-white text-xl font-extrabold uppercase tracking-[0.3em]">
+                  4-18
+                  <span className="text-red-500"> BRAND</span>
+                </span>
+              </Link>
+
+              <div className="flex items-center gap-4">
+                <Link
+                  to="/productos"
+                  className="relative text-white transition-colors duration-150 hover:text-brand"
+                  aria-label="Buscar productos"
+                >
+                  <FiSearch className="text-2xl" />
+                </Link>
+                <Link
+                  to="/cart"
+                  className="relative text-white transition-colors duration-150 hover:text-brand"
+                  aria-label="Ver carrito"
+                >
+                  <HiOutlineShoppingBag className="text-2xl" />
+                  {count > 0 && (
+                    <span className="absolute -top-2 -right-2 min-w-[1.2rem] rounded-full bg-brand px-1 text-center text-[10px] font-bold leading-4 text-black">
+                      {count > 9 ? '9+' : count}
+                    </span>
+                  )}
+                </Link>
+              </div>
+            </div>
+
+            <div className="hidden lg:flex items-center justify-between py-4 gap-4">
+              <Link to="/" className="flex-shrink-0" aria-label="Volver al inicio">
+                <span className="text-white text-3xl font-extrabold tracking-wide drop-shadow-sm uppercase">
+4-18 BRAND                 </span>
+              </Link>
+
+              <div className="flex flex-1 justify-center">
+                <ul className="flex items-center gap-6 text-sm uppercase tracking-wide">
+                  {loadingMenu && (
+                    <li className="text-white/60 text-xs">Cargando menu...</li>
+                  )}
+                  {!loadingMenu && highlightItems.length === 0 && (
+                    <li>
+                      <Link
+                        className="hover:text-brand transition-colors duration-200"
+                        to="/productos"
+                      >
+                        Categorias
+                      </Link>
+                    </li>
+                  )}
+                  {highlightItems.map((item, index) => {
+                    const href = resolveHref(item);
+                    return (
+                      <li key={item.id || `highlight-${index}`}>
+                        <Link
+                          to={href}
+                          className="hover:text-brand transition-colors duration-150"
+                        >
+                          {item.label}
+                          {item.badge && (
+                            <span className="ml-2 rounded bg-brand px-2 py-0.5 text-[11px] uppercase tracking-wider">
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <div className="flex items-center gap-4 text-sm">
+                <Link
+                  to="/cart"
+                  className="hover:text-brand transition-colors duration-150"
+                >
+                  Carrito {count > 0 ? `(${count})` : ''}
+                </Link>
+                {!isAuthenticated ? (
+                  <>
+                    <Link
+                      to="/login?redirect=/"
+                      className="text-white/80 transition-colors duration-150 hover:text-white"
+                    >
+                      Iniciar sesion
+                    </Link>
+                    <Link
+                      to="/register?redirect=/"
+                      className="rounded-full border border-white/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white hover:text-slate-900"
+                    >
+                      Crear cuenta
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    {isAdmin && (
+                      <Link
+                        to="/admin-dashboard"
+                        className="hover:text-brand transition-colors duration-150"
+                      >
+                        Admin
+                      </Link>
+                    )}
+                    <Link
+                      to="/mis-pedidos"
+                      className="hover:text-brand transition-colors duration-150"
+                    >
+                      Mis pedidos
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={handleLogout}
+                      className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white hover:text-slate-900"
+                    >
+                      Cerrar sesion
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div
+              className={`lg:hidden overflow-hidden border-t border-white/10 transition-all duration-200 ease-in-out ${isMobileMenuOpen ? 'max-h-[75vh] opacity-100' : 'max-h-0 opacity-0'}`}
+            >
+              <div className="py-3 space-y-4">
+                {highlightItems.length > 0 && (
+                  <div className="flex items-center gap-3 overflow-x-auto text-xs uppercase tracking-wide whitespace-nowrap px-1">
+                    {highlightItems.map((item, index) => {
+                      const href = resolveHref(item);
+                      return (
+                        <Link
+                          key={item.id || `chip-${index}`}
+                          to={href}
+                          className="rounded-full border border-white/30 px-4 py-1 text-white hover:bg-white hover:text-black transition-colors duration-150"
+                        >
+                          {item.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {categoryRows.length > 0 && (
+                  <div className="divide-y divide-white/10">
+                    {categoryRows.map((row, rowIndex) => (
+                      <details key={row.id || `mobile-row-${rowIndex}`} className="py-3">
+                        <summary className="text-sm font-semibold uppercase tracking-wide text-white/90 cursor-pointer">
+                          {row.title || 'Categorias'}
+                        </summary>
+                        <div className="mt-2 space-y-3 text-sm">
+                          {sortItems(row.items || []).map((item, itemIndex) => {
+                            const href = resolveHref(item);
+                            const subItems = (item.megaMenu?.columns || []).flatMap(column => column.items || []);
+                            return (
+                              <div key={item.id || `mobile-item-${rowIndex}-${itemIndex}`} className="space-y-1">
+                                <Link to={href} className="block text-white hover:text-brand">
+                                  {item.label}
+                                  {item.badge && (
+                                    <span className="ml-2 rounded bg-brand px-2 py-0.5 text-[11px] uppercase tracking-wider">
+                                      {item.badge}
+                                    </span>
+                                  )}
+                                </Link>
+                                {subItems.length > 0 && (
+                                  <ul className="pl-4 space-y-1 text-xs text-white/70">
+                                    {subItems.map((columnItem, subIndex) => (
+                                      <li key={columnItem.id || `mobile-sub-${rowIndex}-${itemIndex}-${subIndex}`}>
+                                        <Link
+                                          to={columnItem.href || '#'}
+                                          className="hover:text-brand transition-colors duration-150"
+                                        >
+                                          {columnItem.label}
+                                          {columnItem.badge && (
+                                            <span className="ml-2 rounded bg-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                                              {columnItem.badge}
+                                            </span>
+                                          )}
+                                        </Link>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </details>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {categoryRows.length > 0 && (
+              <div className="hidden lg:flex items-center justify-center gap-8 py-3 border-t border-white/10">
+                {categoryRows.map(row =>
+                  sortItems(row.items || []).map((item, index) => {
+                    const href = resolveHref(item);
+                    const hasMega = item.megaMenu && (item.megaMenu.columns || []).length > 0;
+
+                    return (
+                      <div
+                        key={item.id || `category-${index}`}
+                        className="relative"
+                        onMouseEnter={() => hasMega && handleMouseEnter(item.id)}
+                        onMouseLeave={handleMouseLeave}
+                      >
+                        <Link
+                          to={href}
+                          className="uppercase tracking-wide text-sm hover:text-brand transition-colors duration-150"
+                        >
+                          {item.label}
+                          {item.badge && (
+                            <span className="ml-2 rounded bg-brand px-2 py-0.5 text-[11px] uppercase tracking-wider">
+                              {item.badge}
+                            </span>
+                          )}
+                        </Link>
+
+                        {hasMega && openItemId === item.id && (
+                          <MegaMenuPanel item={item} onClose={handleMouseLeave} />
+                        )}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+const MegaMenuPanel = ({ item, onClose }) => (
+  <div
+    className="absolute left-1/2 top-full z-40 mt-2 w-[860px] -translate-x-1/2 rounded-xl bg-white p-6 text-black shadow-2xl"
+    onMouseLeave={onClose}
+  >
+    <div className="grid grid-cols-1 gap-8 md:grid-cols-4">
+      {(item.megaMenu?.columns || []).map((column, columnIndex) => (
+        <div key={column.id || `column-${columnIndex}`} className="space-y-3">
+          {column.title && (
+            <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {column.title}
+            </h4>
+          )}
+          <ul className="space-y-2 text-sm">
+            {(column.items || []).map((columnItem, columnItemIndex) => {
+              const href = columnItem.href || '#';
+              return (
+                <li key={columnItem.id || `column-item-${columnIndex}-${columnItemIndex}`}>
+                  <Link
+                    to={href}
+                    className="flex items-center justify-between text-slate-600 hover:text-brand transition-colors duration-150"
+                  >
+                    <span>{columnItem.label}</span>
+                    {columnItem.badge && (
+                      <span className="ml-2 rounded bg-black px-2 py-0.5 text-[11px] uppercase tracking-wide text-white">
+                        {columnItem.badge}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ))}
+
+      {item.megaMenu?.featured && (
+        <div className="col-span-3 rounded-lg border border-surface-200 p-4 md:col-span-1 md:row-span-full bg-surface-50">
+          {item.megaMenu.featured.imageUrl && (
+            <img
+              src={item.megaMenu.featured.imageUrl}
+              alt={item.megaMenu.featured.title || 'Destacado'}
+              className="mb-3 h-40 w-full rounded-md object-cover"
+            />
+          )}
+          <h4 className="text-base font-semibold mb-1">
+            {item.megaMenu.featured.title}
+          </h4>
+          <p className="text-sm text-slate-500 mb-3">
+            {item.megaMenu.featured.description}
+          </p>
+          {item.megaMenu.featured.href && (
+            <Link
+              to={item.megaMenu.featured.href}
+              className="inline-flex items-center gap-2 text-sm font-semibold text-brand hover:text-brand-dark"
+            >
+              Ver mas
+              <span aria-hidden="true">-></span>
+            </Link>
+          )}
+        </div>
+      )}
+    </div>
+  </div>
+);
+
+export default NavbarTop;

@@ -1,0 +1,19 @@
+/* styles.css */
+
+/* Clase para la imagen que tendrá el zoom */
+.zoom-image {
+  transition: transform 0.3s ease;
+  cursor: zoom-in; /* Cambiar el cursor al pasar por encima */
+}
+
+/* Clase cuando la imagen está en estado de zoom */
+.zoomed {
+  transform: scale(2); /* Permite un zoom de hasta 2x */
+}
+
+/* Modal de imagen en pantalla completa */
+.modal-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}

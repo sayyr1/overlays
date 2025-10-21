@@ -1,0 +1,197 @@
+.product-mobile-card {
+  font-family: 'Inter', sans-serif;
+  background-color: #f9fbff;
+  border-radius: 20px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.06);
+  max-width: 420px;
+  margin: 1.5rem auto;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 2rem;
+}
+
+.product-image-container {
+  width: 100%;
+  padding: 1rem;
+  background-color: #fafafa;
+  display: flex;
+  justify-content: center;
+}
+
+.product-image {
+  width: 100%;
+  max-width: 350px;
+  border-radius: 16px;
+  object-fit: cover;
+  transition: opacity 0.3s ease-in-out;
+  opacity: 1;
+}
+
+.fade-out {
+  opacity: 0;
+}
+
+.fade-in {
+  opacity: 1;
+}
+
+.product-top-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.6rem 1.2rem;
+  margin-bottom: 0.8rem;
+  margin-top: -10px;
+}
+
+.product-name {
+  font-size: 1.1rem;
+  font-weight: 500;
+  color: #333;
+}
+
+.product-price {
+  font-size: 1.4rem;
+  font-weight: bold;
+  color: #111;
+}
+
+.thumbnails {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.5rem 1rem;
+  overflow-x: auto;
+}
+
+.thumbnail {
+  width: 50px;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 6px;
+  opacity: 0.6;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.thumbnail.active {
+  opacity: 1;
+  border-color: #007bff;
+  transform: scale(1.05);
+}
+
+.thumbnail:hover {
+  transform: scale(1.08);
+  opacity: 1;
+}
+
+.product-info-section {
+  padding: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.product-description {
+  font-size: 1rem;
+  color: #444;
+  line-height: 1.5;
+}
+
+.read-more {
+  color: #007bff;
+  font-weight: bold;
+  cursor: pointer;
+  margin-left: 6px;
+}
+
+.size-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 0.5rem;
+}
+
+.size-box {
+  background: #f1f1f1;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 500;
+  min-width: 40px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.full-width-button {
+  width: 100%;
+  display: block;
+  margin-top: 1rem;
+}
+
+.product-info-section a {
+  display: flex;
+  justify-content: center;
+  
+}
+
+.product-info-section button {
+  width: auto; /* o 100% si lo quieres ancho */
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--primary, #007bff);
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  margin: 0 auto; /* ⬅️ esto centra el botón */
+}
+
+.product-info-section a {
+  text-decoration: none; /* Elimina subrayado del enlace */
+}
+
+.product-info-section a button {
+  all: unset; /* Limpia herencias como borde/subrayado */
+  display: block;
+  margin: 0 auto;
+  padding: 10px 20px;
+  background-color: var(--primary, #007bff);
+  color: white;
+  font-size: 1rem;
+  font-weight: bold;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.2s ease;
+}
+
+.product-info-section a button:hover {
+  background-color: #0056b3;
+}
+
+
+.whatsapp-button {
+  background-color: #25D366;
+  color: white;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 1rem;
+  font-weight: bold;
+  transition: background-color 0.2s ease;
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+}
+
+.whatsapp-button:hover {
+  background-color: #1ebe5b;
+  transform: scale(1.02);
+}

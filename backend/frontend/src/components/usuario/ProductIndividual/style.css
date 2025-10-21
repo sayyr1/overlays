@@ -1,0 +1,104 @@
+/* src/pages/style.css */
+
+/* Chips de color */
+.chip {
+  @apply inline-flex items-center rounded-full border px-3 py-1 text-sm font-medium transition;
+}
+.chip-idle {
+  @apply border-slate-200 bg-white text-slate-700 hover:bg-slate-50;
+}
+.chip-active {
+  @apply border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-100;
+}
+
+/* Tallas */
+.size-chip {
+  @apply inline-flex min-w-[3rem] items-center justify-center rounded-xl border px-4 py-2 text-sm font-semibold transition;
+  @apply border-slate-200 bg-white text-slate-800 hover:bg-slate-50;
+}
+.size-chip-active {
+  @apply border-blue-600 bg-blue-600 text-white shadow-sm;
+}
+.size-chip-disabled {
+  @apply cursor-not-allowed opacity-50 hover:bg-white;
+}
+
+/* Botón primario */
+.btn-primary {
+  @apply inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300;
+}
+.btn-disabled {
+  @apply cursor-not-allowed bg-slate-300 text-slate-600 hover:bg-slate-300 focus:ring-0;
+}
+
+/* Zoom sutil en la galería */
+.zoom-image {
+  transition: transform 400ms ease, filter 400ms ease;
+  touch-action: pan-y;
+}
+.zoom-image:hover {
+  transform: scale(1.02);
+  filter: saturate(1.05);
+}
+
+/* Modal */
+.modal-zoom-surface {
+  @apply relative flex w-full items-center justify-center overflow-hidden rounded-3xl bg-slate-900/40 p-4;
+  max-height: 80vh;
+  min-height: clamp(320px, 65vh, 680px);
+  touch-action: pan-y;
+}
+.modal-zoomed {
+  cursor: grab;
+}
+.modal-controls {
+  @apply absolute bottom-6 left-1/2 flex -translate-x-1/2 items-center gap-4;
+}
+.modal-nav-button {
+  @apply flex h-14 w-14 items-center justify-center rounded-full bg-white/95 text-slate-900 shadow-lg transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400;
+}
+.modal-nav-button:disabled {
+  @apply cursor-not-allowed opacity-40 shadow-none hover:bg-white;
+}
+.modal-zoom-toggle {
+  @apply absolute top-6 right-6 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-slate-900 shadow-lg transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-400;
+}
+.zoom-target {
+  max-height: 78vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  cursor: zoom-in;
+  transition: transform 300ms ease;
+  will-change: transform;
+}
+.zoom-target.is-zoomed {
+  cursor: grab;
+}
+.zoom-target.is-zoomed.is-dragging {
+  cursor: grabbing;
+}
+.modal-zoomed .zoom-target {
+  cursor: grab;
+}
+
+@media (max-width: 640px) {
+  .modal-nav-button {
+    @apply h-12 w-12;
+  }
+  .modal-zoom-toggle {
+    @apply top-4 right-4;
+  }
+  .modal-controls {
+    @apply bottom-4 gap-3;
+  }
+}
+
+/* Swiper bullets */
+.swiper-pagination-bullet {
+  background: rgba(15, 23, 42, 0.35);
+  opacity: 1;
+}
+.swiper-pagination-bullet-active {
+  background: #0ea5e9;
+}

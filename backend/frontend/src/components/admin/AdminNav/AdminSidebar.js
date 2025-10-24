@@ -82,7 +82,7 @@ const AdminSidebar = ({ handleLogout }) => {
           </span>
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Administrativo</p>
-            <p className="text-lg font-semibold text-slate-900">4-18</p>
+            <p className="text-lg font-semibold text-slate-900">NIWAY STORE</p>
           </div>
         </div>
       </div>

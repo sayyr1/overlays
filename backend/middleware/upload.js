@@ -5,7 +5,7 @@ import cloudinary from '../utils/cloudinary.js';
 const storage = new CloudinaryStorage({
   cloudinary,
   params: {
-    folder: '4-18', // <- ✅ nueva carpeta creada en Cloudinary
+    folder: 'Niway-Store', // <- ✅ nueva carpeta creada en Cloudinary
     allowed_formats: ['jpg', 'png', 'jpeg'],
   },
 });

@@ -168,7 +168,8 @@ const NavbarTop = () => {
 
               <Link to="/" className="flex-1 text-center" aria-label="Volver al inicio">
                 <span className="text-white text-xl font-extrabold uppercase tracking-[0.3em]">
-                  4-18
+                  Niway Store
+                  
                   <span className="text-red-500"> BRAND</span>
                 </span>
               </Link>
@@ -199,7 +200,7 @@ const NavbarTop = () => {
             <div className="hidden lg:flex items-center justify-between py-4 gap-4">
               <Link to="/" className="flex-shrink-0" aria-label="Volver al inicio">
                 <span className="text-white text-3xl font-extrabold tracking-wide drop-shadow-sm uppercase">
-4-18 BRAND                 </span>
+Niway Store                </span>
               </Link>
 
               <div className="flex flex-1 justify-center">

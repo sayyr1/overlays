@@ -8,7 +8,7 @@ export default function Footer() {
         <div>
           <img src="/logo-footer.png" alt="Logo Footer" className="h-8 mb-4" />
           <p className="text-sm">
-            Copyright {new Date().getFullYear()} 4-18 BRAND. Todos los derechos reservados.
+            Copyright {new Date().getFullYear()} Niway Store. Todos los derechos reservados.
           </p>
         </div>
         <div>

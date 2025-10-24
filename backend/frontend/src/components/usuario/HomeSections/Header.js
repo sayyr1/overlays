@@ -8,7 +8,7 @@ export default function Header() {
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
           <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-          <span className="ml-2 text-xl font-bold uppercase">4-18 BRAND</span>
+          <span className="ml-2 text-xl font-bold uppercase">NIWAY STORE</span>
         </div>
         <div className="hidden md:flex flex-1 mx-6">
           <input

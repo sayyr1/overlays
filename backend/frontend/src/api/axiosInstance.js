@@ -4,10 +4,10 @@
   // ⬇️ COMENTA Y DESCOMENTA SEGÚN TU ENTORNO
 
   // ✅ Localhost (DESARROLLO LOCAL)
-  const baseURL = 'http://localhost:5000';
+  //const baseURL = 'http://localhost:5000';
 
   // ✅ Render (PRODUCCIÓN)
-   //const baseURL = 'https://niway-dzxk.onrender.com';
+   const baseURL = 'https://niway-dzxk.onrender.com';
 
   console.log('🌐 Usando baseURL:', baseURL);
 

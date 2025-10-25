@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AiOutlineHome } from 'react-icons/ai';
 import { FiTag, FiPackage, FiUser, FiLogOut } from 'react-icons/fi';
@@ -17,6 +17,7 @@ const NavbarBottom = () => {
   const { count } = useCart();
   const { isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
+  const navRef = useRef(null);
 
   const getItemClasses = isActive =>
     `group flex flex-col items-center gap-1 text-[0.74rem] font-semibold leading-tight tracking-[0.03em] transition-colors duration-200 ${
@@ -41,8 +42,43 @@ const NavbarBottom = () => {
 
   const navItems = [...navigationLinks, sessionItem];
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const root = document.documentElement;
+    const body = document.body;
+
+    const updateOffset = () => {
+      if (!navRef.current) return;
+      const isMobileViewport = window.innerWidth < 768;
+
+      if (!isMobileViewport) {
+        root.style.removeProperty('--mobile-bottom-nav-offset');
+        body.classList.remove('has-mobile-bottom-nav');
+        return;
+      }
+
+      const navHeight = navRef.current.getBoundingClientRect().height || 0;
+      const offsetValue = `${Math.ceil(navHeight + 16)}px`;
+      root.style.setProperty('--mobile-bottom-nav-offset', offsetValue);
+      body.classList.add('has-mobile-bottom-nav');
+    };
+
+    updateOffset();
+    window.addEventListener('resize', updateOffset);
+
+    return () => {
+      window.removeEventListener('resize', updateOffset);
+      root.style.removeProperty('--mobile-bottom-nav-offset');
+      body.classList.remove('has-mobile-bottom-nav');
+    };
+  }, [count, isAuthenticated]);
+
   return (
-    <nav className="md:hidden pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]">
+    <nav
+      ref={navRef}
+      className="md:hidden pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+    >
       <div className="pointer-events-auto w-full max-w-xl rounded-[2.25rem] border border-white/15 bg-gradient-to-r from-slate-950/95 via-slate-900/95 to-slate-950/95 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <ul className="grid grid-cols-5 items-stretch gap-1.5 px-4 py-3 sm:gap-2 sm:py-4">
           {navItems.map(link => {

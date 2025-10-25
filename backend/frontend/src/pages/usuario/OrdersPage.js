@@ -8,11 +8,11 @@ import {
 } from '../../utils/orderStatus';
 
 const bankConfig = {
-  name: process.env.REACT_APP_BANK_NAME || 'Banco',
+  name: process.env.REACT_APP_BANK_NAME || 'Banco Pichicha',
   account: process.env.REACT_APP_BANK_ACCOUNT || '0000000000',
   owner: process.env.REACT_APP_BANK_OWNER || 'Titular',
   document: process.env.REACT_APP_BANK_ID || '',
-  phone: process.env.REACT_APP_DEPOSIT_PHONE || ''
+  phone: process.env.REACT_APP_DEPOSIT_PHONE || '593983842004'
 };
 
 const formatDateTime = value => {

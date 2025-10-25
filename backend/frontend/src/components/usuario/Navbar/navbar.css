@@ -1,3 +1,14 @@
 .navbar-top-custom {
   width: 100%;
 }
+
+body.has-sticky-navbar #main-content {
+  padding-top: var(--navbar-top-offset, 5rem);
+}
+
+@media (max-width: 1024px) {
+  body.has-mobile-bottom-nav #main-content {
+    padding-bottom: var(--mobile-bottom-nav-offset, 6rem);
+  }
+}
+  

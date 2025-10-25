@@ -63,7 +63,12 @@ const NavbarTop = () => {
   const [openItemId, setOpenItemId] = useState(null);
   const [loadingMenu, setLoadingMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [showFloatingMenuToggle, setShowFloatingMenuToggle] = useState(false);
+  const [isNavbarHidden, setIsNavbarHidden] = useState(false);
   const hoverTimerRef = useRef(null);
+  const lastScrollYRef = useRef(0);
+  const navRef = useRef(null);
 
   const isAdmin = Boolean(user?.isAdmin || user?.role === 'admin');
 
@@ -92,6 +97,95 @@ const NavbarTop = () => {
     setIsMobileMenuOpen(false);
   }, [location.pathname, location.search]);
 
+  useEffect(() => {
+    const updateViewport = () => {
+      if (typeof window === 'undefined') return;
+      setIsMobileViewport(window.innerWidth < 1024);
+    };
+
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    return () => window.removeEventListener('resize', updateViewport);
+  }, []);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (typeof window === 'undefined') return;
+      const current = window.scrollY;
+      const last = lastScrollYRef.current ?? 0;
+      lastScrollYRef.current = current;
+
+      const threshold = 6;
+      const scrollingDown = current > last && current - last > threshold;
+      const scrollingUp = current < last && last - current > threshold;
+
+      if (isMobileMenuOpen) {
+        setIsNavbarHidden(false);
+        if (isMobileViewport) {
+          setShowFloatingMenuToggle(true);
+        }
+        return;
+      }
+
+      if (current < 60) {
+        setIsNavbarHidden(false);
+        setShowFloatingMenuToggle(false);
+        return;
+      }
+
+      if (scrollingDown) {
+        setIsNavbarHidden(true);
+      } else if (scrollingUp) {
+        setIsNavbarHidden(false);
+      }
+
+      if (isMobileViewport) {
+        if (scrollingUp) {
+          setShowFloatingMenuToggle(true);
+        } else if (scrollingDown) {
+          setShowFloatingMenuToggle(false);
+        }
+      } else {
+        setShowFloatingMenuToggle(false);
+      }
+    };
+
+    handleScroll();
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMobileViewport, isMobileMenuOpen]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !navRef.current) return undefined;
+    const root = document.documentElement;
+    const body = document.body;
+
+    const updateOffset = () => {
+      if (!navRef.current) return;
+      const height = navRef.current.getBoundingClientRect().height || 0;
+      root.style.setProperty('--navbar-top-offset', `${Math.ceil(height)}px`);
+    };
+
+    body.classList.add('has-sticky-navbar');
+    updateOffset();
+    window.addEventListener('resize', updateOffset);
+
+    let resizeObserver = null;
+    if ('ResizeObserver' in window) {
+      resizeObserver = new ResizeObserver(updateOffset);
+      resizeObserver.observe(navRef.current);
+    }
+
+    return () => {
+      window.removeEventListener('resize', updateOffset);
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+      root.style.removeProperty('--navbar-top-offset');
+      body.classList.remove('has-sticky-navbar');
+    };
+  }, [isMobileMenuOpen, menu.rows.length, loadingMenu, isAuthenticated, isAdmin]);
+
   const highlightRows = useMemo(
     () => menu.rows.filter(row => row.type === 'highlight'),
     [menu.rows]
@@ -118,6 +212,10 @@ const NavbarTop = () => {
     }
   }, []);
 
+  const toggleMobileMenu = () => {
+    setIsMobileMenuOpen(prev => !prev);
+  };
+
   const handleMouseEnter = itemId => {
     if (hoverTimerRef.current) {
       clearTimeout(hoverTimerRef.current);
@@ -136,10 +234,28 @@ const NavbarTop = () => {
     }, 120);
   };
 
+  const floatingToggleVisible = isMobileViewport && (showFloatingMenuToggle || isMobileMenuOpen);
+  const floatingToggleClasses = `lg:hidden fixed right-4 top-4 z-[60] inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-slate-900/95 text-white shadow-lg shadow-black/40 transition-all duration-200 ${
+    floatingToggleVisible ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'
+  }`;
+  const navTransformClasses = isNavbarHidden ? '-translate-y-full' : 'translate-y-0';
+  const navScrollClasses = isMobileViewport && isMobileMenuOpen ? 'max-h-screen overflow-y-auto' : '';
+
   return (
-    <nav className="relative z-50 shadow-brand-sm">
+    <>
+      <nav
+        ref={navRef}
+        className={`fixed left-0 right-0 top-0 z-50 w-full transform-gpu bg-transparent shadow-brand-sm transition-transform duration-300 ease-in-out ${navTransformClasses} ${navScrollClasses}`}
+      >
       <div className="bg-brand text-white">
-        <div className="container mx-auto flex flex-col gap-1 px-4 py-2 text-xs font-medium sm:flex-row sm:items-center sm:justify-between">
+
+
+
+          
+          {/* PARA AGREGAR CAMPA;AS DE NUEVAS coleccionES O PROMOCIONES AQUI */}
+
+          
+              {/* <div className="container mx-auto flex flex-col gap-1 px-4 py-2 text-xs font-medium sm:flex-row sm:items-center sm:justify-between">
           <span className="uppercase tracking-[0.35em] text-white/70">
             Nueva coleccion Street Realism
           </span>
@@ -150,21 +266,23 @@ const NavbarTop = () => {
             Descubrela ahora
             <span aria-hidden="true">-></span>
           </Link>
-        </div>
+        </div> */}
       </div>
 
       <div className="navbar-top-custom bg-slate-900 text-white">
         <div className="container mx-auto px-4">
           <div className="flex flex-col">
             <div className="flex items-center justify-between py-3 lg:hidden">
-              <button
-                type="button"
-                onClick={() => setIsMobileMenuOpen(prev => !prev)}
-                className="flex items-center justify-center rounded-md p-2 text-white transition-colors duration-150 hover:text-brand"
-                aria-label={isMobileMenuOpen ? 'Cerrar menu' : 'Abrir menu'}
-              >
-                <FiMenu className={`text-2xl ${isMobileMenuOpen ? 'text-brand' : 'text-white'}`} />
-              </button>
+              <div className="flex items-center">
+                <button
+                  type="button"
+                  onClick={toggleMobileMenu}
+                  className="flex items-center justify-center rounded-md p-2 text-white transition-colors duration-150 hover:text-brand"
+                  aria-label={isMobileMenuOpen ? 'Cerrar menu' : 'Abrir menu'}
+                >
+                  <FiMenu className={`text-2xl ${isMobileMenuOpen ? 'text-brand' : 'text-white'}`} />
+                </button>
+              </div>
 
               <Link to="/" className="flex-1 text-center" aria-label="Volver al inicio">
                 <span className="text-white text-xl font-extrabold uppercase tracking-[0.3em]">
@@ -391,7 +509,9 @@ Niway Store                </span>
           </div>
         </div>
       </div>
-    </nav>
+      </nav>
+     
+    </>
   );
 };
 

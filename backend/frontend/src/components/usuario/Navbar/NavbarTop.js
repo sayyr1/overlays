@@ -170,11 +170,11 @@ const NavbarTop = () => {
                 <span className="text-white text-xl font-extrabold uppercase tracking-[0.3em]">
                   Niway Store
                   
-                  <span className="text-red-500"> BRAND</span>
                 </span>
               </Link>
+              
 
-              <div className="flex items-center gap-4">
+              {/* <div className="flex items-center gap-4">
                 <Link
                   to="/productos"
                   className="relative text-white transition-colors duration-150 hover:text-brand"
@@ -194,7 +194,7 @@ const NavbarTop = () => {
                     </span>
                   )}
                 </Link>
-              </div>
+              </div> */}
             </div>
 
             <div className="hidden lg:flex items-center justify-between py-4 gap-4">
@@ -247,20 +247,12 @@ Niway Store                </span>
                   Carrito {count > 0 ? `(${count})` : ''}
                 </Link>
                 {!isAuthenticated ? (
-                  <>
-                    <Link
-                      to="/login?redirect=/"
-                      className="text-white/80 transition-colors duration-150 hover:text-white"
-                    >
-                      Iniciar sesion
-                    </Link>
-                    <Link
-                      to="/register?redirect=/"
-                      className="rounded-full border border-white/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white hover:text-slate-900"
-                    >
-                      Crear cuenta
-                    </Link>
-                  </>
+                  <Link
+                    to="/login?redirect=/"
+                    className="rounded-full border border-white/40 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white hover:text-slate-900"
+                  >
+                    Inicia sesion / Registrate
+                  </Link>
                 ) : (
                   <>
                     {isAdmin && (

@@ -36,7 +36,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
-      await axios.post('/api/users/logout', null, { withCredentials: true });
+      await axios.post('/api/users/logout', {}, { withCredentials: true });
     } finally {
       setUser(null);
     }

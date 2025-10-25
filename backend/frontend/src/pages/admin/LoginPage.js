@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const LoginPage = () => {
@@ -11,7 +11,12 @@ const LoginPage = () => {
   const { login } = useAuth();
 
   const redirectParam = searchParams.get('redirect');
-  const safeRedirect = redirectParam === '/' || !redirectParam ? '/' : '/';
+  const safeRedirect =
+    redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
+  const registerLink =
+    safeRedirect !== '/'
+      ? `/register?redirect=${encodeURIComponent(safeRedirect)}`
+      : '/register';
 
   const handleLogin = async event => {
     event.preventDefault();
@@ -68,6 +73,15 @@ const LoginPage = () => {
             </button>
           </div>
         </form>
+        <div className="mt-6 border-t border-gray-100 pt-4 text-center">
+          <p className="text-sm text-gray-500">Aun no tienes cuenta?</p>
+          <Link
+            to={registerLink}
+            className="mt-2 inline-flex w-full items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:text-gray-900"
+          >
+            Registrate
+          </Link>
+        </div>
       </div>
     </div>
   );

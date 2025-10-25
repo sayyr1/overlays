@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const RegisterPage = () => {
@@ -8,7 +8,12 @@ const RegisterPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { register } = useAuth();
+
+  const redirectParam = searchParams.get('redirect');
+  const safeRedirect =
+    redirectParam && redirectParam.startsWith('/') ? redirectParam : '/';
 
   const handleRegister = async event => {
     event.preventDefault();
@@ -16,7 +21,8 @@ const RegisterPage = () => {
 
     try {
       const user = await register({ name, email, password });
-      navigate(user.isAdmin ? '/admin-dashboard' : '/dashboard', { replace: true });
+      const destination = user.isAdmin ? '/admin-dashboard' : safeRedirect;
+      navigate(destination, { replace: true });
     } catch (err) {
       const message = err.response?.data?.message || 'Error al registrar';
       setError(message);

@@ -16,6 +16,7 @@ import EditProductPage from './pages/admin/EditProductPage';
 import ProductDetailsPage from './pages/admin/ProductDetailsPage';
 import ProductListPage from './pages/usuario/ProductListPage';
 import ProductPublicPage from './pages/usuario/ProductPublicPage';
+import OrigenListPage from './pages/usuario/OrigenListPage';
 import CartPage from './pages/usuario/CartPage';
 import OrdersPage from './pages/usuario/OrdersPage';
 import CategoryManagerPage from './pages/admin/CategoryManagerPage';
@@ -129,6 +130,7 @@ const AppContent = () => {
 
           {/* Rutas USUARIO */}
           <Route path="/" element={<MainHome />} />
+          <Route path="/origen" element={<OrigenListPage />} />
           <Route path="/categorias" element={<CategoriesPage />} />
           <Route path="/categoria/:categoria" element={<CategoriasPage />} />
           <Route path="/productos" element={<ProductListPage />} />

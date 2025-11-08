@@ -42,8 +42,14 @@ const productSchema = new mongoose.Schema({
   },
   gender: {
     type: String,
-    enum: ['Hombre', 'Mujer', 'Niño', 'Niña', 'Unisex'],
+    enum: ['Hombre', 'Mujer', 'Ni��o', 'Ni��a', 'Unisex'],
     default: 'Unisex'
+  },
+  // Dynamic attributes for additional category keys (e.g., ORIGEN, MATERIAL, etc.)
+  attributes: {
+    type: Map,
+    of: String,
+    default: () => new Map()
   },
   colors: [{
     type: String,
@@ -90,3 +96,4 @@ const productSchema = new mongoose.Schema({
 });
 
 export default mongoose.model('Product', productSchema);
+

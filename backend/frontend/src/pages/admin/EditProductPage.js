@@ -33,16 +33,10 @@ const EditProductPage = () => {
     type: '',
     collection: '',
     gender: 'Unisex',
+    attributes: {},
     onSale: false
   });
-  const [categories, setCategories] = useState({
-    brand: [],
-    type: [],
-    size: [],
-    collection: [],
-    gender: [],
-    color: []
-  });
+  const [categories, setCategories] = useState({});
   const [variantState, setVariantState] = useState({});
   const [activeColor, setActiveColor] = useState('');
   const [colorToAdd, setColorToAdd] = useState('');
@@ -69,6 +63,16 @@ const EditProductPage = () => {
     return base;
   }, [categoryGenderOptions, form.gender]);
 
+  const PROTECTED_CATEGORY_KEYS = useMemo(
+    () => new Set(['brand', 'type', 'size', 'collection', 'gender', 'color']),
+    []
+  );
+
+  const dynamicAttributeKeys = useMemo(() => {
+    const keys = Object.keys(categories || {});
+    return keys.filter(k => !PROTECTED_CATEGORY_KEYS.has(k));
+  }, [categories, PROTECTED_CATEGORY_KEYS]);
+
   useEffect(() => {
     if (!id) return;
     const loadData = async () => {
@@ -78,14 +82,7 @@ const EditProductPage = () => {
           axios.get(`/api/products/${id}`)
         ]);
 
-        setCategories({
-          brand: catPayload?.brand || [],
-          type: catPayload?.type || [],
-          size: catPayload?.size || [],
-          collection: catPayload?.collection || [],
-          gender: catPayload?.gender || [],
-          color: catPayload?.color || []
-        });
+        setCategories(catPayload || {});
 
         setCode(product.code);
         setForm({
@@ -101,6 +98,7 @@ const EditProductPage = () => {
           type: product.type ?? '',
           collection: product.collection ?? '',
           gender: product.gender ?? 'Unisex',
+          attributes: product.attributes ?? {},
           onSale: Boolean(product.onSale)
         });
 
@@ -338,6 +336,16 @@ const EditProductPage = () => {
     });
   };
 
+  const handleAttributeChange = (key, value) => {
+    setForm(prev => ({
+      ...prev,
+      attributes: {
+        ...(prev.attributes || {}),
+        [key]: value
+      }
+    }));
+  };
+
   const removePreviewImage = index => {
     setPreviewImages(prev => {
       const target = prev[index];
@@ -431,6 +439,12 @@ const EditProductPage = () => {
       const uploadedImages = await uploadNewImages();
       const images = [...existingImages, ...uploadedImages];
 
+      const attributes = {};
+      dynamicAttributeKeys.forEach(k => {
+        const v = form.attributes?.[k];
+        if (v) attributes[k] = v;
+      });
+
       const payload = {
         name: form.name,
         code,
@@ -440,6 +454,7 @@ const EditProductPage = () => {
         type: form.type,
         collection: form.collection,
         gender: form.gender,
+        attributes,
         onSale: form.onSale,
         stockByColorSize: flatVariants,
         stockBySize,
@@ -531,7 +546,7 @@ const EditProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Selecciona una marca</option>
-                {categories.brand.map(brand => (
+                {(categories.brand || []).map(brand => (
                   <option key={brand} value={brand}>
                     {brand}
                   </option>
@@ -547,7 +562,7 @@ const EditProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Selecciona un tipo</option>
-                {categories.type.map(type => (
+                {(categories.type || []).map(type => (
                   <option key={type} value={type}>
                     {type}
                   </option>
@@ -563,7 +578,7 @@ const EditProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Selecciona una coleccion</option>
-                {categories.collection.map(collection => (
+                {(categories.collection || []).map(collection => (
                   <option key={collection} value={collection}>
                     {collection}
                   </option>
@@ -587,6 +602,28 @@ const EditProductPage = () => {
               ))}
             </select>
           </label>
+
+          {dynamicAttributeKeys.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-3">
+              {dynamicAttributeKeys.map(key => (
+                <label key={key} className="text-sm font-medium text-gray-700">
+                  {key}
+                  <select
+                    value={form.attributes?.[key] || ''}
+                    onChange={e => handleAttributeChange(key, e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Selecciona una opcion</option>
+                    {(categories[key] || []).map(val => (
+                      <option key={val} value={val}>
+                        {val}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
 
           <section className="rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-semibold text-gray-700">Inventario por color y talla</h3>

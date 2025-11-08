@@ -15,6 +15,15 @@ const ProductListPage = () => {
 
   const [products, setProducts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const extraFilters = useMemo(() => {
+    const raw = new URLSearchParams(location.search);
+    const knownKeys = new Set(['brand', 'type', 'gender', 'size', 'collection', 'onSale', 'minPrice', 'maxPrice']);
+    const extras = {};
+    raw.forEach((value, key) => {
+      if (!knownKeys.has(key)) extras[key] = value;
+    });
+    return extras;
+  }, [location.search]);
 
   const urlFilters = useMemo(() => {
     const params = new URLSearchParams(location.search);
@@ -44,8 +53,17 @@ const ProductListPage = () => {
   const fetchProducts = useCallback(async activeFilters => {
     setIsLoading(true);
     try {
-      const search = buildProductFilterSearch(activeFilters);
-      const url = search ? `/api/products/filter?${search}` : '/api/products';
+      // Merge known sanitized filters with any extra query params (e.g., ORIGEN)
+      const known = new URLSearchParams(buildProductFilterSearch(activeFilters));
+      const raw = new URLSearchParams(location.search);
+      const knownKeys = new Set(['brand', 'type', 'gender', 'size', 'collection', 'onSale', 'minPrice', 'maxPrice']);
+      raw.forEach((value, key) => {
+        if (!knownKeys.has(key) && value != null) {
+          known.append(key, value);
+        }
+      });
+      const combined = known.toString();
+      const url = combined ? `/api/products/filter?${combined}` : '/api/products';
       const { data } = await axios.get(url);
       setProducts(data);
     } catch (error) {
@@ -54,7 +72,7 @@ const ProductListPage = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [location.search]);
 
   useEffect(() => {
     fetchProducts(activeFilters);
@@ -64,6 +82,15 @@ const ProductListPage = () => {
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto p-6 space-y-6">
         <h1 className="text-3xl font-semibold text-center text-gray-800">Tienda en linea</h1>
+        {Object.keys(extraFilters).length > 0 && (
+          <div className="flex flex-wrap justify-center gap-2">
+            {Object.entries(extraFilters).map(([k, v]) => (
+              <span key={`${k}-${v}`} className="inline-flex items-center rounded-full bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700">
+                {k}: {v}
+              </span>
+            ))}
+          </div>
+        )}
 
         {isLoading ? (
           <p className="text-center text-gray-500">Cargando productos...</p>

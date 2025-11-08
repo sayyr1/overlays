@@ -1,53 +1,46 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from '../../api/axiosInstance';
 import '../../App.css';
 
-const CATEGORY_OPTIONS = [
-  { value: 'brand', label: 'Marcas' },
-  { value: 'type', label: 'Tipos' },
-  { value: 'size', label: 'Tallas' },
-  { value: 'collection', label: 'Colecciones' },
-  { value: 'gender', label: 'Generos' },
-  { value: 'color', label: 'Colores' }
-];
+const PROTECTED_KEYS = new Set(['brand', 'type', 'size', 'collection', 'gender', 'color']);
 
-const buildEmptyCategories = () =>
-  CATEGORY_OPTIONS.reduce((acc, option) => {
-    acc[option.value] = [];
-    return acc;
-  }, {});
-
-const normalizeCategories = payload => {
-  const base = buildEmptyCategories();
-  if (!payload || typeof payload !== 'object') {
-    return base;
+const normalizeCategories = (payload = {}) => {
+  const out = {};
+  if (payload && typeof payload === 'object') {
+    Object.entries(payload).forEach(([k, v]) => {
+      out[k] = Array.isArray(v) ? v : [];
+    });
   }
-  CATEGORY_OPTIONS.forEach(option => {
-    const values = payload[option.value];
-    base[option.value] = Array.isArray(values) ? values : [];
+  PROTECTED_KEYS.forEach(k => {
+    if (!Object.prototype.hasOwnProperty.call(out, k)) {
+      out[k] = [];
+    }
   });
-  return base;
+  return out;
 };
 
-const getCategoryLabel = key =>
-  CATEGORY_OPTIONS.find(option => option.value === key)?.label || key;
-
 const CategoryManagerPage = () => {
-  const [categories, setCategories] = useState(buildEmptyCategories());
-  const [catForm, setCatForm] = useState({ key: CATEGORY_OPTIONS[0].value, value: '' });
+  const [categories, setCategories] = useState({});
+  const [catForm, setCatForm] = useState({ key: '', value: '' });
+  const [newKey, setNewKey] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+
+  const keys = useMemo(() => Object.keys(categories).sort((a, b) => a.localeCompare(b)), [categories]);
 
   useEffect(() => {
     const loadCategories = async () => {
       setLoading(true);
       try {
         const { data } = await axios.get('/api/categories');
-        setCategories(normalizeCategories(data));
+        const normalized = normalizeCategories(data);
+        setCategories(normalized);
         setCatForm(prev => {
-          const isValid = CATEGORY_OPTIONS.some(option => option.value === prev.key);
-          return { ...prev, key: isValid ? prev.key : CATEGORY_OPTIONS[0].value };
+          const currentKey = prev.key && Object.prototype.hasOwnProperty.call(normalized, prev.key)
+            ? prev.key
+            : Object.keys(normalized)[0] || '';
+          return { ...prev, key: currentKey };
         });
         setError('');
       } catch {
@@ -62,18 +55,12 @@ const CategoryManagerPage = () => {
 
   const handleAddCategory = async () => {
     const { key, value } = catForm;
-    const trimmed = value.trim();
-    if (!key || !trimmed) {
-      return;
-    }
+    const trimmed = (value || '').trim();
+    if (!key || !trimmed) return;
 
     setSubmitting(true);
     try {
-      const { data } = await axios.post(
-        '/api/categories',
-        { key, value: trimmed },
-        { headers: { 'Content-Type': 'application/json' } }
-      );
+      const { data } = await axios.post('/api/categories', { key, value: trimmed });
       setCategories(normalizeCategories(data));
       setCatForm(prev => ({ ...prev, value: '' }));
     } catch (err) {
@@ -85,16 +72,47 @@ const CategoryManagerPage = () => {
   };
 
   const handleDeleteCategory = async (key, value) => {
-    const label = getCategoryLabel(key).toLowerCase();
-    if (!window.confirm(`Eliminar "${value}" de ${label}?`)) {
-      return;
-    }
-
+    if (!window.confirm(`Eliminar "${value}" de ${key}?`)) return;
     try {
       const { data } = await axios.delete('/api/categories', { data: { key, value } });
       setCategories(normalizeCategories(data));
     } catch (err) {
       const message = err?.response?.data?.message || 'Error al eliminar la categoria';
+      window.alert(message);
+    }
+  };
+
+  const handleAddKey = async () => {
+    const key = (newKey || '').trim();
+    if (!key) return;
+    try {
+      const { data } = await axios.post('/api/categories/key', { key });
+      const normalized = normalizeCategories(data);
+      setCategories(normalized);
+      setCatForm(prev => ({ ...prev, key }));
+      setNewKey('');
+    } catch (err) {
+      const message = err?.response?.data?.message || 'Error al crear la clave';
+      window.alert(message);
+    }
+  };
+
+  const handleDeleteKey = async key => {
+    if (PROTECTED_KEYS.has(key)) {
+      window.alert('No se puede eliminar una clave por defecto.');
+      return;
+    }
+    if (!window.confirm(`Eliminar la clave "${key}" y todos sus valores?`)) return;
+    try {
+      const { data } = await axios.delete('/api/categories/key', { data: { key } });
+      const normalized = normalizeCategories(data);
+      setCategories(normalized);
+      setCatForm(prev => {
+        const firstKey = Object.keys(normalized)[0] || '';
+        return { ...prev, key: firstKey };
+      });
+    } catch (err) {
+      const message = err?.response?.data?.message || 'Error al eliminar la clave';
       window.alert(message);
     }
   };
@@ -114,9 +132,9 @@ const CategoryManagerPage = () => {
               onChange={e => setCatForm({ ...catForm, key: e.target.value })}
               className="p-2 border border-gray-300 rounded-md w-full sm:w-1/3 mb-2 sm:mb-0"
             >
-              {CATEGORY_OPTIONS.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
+              {keys.map(k => (
+                <option key={k} value={k}>
+                  {k}
                 </option>
               ))}
             </select>
@@ -139,12 +157,42 @@ const CategoryManagerPage = () => {
             </button>
           </div>
 
+          <div className="flex flex-col sm:flex-row sm:space-x-4 mb-8">
+            <input
+              value={newKey}
+              onChange={e => setNewKey(e.target.value)}
+              placeholder="Nueva clave (ej: ORIGEN)"
+              className="p-2 border border-gray-300 rounded-md w-full sm:w-1/3 mb-2 sm:mb-0"
+            />
+            <button
+              onClick={handleAddKey}
+              disabled={!newKey.trim()}
+              className="p-2 rounded-md w-full sm:w-auto bg-green-600 text-white hover:bg-green-700 transition"
+            >
+              Agregar clave
+            </button>
+          </div>
+
           <div className="space-y-4">
-            {CATEGORY_OPTIONS.map(option => {
-              const values = categories[option.value] || [];
+            {keys.map(k => {
+              const values = categories[k] || [];
               return (
-                <div key={option.value}>
-                  <h4 className="text-lg font-medium text-gray-700 mb-2">{option.label}</h4>
+                <div key={k}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-lg font-medium text-gray-700">{k}</h4>
+                    <button
+                      onClick={() => handleDeleteKey(k)}
+                      disabled={PROTECTED_KEYS.has(k)}
+                      className={`text-sm px-3 py-1 rounded ${
+                        PROTECTED_KEYS.has(k)
+                          ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                          : 'bg-red-100 text-red-700 hover:bg-red-200'
+                      }`}
+                      title={PROTECTED_KEYS.has(k) ? 'Clave protegida' : 'Eliminar clave'}
+                    >
+                      Eliminar clave
+                    </button>
+                  </div>
                   {values.length ? (
                     values.map(val => (
                       <div
@@ -153,7 +201,7 @@ const CategoryManagerPage = () => {
                       >
                         <span className="text-gray-800">{val}</span>
                         <button
-                          onClick={() => handleDeleteCategory(option.value, val)}
+                          onClick={() => handleDeleteCategory(k, val)}
                           className="text-red-500 hover:text-red-700 transition"
                         >
                           Eliminar
@@ -174,3 +222,4 @@ const CategoryManagerPage = () => {
 };
 
 export default CategoryManagerPage;
+

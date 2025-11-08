@@ -327,6 +327,14 @@ router.get('/filtrar', async (req, res) => {
       if (maxPrice) filter['price.retail'].$lte = parseFloat(maxPrice);
     }
 
+    // Dynamic attribute filters: any unknown query key
+    const knownKeys = new Set(['brand','type','gender','collection','size','onSale','minPrice','maxPrice']);
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (!knownKeys.has(key)) {
+        applyRegexFilter(filter, `attributes.${key}`, value);
+      }
+    });
+
     const productos = await Product.find(filter);
     res.json(productos.map(formatProduct));
   } catch (error) {
@@ -371,6 +379,14 @@ router.get('/filter', async (req, res) => {
       if (maxPrice) filter['price.retail'].$lte = parseFloat(maxPrice);
     }
 
+    // Dynamic attribute filters: any unknown query key
+    const knownKeys = new Set(['brand','type','gender','collection','size','onSale','minPrice','maxPrice']);
+    Object.entries(req.query).forEach(([key, value]) => {
+      if (!knownKeys.has(key)) {
+        applyRegexFilter(filter, `attributes.${key}`, value);
+      }
+    });
+
     const productos = await Product.find(filter);
     res.json(productos.map(formatProduct));
   } catch (error) {
@@ -398,13 +414,13 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
-  try {
-    const payload = { ...req.body };
-    payload.price = parsePricePayload(req.body.price);
-    let stockByColorSizeMap = parseStockByColorSizePayload(
-      req.body.stockByColorSize ?? req.body.variants
-    );
+  router.post('/', async (req, res) => {
+    try {
+      const payload = { ...req.body };
+      payload.price = parsePricePayload(req.body.price);
+      let stockByColorSizeMap = parseStockByColorSizePayload(
+        req.body.stockByColorSize ?? req.body.variants
+      );
 
     if (stockByColorSizeMap.size === 0 && req.body.stockBySize) {
       Object.entries(req.body.stockBySize || {}).forEach(([size, qty]) => {
@@ -415,16 +431,20 @@ router.post('/', async (req, res) => {
       });
     }
 
-    const aggregatedBySize = aggregateBySizeFromVariants(stockByColorSizeMap);
+      const aggregatedBySize = aggregateBySizeFromVariants(stockByColorSizeMap);
 
-    const providedColors = parseColorsPayload(req.body.colors);
-    const variantColors = uniqueColorsFromVariantMap(stockByColorSizeMap);
-    payload.colors = uniqueStrings([...providedColors, ...variantColors]);
-    payload.stockByColorSize = stockByColorSizeMap;
-    payload.stockBySize = aggregatedBySize;
+      const providedColors = parseColorsPayload(req.body.colors);
+      const variantColors = uniqueColorsFromVariantMap(stockByColorSizeMap);
+      payload.colors = uniqueStrings([...providedColors, ...variantColors]);
+      // Normalize attributes map if provided
+      if (req.body.attributes && typeof req.body.attributes === 'object') {
+        payload.attributes = req.body.attributes;
+      }
+      payload.stockByColorSize = stockByColorSizeMap;
+      payload.stockBySize = aggregatedBySize;
 
-    const newProduct = new Product(payload);
-    const saved = await newProduct.save();
+      const newProduct = new Product(payload);
+      const saved = await newProduct.save();
     res.status(201).json(formatProduct(saved));
   } catch (err) {
     console.error(err);
@@ -477,7 +497,7 @@ router.put('/:id', async (req, res) => {
       product.colors = incomingColors;
     }
 
-    const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'type', 'collection', 'gender', 'onSale', 'images'];
+    const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'type', 'collection', 'gender', 'onSale', 'images', 'attributes'];
     fieldsToUpdate.forEach(field => {
       if (req.body[field] !== undefined) {
         product[field] = req.body[field];

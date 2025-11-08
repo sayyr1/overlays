@@ -24,6 +24,7 @@ const createInitialFormState = () => ({
   type: '',
   collection: '',
   gender: 'Unisex',
+  attributes: {},
   onSale: false,
   files: null
 });
@@ -33,14 +34,7 @@ const DEFAULT_GENDERS = ['Unisex', 'Hombre', 'Mujer', 'Nino', 'Nina'];
 const CreateProductPage = () => {
   const [form, setForm] = useState(() => createInitialFormState());
   const [code, setCode] = useState('');
-  const [categories, setCategories] = useState({
-    brand: [],
-    type: [],
-    size: [],
-    collection: [],
-    gender: [],
-    color: []
-  });
+  const [categories, setCategories] = useState({});
   const [variantState, setVariantState] = useState({});
   const [previewImages, setPreviewImages] = useState([]);
   const [colorToAdd, setColorToAdd] = useState('');
@@ -74,14 +68,7 @@ const CreateProductPage = () => {
       try {
         const { data } = await axios.get('/api/categories');
         if (!cancelled) {
-          setCategories({
-            brand: data?.brand || [],
-            type: data?.type || [],
-            size: data?.size || [],
-            collection: data?.collection || [],
-            gender: data?.gender || [],
-            color: data?.color || []
-          });
+          setCategories(data || {});
         }
       } catch (error) {
         console.error('Error loading categories', error);
@@ -111,6 +98,16 @@ const CreateProductPage = () => {
   );
 
   const selectedColors = useMemo(() => Object.keys(variantState), [variantState]);
+
+  const PROTECTED_CATEGORY_KEYS = useMemo(
+    () => new Set(['brand', 'type', 'size', 'collection', 'gender', 'color']),
+    []
+  );
+
+  const dynamicAttributeKeys = useMemo(() => {
+    const keys = Object.keys(categories || {});
+    return keys.filter(k => !PROTECTED_CATEGORY_KEYS.has(k));
+  }, [categories, PROTECTED_CATEGORY_KEYS]);
 
   const colorOptions = useMemo(() => {
     const map = new Map();
@@ -201,6 +198,16 @@ const CreateProductPage = () => {
     setForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const handleAttributeChange = (key, value) => {
+    setForm(prev => ({
+      ...prev,
+      attributes: {
+        ...(prev.attributes || {}),
+        [key]: value
+      }
     }));
   };
 
@@ -386,6 +393,13 @@ const CreateProductPage = () => {
       const stockBySize = aggregateSizesFromVariants(sanitizedVariants);
       const productColors = Object.keys(groupedVariants);
 
+      // Build attributes payload from dynamic keys
+      const attributes = {};
+      dynamicAttributeKeys.forEach(k => {
+        const v = form.attributes?.[k];
+        if (v) attributes[k] = v;
+      });
+
       const productData = {
         name: form.name,
         code,
@@ -395,6 +409,7 @@ const CreateProductPage = () => {
         type: form.type,
         collection: form.collection,
         gender: form.gender,
+        attributes,
         onSale: form.onSale,
         stockByColorSize: sanitizedVariants,
         stockBySize,
@@ -484,7 +499,7 @@ const CreateProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Selecciona una marca</option>
-                {categories.brand.map(brand => (
+                {(categories.brand || []).map(brand => (
                   <option key={brand} value={brand}>
                     {brand}
                   </option>
@@ -500,7 +515,7 @@ const CreateProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Selecciona un tipo</option>
-                {categories.type.map(type => (
+                {(categories.type || []).map(type => (
                   <option key={type} value={type}>
                     {type}
                   </option>
@@ -516,7 +531,7 @@ const CreateProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               >
                 <option value="">Selecciona una coleccion</option>
-                {categories.collection.map(collection => (
+                {(categories.collection || []).map(collection => (
                   <option key={collection} value={collection}>
                     {collection}
                   </option>
@@ -540,6 +555,28 @@ const CreateProductPage = () => {
               ))}
             </select>
           </label>
+
+          {dynamicAttributeKeys.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-3">
+              {dynamicAttributeKeys.map(key => (
+                <label key={key} className="text-sm font-medium text-gray-700">
+                  {key}
+                  <select
+                    value={form.attributes?.[key] || ''}
+                    onChange={e => handleAttributeChange(key, e.target.value)}
+                    className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="">Selecciona una opcion</option>
+                    {(categories[key] || []).map(val => (
+                      <option key={val} value={val}>
+                        {val}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </div>
+          )}
 
           <section className="rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-semibold text-gray-700">Inventario por color y talla</h3>

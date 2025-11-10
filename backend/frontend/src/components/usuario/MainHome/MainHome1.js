@@ -13,8 +13,8 @@ export default function HomePage() {
       {/* <HeroSection /> */}
       {/* <InfoIconsSection /> */}
       <FeaturedProductsSection />
+            <OrigenSection limit={8} />
       <CategoriesSection limit={10} />
-      <OrigenSection limit={8} />
       {/* <InfoBannerSection /> */}
       <MoreProductsSection />
     </div>

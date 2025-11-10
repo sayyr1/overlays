@@ -85,6 +85,21 @@ const EditProductPage = () => {
         setCategories(catPayload || {});
 
         setCode(product.code);
+        // Normaliza claves de atributos del producto para que coincidan con las claves de categorías (insensible a mayúsculas/minúsculas)
+        const categoriesKeyMap = Object.keys(catPayload || {}).reduce((acc, key) => {
+          acc[key.toLowerCase()] = key;
+          return acc;
+        }, {});
+
+        const normalizedAttributes = Object.entries(product.attributes || {}).reduce(
+          (acc, [rawKey, val]) => {
+            const matchKey = categoriesKeyMap[rawKey?.toLowerCase?.()] || rawKey;
+            acc[matchKey] = val;
+            return acc;
+          },
+          {}
+        );
+
         setForm({
           name: product.name ?? '',
           price: {
@@ -98,7 +113,7 @@ const EditProductPage = () => {
           type: product.type ?? '',
           collection: product.collection ?? '',
           gender: product.gender ?? 'Unisex',
-          attributes: product.attributes ?? {},
+          attributes: normalizedAttributes,
           onSale: Boolean(product.onSale)
         });
 
@@ -605,23 +620,32 @@ const EditProductPage = () => {
 
           {dynamicAttributeKeys.length > 0 && (
             <div className="grid gap-4 md:grid-cols-3">
-              {dynamicAttributeKeys.map(key => (
-                <label key={key} className="text-sm font-medium text-gray-700">
-                  {key}
-                  <select
-                    value={form.attributes?.[key] || ''}
-                    onChange={e => handleAttributeChange(key, e.target.value)}
-                    className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="">Selecciona una opcion</option>
-                    {(categories[key] || []).map(val => (
-                      <option key={val} value={val}>
-                        {val}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              ))}
+              {dynamicAttributeKeys.map(key => {
+                const selectedVal = form.attributes?.[key] || '';
+                const values = Array.from(
+                  new Set([
+                    ...((categories[key] || []).filter(Boolean)),
+                    ...(selectedVal ? [selectedVal] : [])
+                  ])
+                );
+                return (
+                  <label key={key} className="text-sm font-medium text-gray-700">
+                    {key}
+                    <select
+                      value={selectedVal}
+                      onChange={e => handleAttributeChange(key, e.target.value)}
+                      className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="">Selecciona una opcion</option>
+                      {values.map(val => (
+                        <option key={val} value={val}>
+                          {val}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                );
+              })}
             </div>
           )}
 

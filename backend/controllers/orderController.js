@@ -531,6 +531,46 @@ export const cancelOrder = async (req, res) => {
   return res.json(populated);
 };
 
+export const clearOrderHistory = async (req, res) => {
+  // Borra todos los pedidos. Para los pedidos pendientes, libera las reservas antes de borrar.
+  const orders = await Order.find({});
+  const touched = new Set();
+  const productCache = new Map();
+
+  for (const order of orders) {
+    if (order.status !== ORDER_STATUSES.PENDING) continue;
+    for (const item of order.items || []) {
+      const productId = item.product?.toString?.();
+      if (!productId) continue;
+      if (!productCache.has(productId)) {
+        const product = await Product.findById(productId);
+        if (!product) continue;
+        productCache.set(productId, product);
+      }
+      const product = productCache.get(productId);
+      try {
+        releaseReservedStock(product, item.color, item.size, item.quantity);
+        touched.add(productId);
+      } catch (e) {
+        // continuar liberando el resto
+      }
+    }
+  }
+
+  for (const productId of touched) {
+    try {
+      const product = productCache.get(productId);
+      await product.save();
+    } catch (e) {
+      // noop
+    }
+  }
+
+  const toDelete = orders.length;
+  await Order.deleteMany({});
+  return res.json({ deleted: toDelete });
+};
+
 export const updateOrderStatus = async (req, res) => {
   const { id } = req.params;
   const { status, note = '' } = req.body || {};

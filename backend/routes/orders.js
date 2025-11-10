@@ -6,7 +6,8 @@ import {
   getOwnOrders,
   confirmOrder,
   cancelOrder,
-  updateOrderStatus
+  updateOrderStatus,
+  clearOrderHistory
 } from '../controllers/orderController.js';
 
 const router = express.Router();
@@ -17,5 +18,6 @@ router.get('/mine', protect, getOwnOrders);
 router.post('/:id/confirm', protect, adminOnly, confirmOrder);
 router.post('/:id/cancel', protect, adminOnly, cancelOrder);
 router.patch('/:id/status', protect, adminOnly, updateOrderStatus);
+router.delete('/', protect, adminOnly, clearOrderHistory);
 
 export default router;

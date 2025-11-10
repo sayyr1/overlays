@@ -53,6 +53,25 @@ const resolveHref = item => {
 
 const sortItems = items => [...items].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
+const isNonEmptyString = v => typeof v === 'string' && v.trim() !== '';
+const isItemVisible = item => {
+  if (!item || !isNonEmptyString(item.label)) return false;
+  if (isNonEmptyString(item.href)) return true;
+  const kind = item.kind;
+  const s = item.settings || {};
+  switch (kind) {
+    case 'category':
+      return isNonEmptyString(s.filterValue) || isNonEmptyString(s.category);
+    case 'collection':
+      return isNonEmptyString(s.collection);
+    case 'filter':
+      return isNonEmptyString(s.filterKey) && isNonEmptyString(s.filterValue);
+    case 'link':
+    default:
+      return false;
+  }
+};
+
 const NavbarTop = () => {
   const { count } = useCart();
   const { isAuthenticated, logout, user } = useAuth();
@@ -191,10 +210,15 @@ const NavbarTop = () => {
     [menu.rows]
   );
 
-  const categoryRows = useMemo(
-    () => menu.rows.filter(row => row.type === 'category'),
-    [menu.rows]
-  );
+  const categoryRows = useMemo(() => {
+    const rows = menu.rows.filter(row => row.type === 'category');
+    return rows
+      .map(row => ({
+        ...row,
+        items: Array.isArray(row.items) ? row.items.filter(isItemVisible) : []
+      }))
+      .filter(row => row.items.length > 0);
+  }, [menu.rows]);
 
   const highlightItems = useMemo(
     () => highlightRows.flatMap(row => sortItems(row.items || [])),
@@ -422,50 +446,53 @@ Niway Store                </span>
 
                 {categoryRows.length > 0 && (
                   <div className="divide-y divide-white/10">
-                    {categoryRows.map((row, rowIndex) => (
-                      <details key={row.id || `mobile-row-${rowIndex}`} className="py-3">
-                        <summary className="text-sm font-semibold uppercase tracking-wide text-white/90 cursor-pointer">
-                          {row.title || 'Categorias'}
-                        </summary>
-                        <div className="mt-2 space-y-3 text-sm">
-                          {sortItems(row.items || []).map((item, itemIndex) => {
-                            const href = resolveHref(item);
-                            const subItems = (item.megaMenu?.columns || []).flatMap(column => column.items || []);
-                            return (
-                              <div key={item.id || `mobile-item-${rowIndex}-${itemIndex}`} className="space-y-1">
-                                <Link to={href} className="block text-white hover:text-brand">
+                    {categoryRows.map((row, rowIndex) => {
+                      const visibleItems = sortItems(row.items || []);
+                      return (
+                        <details key={row.id || `mobile-row-${rowIndex}`} className="py-3">
+                          <summary className="text-sm font-semibold uppercase tracking-wide text-white/90 cursor-pointer">
+                            {row.title || 'Categorias'}
+                          </summary>
+                          <div className="mt-2 space-y-3 text-sm">
+                            {visibleItems.map((item, itemIndex) => {
+                              const href = resolveHref(item);
+                              const subItems = (item.megaMenu?.columns || []).flatMap(column => column.items || []);
+                              return (
+                                <div key={item.id || `mobile-item-${rowIndex}-${itemIndex}`} className="space-y-1">
+                                  <Link to={href} className="block text-white hover:text-brand">
                                   {item.label}
                                   {item.badge && (
                                     <span className="ml-2 rounded bg-brand px-2 py-0.5 text-[11px] uppercase tracking-wider">
                                       {item.badge}
                                     </span>
                                   )}
-                                </Link>
-                                {subItems.length > 0 && (
-                                  <ul className="pl-4 space-y-1 text-xs text-white/70">
-                                    {subItems.map((columnItem, subIndex) => (
-                                      <li key={columnItem.id || `mobile-sub-${rowIndex}-${itemIndex}-${subIndex}`}>
-                                        <Link
-                                          to={columnItem.href || '#'}
-                                          className="hover:text-brand transition-colors duration-150"
-                                        >
-                                          {columnItem.label}
-                                          {columnItem.badge && (
-                                            <span className="ml-2 rounded bg-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide">
-                                              {columnItem.badge}
-                                            </span>
-                                          )}
-                                        </Link>
-                                      </li>
-                                    ))}
-                                  </ul>
-                                )}
-                              </div>
+                                  </Link>
+                                  {subItems.length > 0 && (
+                                    <ul className="pl-4 space-y-1 text-xs text-white/70">
+                                      {subItems.map((columnItem, subIndex) => (
+                                        <li key={columnItem.id || `mobile-sub-${rowIndex}-${itemIndex}-${subIndex}`}>
+                                          <Link
+                                            to={columnItem.href || '#'}
+                                            className="hover:text-brand transition-colors duration-150"
+                                          >
+                                            {columnItem.label}
+                                            {columnItem.badge && (
+                                              <span className="ml-2 rounded bg-white/20 px-2 py-0.5 text-[10px] uppercase tracking-wide">
+                                                {columnItem.badge}
+                                              </span>
+                                            )}
+                                          </Link>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  )}
+                                </div>
                             );
-                          })}
-                        </div>
-                      </details>
-                    ))}
+                            })}
+                          </div>
+                        </details>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -473,8 +500,9 @@ Niway Store                </span>
 
             {categoryRows.length > 0 && (
               <div className="hidden lg:flex items-center justify-center gap-8 py-3 border-t border-white/10">
-                {categoryRows.map(row =>
-                  sortItems(row.items || []).map((item, index) => {
+                {categoryRows.map(row => {
+                  const visibleItems = sortItems(row.items || []);
+                  return visibleItems.map((item, index) => {
                     const href = resolveHref(item);
                     const hasMega = item.megaMenu && (item.megaMenu.columns || []).length > 0;
 
@@ -502,8 +530,8 @@ Niway Store                </span>
                         )}
                       </div>
                     );
-                  })
-                )}
+                  });
+                })}
               </div>
             )}
           </div>

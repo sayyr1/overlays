@@ -7,11 +7,11 @@ import { formatCurrency } from '../../utils/pricing';
 import { formatOrderStatus, getOrderStatusBadgeClass } from '../../utils/orderStatus';
 
 const bankConfig = {
-  name: process.env.REACT_APP_BANK_NAME || 'Banco',
-  account: process.env.REACT_APP_BANK_ACCOUNT || '0000000000',
-  owner: process.env.REACT_APP_BANK_OWNER || 'Titular',
+  name: process.env.REACT_APP_BANK_NAME || 'Banco Pichincha',
+  account: process.env.REACT_APP_BANK_ACCOUNT || '2209068958',
+  owner: process.env.REACT_APP_BANK_OWNER || 'Willian Anguaya',
   document: process.env.REACT_APP_BANK_ID || '',
-  phone: process.env.REACT_APP_DEPOSIT_PHONE || ''
+  phone: process.env.REACT_APP_DEPOSIT_PHONE || '593987547819'
 };
 
 const getOrderLabel = order => {
@@ -303,7 +303,7 @@ const CartPage = () => {
 
             {!isAuthenticated && (
               <p className="text-sm text-gray-500 mb-4">
-                Inicia sesion para guardar tu carrito y finalizar la compra.
+                Puedes comprar sin iniciar sesión. Inicia sesión solo si deseas guardar tu carrito.
               </p>
             )}
 
@@ -319,7 +319,7 @@ const CartPage = () => {
               className="w-full px-4 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-200"
               type="button"
             >
-              Continuar
+              Generar pedido
             </button>
           </aside>
         </div>
@@ -344,6 +344,7 @@ const CartPage = () => {
                     Tu pedido expira el {expirationLabel}. Pasadas 24 horas se liberara la reserva automaticamente.
                   </p>
                 )}
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">Datos bancarios</h4>
                 <div className="space-y-2 text-sm text-gray-700 mb-4">
                   <p><strong>Banco:</strong> {bankConfig.name}</p>
                   <p><strong>Numero de cuenta:</strong> {bankConfig.account}</p>

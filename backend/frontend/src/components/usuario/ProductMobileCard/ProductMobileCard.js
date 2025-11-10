@@ -30,11 +30,6 @@ const ProductMobileCard = ({ product }) => {
   };
 
   const handleQuickAdd = async () => {
-    if (!isAuthenticated) {
-      navigate('/login?redirect=/');
-      return;
-    }
-
     if (availableSizes.length !== 1) {
       handleViewDetails();
       return;
@@ -56,7 +51,19 @@ const ProductMobileCard = ({ product }) => {
     }
   };
 
-  const handleLoginRedirect = () => navigate('/login?redirect=/');
+  const buildWhatsAppHref = () => {
+    try {
+      const phone = (process.env.REACT_APP_WHATSAPP_PHONE || process.env.REACT_APP_DEPOSIT_PHONE || '').replace(/\D/g, '');
+      const name = product?.name || '';
+      const price = formatCurrency(priceForUser || 0);
+      const url = `${window.location.origin}/product/${product?._id}`;
+      const message = `Hola 👋, me interesa este producto:%0A- Nombre: ${encodeURIComponent(name)}%0A- Precio: ${encodeURIComponent(price)}%0A- URL: ${encodeURIComponent(url)}`;
+      const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
+      return `${base}?text=${message}`;
+    } catch {
+      return 'https://wa.me/';
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
@@ -109,7 +116,7 @@ const ProductMobileCard = ({ product }) => {
           </div>
         )}
 
-        {isAuthenticated ? (
+        <div className="flex flex-col gap-2">
           <div className="flex gap-2">
             <button
               type="button"
@@ -126,24 +133,15 @@ const ProductMobileCard = ({ product }) => {
               Agregar al carrito
             </button>
           </div>
-        ) : (
-          <div className="mt-3 rounded-lg border border-dashed border-blue-300 bg-blue-50 p-3">
-            <button
-              type="button"
-              onClick={handleLoginRedirect}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-              aria-label="Inicia sesion para comprar"
-            >
-              Inicia sesion para comprar
-            </button>
-            <div className="mt-2 text-sm text-blue-700">
-              ¿No tienes cuenta?{' '}
-              <Link to="/register?redirect=/" className="font-medium hover:text-blue-900">
-                Registrate
-              </Link>
-            </div>
-          </div>
-        )}
+          <a
+            href={buildWhatsAppHref()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2 text-center font-semibold rounded-md border border-green-500 text-green-700 hover:bg-green-50 transition"
+          >
+            Pedir por WhatsApp
+          </a>
+        </div>
         {availableSizes.length === 0 && (
           <p className="mt-2 text-xs text-red-500">Sin stock disponible.</p>
         )}

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AiOutlineHome } from 'react-icons/ai';
-import { FiTag, FiPackage, FiUser, FiLogOut } from 'react-icons/fi';
+import { FiTag, FiPackage, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
 import { HiOutlineShoppingBag } from 'react-icons/hi';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -15,7 +15,7 @@ const navigationLinks = [
 
 const NavbarBottom = () => {
   const { count } = useCart();
-  const { isAuthenticated, logout } = useAuth();
+  const { isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
   const navRef = useRef(null);
 
@@ -40,7 +40,12 @@ const NavbarBottom = () => {
     ? { key: 'logout', label: 'Salir', Icon: FiLogOut, action: handleLogout }
     : { key: 'login', to: '/login', label: 'Entrar', Icon: FiUser };
 
-  const navItems = [...navigationLinks, sessionItem];
+  const adminItem = isAdmin
+    ? { to: '/admin-dashboard', label: 'Admin', Icon: FiSettings }
+    : null;
+  const navItems = adminItem
+    ? [...navigationLinks.slice(0, 3), adminItem, ...navigationLinks.slice(3), sessionItem]
+    : [...navigationLinks, sessionItem];
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -74,13 +79,15 @@ const NavbarBottom = () => {
     };
   }, [count, isAuthenticated]);
 
+  const gridColsClass = isAdmin ? 'grid-cols-6' : 'grid-cols-5';
+
   return (
     <nav
       ref={navRef}
       className="md:hidden pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
       <div className="pointer-events-auto w-full max-w-xl rounded-[2.25rem] border border-white/15 bg-gradient-to-r from-slate-950/95 via-slate-900/95 to-slate-950/95 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
-        <ul className="grid grid-cols-5 items-stretch gap-1.5 px-4 py-3 sm:gap-2 sm:py-4">
+        <ul className={`grid ${gridColsClass} items-stretch gap-1.5 px-4 py-3 sm:gap-2 sm:py-4`}>
           {navItems.map(link => {
             const key = link.to || link.key;
 

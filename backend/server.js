@@ -28,7 +28,11 @@ const __dirname  = path.dirname(__filename);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
-   'https://niway-dzxk.onrender.com'
+   'https://niway-dzxk.onrender.com',
+   'https://niway.store',
+   'niway.store'
+
+
 ];
 app.use(cors({
   origin: (origin, callback) => {

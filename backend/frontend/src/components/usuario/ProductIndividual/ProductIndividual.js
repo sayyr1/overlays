@@ -6,7 +6,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { getPriceForUser, formatCurrency } from '../../../utils/pricing';
 import {
   buildNestedVariantsWithFallback,
-  normalizeVariantColor
+  normalizeVariantColor,
+  DEFAULT_COLOR_LABEL
 } from '../../../utils/inventory';
 import {
   ChevronLeftIcon,
@@ -155,14 +156,43 @@ const ProductDetail = () => {
     () => Object.entries(variantMatrix[selectedColor] || {}),
     [variantMatrix, selectedColor]
   );
-  const availableForSelected = selectedColor && selectedSize
-    ? Number(variantMatrix[selectedColor]?.[selectedSize] || 0)
-    : 0;
+
+  const hasAnySizes = useMemo(() => {
+    if (Object.keys(product?.stockBySize || {}).length > 0) return true;
+    return Object.values(variantMatrix || {}).some(sizes => Object.keys(sizes || {}).length > 0);
+  }, [variantMatrix, product]);
+
+  const availableForSelected = useMemo(() => {
+    if (!selectedColor) return 0;
+    if (!selectedSize) {
+      // Si no hay talla elegida y no existen tallas, usar stock total si aplica
+      if (!hasAnySizes) {
+        // Sin tallas; no hay manera confiable de calcular cantidad exacta aquí; permitir 1
+        return 1;
+      }
+      return 0;
+    }
+    let qty = Number(variantMatrix[selectedColor]?.[selectedSize] || 0);
+    if (qty > 0) return qty;
+    // Fallback a color por defecto y agregados por talla
+    qty = Number(variantMatrix[DEFAULT_COLOR_LABEL]?.[selectedSize] || 0);
+    if (qty > 0) return qty;
+    qty = Number(product?.stockBySize?.[selectedSize] || 0);
+    return qty;
+  }, [selectedColor, selectedSize, variantMatrix, product, hasAnySizes]);
+
   const maxQuantity = availableForSelected ? Math.min(availableForSelected, 99) : 99;
   const disableAddToCart =
     !selectedColor ||
-    !selectedSize ||
+    (hasAnySizes && !selectedSize) ||
     availableForSelected <= 0;
+
+  const stockLabel = useMemo(() => {
+    if (!selectedColor || !selectedSize) return '';
+    if (availableForSelected <= 0) return 'Agotado';
+    if (availableForSelected <= 3) return 'Pocos en stock';
+    return 'En stock';
+  }, [selectedColor, selectedSize, availableForSelected]);
 
   const handleSelectSize = size => {
     setSelectedSize(size);
@@ -190,13 +220,7 @@ const ProductDetail = () => {
   };
 
   const handleAddToCart = async () => {
-    if (!isAuthenticated) {
-      setFeedback('Inicia sesión para agregar productos al carrito.');
-      navigate('/login?redirect=/');
-      return;
-    }
-
-    if (!selectedColor || !selectedSize) {
+    if (!selectedColor || (hasAnySizes && !selectedSize)) {
       setFeedback('Selecciona un color y una talla antes de agregar al carrito.');
       return;
     }
@@ -209,7 +233,7 @@ const ProductDetail = () => {
     try {
       await addItem({
         productId: product._id,
-        size: selectedSize,
+        size: hasAnySizes ? selectedSize : '',
         quantity,
         unitPrice: priceForUser,
         title: product.name,
@@ -220,6 +244,20 @@ const ProductDetail = () => {
     } catch (error) {
       console.error('Error al agregar al carrito', error);
       setFeedback('No se pudo agregar el producto al carrito.');
+    }
+  };
+
+  const buildWhatsAppHref = () => {
+    try {
+      const phone = (process.env.REACT_APP_WHATSAPP_PHONE || process.env.REACT_APP_DEPOSIT_PHONE || '').replace(/\D/g, '');
+      const name = product?.name || '';
+      const price = formatCurrency(priceForUser || 0);
+      const url = typeof window !== 'undefined' ? window.location.href : '';
+      const message = `Hola 👋, me interesa este producto:%0A- Nombre: ${encodeURIComponent(name)}%0A- Precio: ${encodeURIComponent(price)}%0A- URL: ${encodeURIComponent(url)}`;
+      const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
+      return `${base}?text=${message}`;
+    } catch {
+      return 'https://wa.me/';
     }
   };
 
@@ -603,62 +641,46 @@ const ProductDetail = () => {
               </p>
             </div>
           )}
-          {isAuthenticated ? (
-            <>
-              <div className="mb-4 flex items-center gap-3">
-                <label className="text-sm font-medium text-gray-600" htmlFor="quantity-input">
-                  Cantidad
-                </label>
-                <input
-                  id="quantity-input"
-                  type="number"
-                  min="1"
-                  max={maxQuantity}
-                  value={quantity}
-                  onChange={e => handleQuantityChange(e.target.value)}
-                  className="w-24 border border-gray-300 rounded-md p-2 text-center"
-                />
-                {selectedColor && selectedSize && (
-                  <span className="text-xs text-gray-500">Disponible: {availableForSelected}</span>
-                )}
-              </div>
+          <div className="mb-4 flex items-center gap-3">
+            <label className="text-sm font-medium text-gray-600" htmlFor="quantity-input">
+              Cantidad
+            </label>
+            <input
+              id="quantity-input"
+              type="number"
+              min="1"
+              max={maxQuantity}
+              value={quantity}
+              onChange={e => handleQuantityChange(e.target.value)}
+              className="w-24 border border-gray-300 rounded-md p-2 text-center"
+            />
+            {selectedColor && selectedSize && (
+              <span className="text-xs text-gray-600">{stockLabel}</span>
+            )}
+          </div>
 
-              <button
-                type="button"
-                onClick={handleAddToCart}
-                disabled={disableAddToCart}
-                className={`w-full py-3 mb-4 text-center font-semibold rounded-lg transition ${
-                  disableAddToCart
-                    ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                }`}
-              >
-                Agregar al carrito
-              </button>
-            </>
-          ) : (
-            <div className="mb-6 rounded-lg border border-dashed border-blue-300 bg-blue-50 p-4">
-              <p className="text-sm text-blue-800 mb-3">
-                Inicia sesión para comprar este producto.
-              </p>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={handleNavigateLogin}
-                  className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-                  aria-label="Inicia sesión para comprar"
-                >
-                  Inicia sesión para comprar
-                </button>
-                <Link
-                  to="/register?redirect=/"
-                  className="text-sm text-blue-700 hover:text-blue-900 font-medium"
-                >
-                  ¿No tienes cuenta? Regístrate
-                </Link>
-              </div>
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={disableAddToCart}
+              className={`w-full py-3 text-center font-semibold rounded-lg transition ${
+                disableAddToCart
+                  ? 'bg-gray-300 text-gray-600 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              Agregar al carrito
+            </button>
+            <a
+              href={buildWhatsAppHref()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full py-3 text-center font-semibold rounded-lg border border-green-500 text-green-700 hover:bg-green-50 transition"
+            >
+              Pedir por WhatsApp
+            </a>
+          </div>
           {feedback && <p className="mb-4 text-sm text-green-600">{feedback}</p>}
 
           <div className="text-gray-700 space-y-4 mb-4">

@@ -100,6 +100,20 @@ const PedidosPage = () => {
     }
   };
 
+  const handleClearHistory = async () => {
+    const confirmed = window.confirm(
+      'Esto eliminará todos los pedidos y liberará las reservas de los pedidos pendientes. ¿Deseas continuar?'
+    );
+    if (!confirmed) return;
+    try {
+      await axios.delete('/api/orders', { withCredentials: true });
+      await fetchOrders();
+      window.alert('Historial de pedidos eliminado.');
+    } catch (err) {
+      window.alert(err?.response?.data?.message || 'No se pudo borrar el historial.');
+    }
+  };
+
   const handleStatusUpdate = async order => {
     const options = ORDER_STATUS_FLOW[order.status];
     if (!options?.length) {
@@ -149,13 +163,22 @@ const PedidosPage = () => {
             Gestiona los pedidos pendientes, confirma pagos y consulta el historial reciente.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={fetchOrders}
-          className="inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100 transition"
-        >
-          Recargar
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={fetchOrders}
+            className="inline-flex items-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100 transition"
+          >
+            Recargar
+          </button>
+          <button
+            type="button"
+            onClick={handleClearHistory}
+            className="inline-flex items-center rounded-md border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 shadow-sm hover:bg-red-100 transition"
+          >
+            Borrar historial
+          </button>
+        </div>
       </div>
 
       {loading && (

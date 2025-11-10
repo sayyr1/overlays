@@ -30,9 +30,7 @@ const allowedOrigins = [
   'http://localhost:5000',
    'https://niway-dzxk.onrender.com',
    'https://niway.store',
-   'niway.store'
-
-
+'https://www.niway.store'
 ];
 app.use(cors({
   origin: (origin, callback) => {

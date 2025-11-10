@@ -7,8 +7,7 @@
   //const baseURL = 'http://localhost:5000';
 
   // ✅ Render (PRODUCCIÓN)
-  const baseURL = 'https://niway-dzxk.onrender.com';
-
+const baseURL = process.env.REACT_APP_API_URL || 'https://niway-dzxk.onrender.com';
   console.log('🌐 Usando baseURL:', baseURL);
 
   const instance = axios.create({

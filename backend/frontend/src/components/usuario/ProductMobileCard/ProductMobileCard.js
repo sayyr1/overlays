@@ -53,7 +53,7 @@ const ProductMobileCard = ({ product }) => {
 
   const buildWhatsAppHref = () => {
     try {
-      const phone = (process.env.REACT_APP_WHATSAPP_PHONE || process.env.REACT_APP_DEPOSIT_PHONE || '').replace(/\D/g, '');
+      const phone = 593987547819;
       const name = product?.name || '';
       const price = formatCurrency(priceForUser || 0);
       const url = `${window.location.origin}/product/${product?._id}`;

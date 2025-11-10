@@ -249,11 +249,11 @@ const ProductDetail = () => {
 
   const buildWhatsAppHref = () => {
     try {
-      const phone = (process.env.REACT_APP_WHATSAPP_PHONE || process.env.REACT_APP_DEPOSIT_PHONE || '').replace(/\D/g, '');
+      const phone = 593987547819;
       const name = product?.name || '';
       const price = formatCurrency(priceForUser || 0);
       const url = typeof window !== 'undefined' ? window.location.href : '';
-      const message = `Hola 👋, me interesa este producto:%0A- Nombre: ${encodeURIComponent(name)}%0A- Precio: ${encodeURIComponent(price)}%0A- URL: ${encodeURIComponent(url)}`;
+      const message = `Hola, me interesa este producto:%0A- Nombre: ${encodeURIComponent(name)}%0A- Precio: ${encodeURIComponent(price)}%0A- URL: ${encodeURIComponent(url)}`;
       const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
       return `${base}?text=${message}`;
     } catch {

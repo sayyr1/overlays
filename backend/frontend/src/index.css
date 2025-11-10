@@ -5,12 +5,25 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Overlay for readability over the background image */
+    --app-bg-overlay: radial-gradient(1200px circle at 30% -10%, rgba(255,255,255,0.08), transparent 60%),
+                      linear-gradient(0deg, rgba(8,12,20,0.65), rgba(8,12,20,0.65));
+  }
+
   html {
     scroll-behavior: smooth;
   }
 
   body {
-    @apply font-sans bg-surface-50 text-slate-900 antialiased;
+    @apply font-sans text-slate-900 antialiased;
+    /* Global background image with subtle overlay */
+    background-image: var(--app-bg-overlay), url('./assets/images/background.png');
+    background-size: cover;
+    background-position: center; /* keeps focal point centered */
+    background-repeat: no-repeat;
+    background-attachment: fixed; /* elegant parallax-like stability */
+    background-color: #0b1220; /* fallback color under image */
   }
 
   h1,
@@ -26,6 +39,11 @@
 }
 
 @layer components {
+  .content-surface {
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
   .glass-card {
     @apply rounded-3xl bg-white/80 backdrop-blur-md shadow-card-lg border border-white/40;
   }

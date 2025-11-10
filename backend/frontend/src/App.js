@@ -66,7 +66,7 @@ const AppContent = () => {
         className={
           isAdminRoute
             ? 'ml-0 md:ml-72 min-h-screen bg-surface-50 pb-24 md:pb-16 pt-20 md:pt-24 transition-all duration-200'
-            : ''
+            : 'min-h-screen content-surface'
         }
       >
         <Routes>

@@ -7,6 +7,7 @@ import './navbar.css';
 import { buildProductFilterUrl } from '../../../utils/productFilters';
 import { FiMenu, FiSearch } from 'react-icons/fi';
 import { HiOutlineShoppingBag } from 'react-icons/hi';
+import LogoBg from '../../../assets/images/background.png';
 
 const createId = () => (window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
@@ -308,11 +309,11 @@ const NavbarTop = () => {
                 </button>
               </div>
 
-              <Link to="/" className="flex-1 text-center" aria-label="Volver al inicio">
-                <span className="text-white text-xl font-extrabold uppercase tracking-[0.3em]">
-                  Niway Store
-                  
+              <Link to="/" className="flex-1 flex items-center justify-center gap-2" aria-label="Volver al inicio">
+                <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 shadow">
+                  <img src={LogoBg} alt="Logo" className="h-full w-full object-cover" />
                 </span>
+                <span className="text-white text-xl font-extrabold uppercase tracking-[0.3em]">Niway Store</span>
               </Link>
               
 
@@ -340,9 +341,11 @@ const NavbarTop = () => {
             </div>
 
             <div className="hidden lg:flex items-center justify-between py-4 gap-4">
-              <Link to="/" className="flex-shrink-0" aria-label="Volver al inicio">
-                <span className="text-white text-3xl font-extrabold tracking-wide drop-shadow-sm uppercase">
-Niway Store                </span>
+              <Link to="/" className="flex items-center gap-3 flex-shrink-0" aria-label="Volver al inicio">
+                <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 shadow">
+                  <img src={LogoBg} alt="Logo" className="h-full w-full object-cover" />
+                </span>
+                <span className="text-white text-3xl font-extrabold tracking-wide drop-shadow-sm uppercase">Niway Store</span>
               </Link>
 
               <div className="flex flex-1 justify-center">

@@ -147,6 +147,23 @@ const ProductDetail = () => {
     resetZoomDragState();
   }, [product, resetZoomDragState]);
 
+  // Evita que el bottom nav móvil y el scroll interfieran cuando el modal está abierto
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined;
+    const body = document.body;
+    if (isModalOpen) {
+      body.classList.add('modal-open');
+      body.style.overflow = 'hidden';
+    } else {
+      body.classList.remove('modal-open');
+      body.style.overflow = '';
+    }
+    return () => {
+      body.classList.remove('modal-open');
+      body.style.overflow = '';
+    };
+  }, [isModalOpen]);
+
   const priceForUser = useMemo(() => getPriceForUser(product, membershipLevel), [product, membershipLevel]);
 
   const variantMatrix = useMemo(() => buildVariantMatrix(product), [product]);
@@ -705,7 +722,7 @@ const ProductDetail = () => {
 
       {isModalOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/95 backdrop-blur-sm px-4 sm:px-6"
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/95 backdrop-blur-sm px-4 sm:px-6"
           onClick={handleCloseModal}
         >
           <div

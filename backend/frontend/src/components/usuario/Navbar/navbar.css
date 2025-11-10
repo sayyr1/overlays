@@ -10,5 +10,11 @@ body.has-sticky-navbar #main-content {
   body.has-mobile-bottom-nav #main-content {
     padding-bottom: var(--mobile-bottom-nav-offset, 6rem);
   }
+  body.modal-open .mobile-bottom-nav {
+    display: none !important;
+  }
+  body.modal-open #main-content {
+    padding-bottom: 0 !important;
+  }
 }
   

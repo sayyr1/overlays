@@ -84,7 +84,7 @@ const NavbarBottom = () => {
   return (
     <nav
       ref={navRef}
-      className="md:hidden pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+      className="mobile-bottom-nav md:hidden pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
     >
       <div className="pointer-events-auto w-full max-w-xl rounded-[2.25rem] border border-white/15 bg-gradient-to-r from-slate-950/95 via-slate-900/95 to-slate-950/95 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <ul className={`grid ${gridColsClass} items-stretch gap-1.5 px-4 py-3 sm:gap-2 sm:py-4`}>

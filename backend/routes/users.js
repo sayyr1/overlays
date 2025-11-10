@@ -9,12 +9,17 @@ const router = express.Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
 const attachAuthCookie = (res, token) => {
-  res.cookie('access_token', token, {
+  const cookieOptions = {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: isProduction ? 'none' : 'lax',
     secure: isProduction,
     maxAge: 60 * 60 * 1000
-  });
+  };
+  // Permite fijar el dominio por entorno si se usa el mismo TLD en subdominios
+  if (process.env.COOKIE_DOMAIN) {
+    cookieOptions.domain = process.env.COOKIE_DOMAIN;
+  }
+  res.cookie('access_token', token, cookieOptions);
 };
 
 // Registro de usuario

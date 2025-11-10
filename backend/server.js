@@ -20,6 +20,9 @@ dotenv.config();
 
 const app = express();
 
+// Confiar en el primer proxy para que las cookies 'secure' funcionen correctamente detrás de HTTPS
+app.set('trust proxy', 1);
+
 // __dirname para ESModules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);

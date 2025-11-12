@@ -1,5 +1,5 @@
-import React, { useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProductImage from '../ProductImage';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
@@ -9,6 +9,10 @@ const ProductMobileCard = ({ product }) => {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { isAuthenticated, membershipLevel } = useAuth();
+
+  const [isCardPressed, setIsCardPressed] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const resetTimerRef = useRef(null);
 
   const availableSizes = useMemo(
     () => Object.entries(product.stockBySize || {}).filter(([, qty]) => qty > 0),
@@ -25,11 +29,40 @@ const ProductMobileCard = ({ product }) => {
     [product, membershipLevel]
   );
 
-  const handleViewDetails = () => {
-    navigate(`/product/${product._id}`);
-  };
+  const clearNavigateFeedback = useCallback(() => {
+    if (resetTimerRef.current) {
+      clearTimeout(resetTimerRef.current);
+      resetTimerRef.current = null;
+    }
+  }, []);
 
-  const handleQuickAdd = async () => {
+  useEffect(() => () => {
+    clearNavigateFeedback();
+  }, [clearNavigateFeedback]);
+
+  const handleViewDetails = useCallback(() => {
+    if (!product?._id) return;
+    setIsNavigating(true);
+    navigate(`/product/${product._id}`);
+    clearNavigateFeedback();
+    resetTimerRef.current = setTimeout(() => {
+      setIsNavigating(false);
+      resetTimerRef.current = null;
+    }, 900);
+  }, [clearNavigateFeedback, navigate, product?._id]);
+
+  const handleCardKeyDown = useCallback(
+    event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        handleViewDetails();
+      }
+    },
+    [handleViewDetails]
+  );
+
+  const handleQuickAdd = useCallback(async event => {
+    event?.stopPropagation();
     if (availableSizes.length !== 1) {
       handleViewDetails();
       return;
@@ -46,10 +79,19 @@ const ProductMobileCard = ({ product }) => {
         imageUrl: product.images?.[0]?.url || '',
         color: availableColors.length === 1 ? availableColors[0] : ''
       });
+
+      if (!isAuthenticated) {
+        setIsNavigating(true);
+        clearNavigateFeedback();
+        resetTimerRef.current = setTimeout(() => {
+          setIsNavigating(false);
+          resetTimerRef.current = null;
+        }, 700);
+      }
     } catch (error) {
       console.error('Error al agregar al carrito', error);
     }
-  };
+  }, [addItem, availableColors, availableSizes, clearNavigateFeedback, handleViewDetails, isAuthenticated, priceForUser, product]);
 
   const buildWhatsAppHref = () => {
     try {
@@ -65,88 +107,130 @@ const ProductMobileCard = ({ product }) => {
     }
   };
 
+  const handleWhatsAppClick = useCallback(event => {
+    event.stopPropagation();
+  }, []);
+
+  const handlePressStart = () => setIsCardPressed(true);
+  const handlePressEnd = () => setIsCardPressed(false);
+
+  const stockBadge = product.onSale
+    ? 'Promo'
+    : availableSizes.length || Object.keys(product.stockBySize || {}).length
+    ? 'Disponible'
+    : 'Sin stock';
+
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-      <button type="button" onClick={handleViewDetails} className="w-full">
-        <div className="w-full aspect-[4/3] overflow-hidden">
-          <ProductImage
-            src={product.images?.[0]?.url || ''}
-            alt={product.name}
-            className="w-full h-full object-cover"
-          />
+    <article
+      className={`group relative flex h-full flex-col overflow-hidden rounded-[28px] border border-white/30 bg-white/90 shadow-lg shadow-slate-900/5 ring-1 ring-slate-100 transition-all duration-300 ${
+        isCardPressed ? 'scale-[0.97]' : 'hover:-translate-y-2 hover:shadow-2xl active:scale-[0.98]'
+      }`}
+      tabIndex={0}
+      role="button"
+      onClick={handleViewDetails}
+      onKeyDown={handleCardKeyDown}
+      onPointerDown={handlePressStart}
+      onPointerUp={handlePressEnd}
+      onPointerLeave={handlePressEnd}
+      onPointerCancel={handlePressEnd}
+      onTouchEnd={handlePressEnd}
+    >
+      <div className="relative overflow-hidden rounded-[24px] bg-slate-100">
+        <ProductImage
+          src={product.images?.[0]?.url || ''}
+          alt={product.name}
+          className="h-56 w-full object-cover transition duration-500 ease-out group-hover:scale-105"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 via-slate-900/20 to-transparent" />
+        <div className="absolute top-4 right-4 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-slate-700 shadow-lg shadow-slate-900/10">
+          {isNavigating ? (
+            <>
+              <span className="h-3 w-3 animate-spin rounded-full border border-slate-400 border-t-slate-900" />
+              Abriendo...
+            </>
+          ) : (
+            <>
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400" />
+              {stockBadge}
+            </>
+          )}
         </div>
-      </button>
-      <div className="px-4 py-3">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="text-base font-semibold text-gray-800 truncate mr-3">{product.name}</h3>
-          <span className="text-lg font-bold text-blue-600">
-            {formatCurrency(priceForUser)}
-          </span>
+        {product.collection && (
+          <div className="absolute bottom-4 left-4 rounded-full bg-white/20 px-4 py-1 text-[11px] font-semibold uppercase tracking-wide text-white backdrop-blur">
+            {product.collection}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-1 flex-col gap-4 p-5">
+        <header>
+          <p className="text-xs uppercase tracking-[0.2em] text-slate-400">{product.gender || 'Unisex'}</p>
+          <h3 className="mt-1 text-lg font-semibold text-slate-900 line-clamp-2">{product.name}</h3>
+        </header>
+
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-xs uppercase text-slate-400">Desde</span>
+            <p className="text-2xl font-semibold text-slate-900">{formatCurrency(priceForUser)}</p>
+          </div>
+          {product.brand && (
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {product.brand}
+            </span>
+          )}
         </div>
 
         {availableColors.length > 0 && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-500 uppercase mb-1">Colores</p>
-            <div className="flex flex-wrap gap-1">
-              {availableColors.map(color => (
-                <span
-                  key={color}
-                  className="px-2 py-1 border border-gray-200 rounded-full text-xs text-gray-700"
-                >
-                  {color}
-                </span>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1.5">
+            {availableColors.slice(0, 4).map(color => (
+              <span key={color} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600">
+                {color}
+              </span>
+            ))}
+            {availableColors.length > 4 && (
+              <span className="text-xs text-slate-500">+{availableColors.length - 4} colores</span>
+            )}
           </div>
         )}
 
         {availableSizes.length > 0 && (
-          <div className="mb-3">
-            <p className="text-xs text-gray-500 uppercase mb-1">Tallas disponibles</p>
-            <div className="flex flex-wrap gap-1">
-              {availableSizes.map(([size]) => (
-                <span
-                  key={size}
-                  className="px-2 py-1 border border-gray-200 rounded-full text-xs text-gray-700"
-                >
-                  {size}
-                </span>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1 text-xs text-slate-500">
+            {availableSizes.slice(0, 6).map(([size]) => (
+              <span key={size} className="rounded-full border border-slate-200 px-3 py-1 text-slate-700">
+                {size}
+              </span>
+            ))}
+            {availableSizes.length > 6 && (
+              <span className="text-xs text-slate-500">+{availableSizes.length - 6}</span>
+            )}
           </div>
         )}
 
         <div className="flex flex-col gap-2">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={handleViewDetails}
-              className="flex-1 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-100 transition duration-200"
-            >
-              Ver detalles
-            </button>
-            <button
-              type="button"
-              onClick={handleQuickAdd}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-200"
-            >
-              Agregar al carrito
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleQuickAdd}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-400 active:scale-[0.98]"
+          >
+            Agregar rápido
+            <span className="text-base">＋</span>
+          </button>
           <a
             href={buildWhatsAppHref()}
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full py-2 text-center font-semibold rounded-md border border-green-500 text-green-700 hover:bg-green-50 transition"
+            onClick={handleWhatsAppClick}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-green-500/50 bg-white px-4 py-3 text-sm font-semibold text-green-600 shadow-sm transition hover:border-green-500 hover:bg-green-50"
           >
             Pedir por WhatsApp
           </a>
         </div>
+
         {availableSizes.length === 0 && (
-          <p className="mt-2 text-xs text-red-500">Sin stock disponible.</p>
+          <p className="text-xs font-medium text-rose-500">Sin stock disponible.</p>
         )}
       </div>
-    </div>
+    </article>
   );
 };
 

@@ -42,7 +42,7 @@ const productSchema = new mongoose.Schema({
   },
   gender: {
     type: String,
-    enum: ['Hombre', 'Mujer', 'Ni��o', 'Ni��a', 'Unisex'],
+    enum: ['Hombre', 'Mujer', 'Niño', 'Niña', 'Unisex'],
     default: 'Unisex'
   },
   // Dynamic attributes for additional category keys (e.g., ORIGEN, MATERIAL, etc.)

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import axios from '../../../api/axiosInstance';
 import Nuevos from '../CardStyles/Nuevos';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -6,6 +6,8 @@ import { A11y, Navigation, Pagination } from 'swiper/modules';
 import 'swiper/css';
 import 'swiper/css/navigation';
 import 'swiper/css/pagination';
+
+const skeletonItems = Array.from({ length: 4 }, (_, index) => index);
 
 const MoreProductsSection = () => {
   const [recentProducts, setRecentProducts] = useState([]);
@@ -43,24 +45,29 @@ const MoreProductsSection = () => {
   }
 
   return (
-    <section className="relative isolate overflow-hidden py-16">
-      <div className="absolute inset-x-0 top-0 -z-10 h-full bg-gradient-to-b from-white via-surface-50 to-white" />
+    <section className="relative isolate overflow-hidden bg-white py-16">
+      <div className="absolute inset-x-0 top-0 -z-10 h-full bg-gradient-to-b from-white via-slate-50 to-white" />
 
       <div className="container mx-auto px-4 lg:px-10">
-        <div className="flex flex-col gap-3 text-center">
-          <span className="pill-badge mx-auto bg-brand/5 text-brand">Ultimos lanzamientos</span>
-          <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">Recien agregados</h2>
-          <p className="mx-auto max-w-2xl text-sm text-slate-500 sm:text-base">
-            Productos fresh-from-production listos para publicar. Sincronizamos inventario en tiempo real para garantizar disponibilidad y tallajes.
+        <div className="flex flex-col gap-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-sky-500">
+            Últimos lanzamientos
+          </p>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.3rem]">
+            Recién agregados
+          </h2>
+          <p className="mx-auto max-w-2xl text-base text-[#5f6168] sm:text-lg">
+            Productos fresh-from-production listos para publicar. Sincronizamos inventario en tiempo real para
+            garantizar disponibilidad y tallajes.
           </p>
         </div>
 
         {loading && (
           <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }, (_, index) => (
+            {skeletonItems.map(item => (
               <div
-                key={`recent-skeleton-${index}`}
-                className="h-72 animate-pulse rounded-2xl border border-surface-200 bg-white/70"
+                key={`recent-skeleton-${item}`}
+                className="h-72 animate-pulse rounded-[32px] border border-white/70 bg-white/85 shadow-inner shadow-slate-200"
               />
             ))}
           </div>
@@ -79,12 +86,14 @@ const MoreProductsSection = () => {
               1024: { slidesPerView: 3 },
               1280: { slidesPerView: 3.5 }
             }}
-            className="mt-10 !pb-12"
+            className="mt-10 !pb-16"
           >
             {recentProducts.map(product => (
               <SwiperSlide key={product._id}>
                 <div className="px-2">
-                  <Nuevos product={product} />
+                  <div className="rounded-[32px] border border-white/70 bg-white/95 p-2 shadow-xl shadow-slate-900/5 transition hover:-translate-y-1 hover:shadow-2xl">
+                    <Nuevos product={product} />
+                  </div>
                 </div>
               </SwiperSlide>
             ))}

@@ -35,16 +35,18 @@ export default function CategoriesSection({ limit }) {
       <div className="container mx-auto px-4 lg:px-10">
         <div className="flex flex-col gap-4 text-center md:flex-row md:items-end md:justify-between md:text-left">
           <div className="space-y-3">
-            <span className="pill-badge bg-brand/10 text-brand">Explora por estilo</span>
-            <h2 className="text-3xl font-semibold text-slate-900 md:text-4xl">Categorias destacadas</h2>
-            <p className="text-sm text-slate-500 md:max-w-xl">
-              Estructura tu escaparate con colecciones personalizadas. Utiliza las categorias para construir campanas,
+            <span className="pill-badge bg-sky-100 text-sky-600">Explora por estilo</span>
+            <h2 className="text-3xl font-semibold tracking-tight text-slate-900 md:text-4xl">
+              Categorías destacadas
+            </h2>
+            <p className="text-base text-[#5f6168] md:max-w-xl">
+              Estructura tu escaparate con colecciones personalizadas. Utiliza las categorías para construir campañas,
               filtros inteligentes y automatizaciones.
             </p>
           </div>
           <Link
             to="/categorias"
-            className="inline-flex items-center gap-2 rounded-full border border-surface-200 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-slate-700 transition hover:border-brand/40 hover:text-brand"
+            className="inline-flex items-center gap-2 rounded-full border border-surface-200 px-5 py-2 text-xs font-semibold uppercase tracking-wide text-sky-500 transition hover:border-sky-400 hover:text-sky-600"
           >
             Ver todas
           </Link>
@@ -54,7 +56,10 @@ export default function CategoriesSection({ limit }) {
           {loading && (
             <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {Array.from({ length: limit || 8 }, (_, index) => (
-                <div key={`category-skeleton-${index}`} className="h-32 animate-pulse rounded-2xl bg-surface-100" />
+                <div
+                  key={`category-skeleton-${index}`}
+                  className="h-32 animate-pulse rounded-[28px] border border-white/60 bg-white/80"
+                />
               ))}
             </div>
           )}
@@ -79,7 +84,7 @@ export default function CategoriesSection({ limit }) {
                   <Link
                     key={cat.name}
                     to={`/categoria/${encodeURIComponent(cat.name)}`}
-                    className="group relative overflow-hidden rounded-2xl border border-surface-200 bg-white p-5 shadow-brand-sm transition hover:-translate-y-1 hover:shadow-card-lg"
+                    className="group relative overflow-hidden rounded-[28px] border border-slate-100 bg-white/95 p-5 shadow-brand-sm transition hover:-translate-y-1 hover:shadow-2xl"
                   >
                     <div className="absolute inset-0 bg-brand/5 opacity-0 transition-opacity duration-200 group-hover:opacity-100" />
                     <div className="relative flex h-full flex-col justify-between gap-4">
@@ -87,8 +92,10 @@ export default function CategoriesSection({ limit }) {
                         <Icon className="h-6 w-6" aria-hidden="true" />
                       </span>
                       <div>
-                        <p className="text-sm font-semibold text-slate-900">{cat.name}</p>
-                        <span className="text-xs uppercase tracking-wide text-slate-400">Ver coleccion -></span>
+                        <p className="text-base font-semibold text-slate-900">{cat.name}</p>
+                        <span className="text-xs uppercase tracking-wide text-slate-400">
+                          Ver coleccion →
+                        </span>
                       </div>
                     </div>
                   </Link>

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+﻿import React, { useEffect, useState } from 'react';
 import axios from '../../../api/axiosInstance';
 import EnPromocion from '../CardStyles/EnPromocion';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -34,18 +34,19 @@ const FeaturedProductsSection = () => {
   }, []);
 
   return (
-    <section className="relative isolate overflow-hidden py-16">
-      <div className="absolute inset-x-0 top-0 -z-10 h-full bg-gradient-to-b from-surface-50 via-white to-surface-50/40" />
+    <section className="relative isolate overflow-hidden bg-slate-50/80 py-16">
+      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-white via-slate-50 to-white" />
       <div className="container mx-auto px-4 lg:px-10">
-        <div className="flex flex-col gap-4 text-center">
-          <span className="pill-badge mx-auto bg-brand/10 text-brand">
-            Seleccion editorial
-          </span>
-          <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">
-            Productos en promocion
+        <div className="flex flex-col gap-2 text-center">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.4em] text-lime-500">
+            Selección editorial
+          </p>
+          <h2 className="text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.3rem]">
+            Productos en promoción
           </h2>
-          <p className="mx-auto max-w-2xl text-sm text-slate-500 sm:text-base">
-            Merchandising curado con descuentos dinamicos y disponibilidad garantizada. Actualizamos la seleccion cada 12 horas para maximizar conversion.
+          <p className="mx-auto max-w-2xl text-base text-[#5f6168] sm:text-lg">
+            Merchandising curado con descuentos dinámicos y disponibilidad garantizada. Actualizamos la
+            selección cada 12 horas para maximizar conversión.
           </p>
         </div>
 
@@ -55,20 +56,20 @@ const FeaturedProductsSection = () => {
               {loadingSkeleton.map(item => (
                 <div
                   key={`promo-skeleton-${item}`}
-                  className="h-72 animate-pulse rounded-2xl border border-surface-200/60 bg-white/70"
+                  className="h-72 animate-pulse rounded-[32px] border border-white/70 bg-white/80 shadow-inner shadow-slate-200"
                 />
               ))}
             </div>
           )}
 
           {!loading && error && (
-            <div className="mt-12 rounded-3xl border border-red-200 bg-red-50 px-6 py-8 text-center text-sm text-red-600">
+            <div className="mt-12 rounded-[32px] border border-red-200 bg-red-50/90 px-6 py-8 text-center text-sm font-medium text-red-600">
               {error}
             </div>
           )}
 
           {!loading && !error && promoProducts.length === 0 && (
-            <div className="mt-12 rounded-3xl border border-surface-200 bg-white px-6 py-10 text-center text-sm text-slate-500">
+            <div className="mt-12 rounded-[32px] border border-slate-100 bg-white/90 px-6 py-10 text-center text-sm text-slate-500 shadow-inner">
               No hay productos destacados por el momento. Vuelve a revisar en unas horas.
             </div>
           )}
@@ -86,12 +87,14 @@ const FeaturedProductsSection = () => {
                 1024: { slidesPerView: 3 },
                 1280: { slidesPerView: 3.5 }
               }}
-              className="!pb-12"
+              className="mt-6 !pb-16"
             >
               {promoProducts.map(product => (
                 <SwiperSlide key={product._id}>
                   <div className="px-2">
-                    <EnPromocion product={product} />
+                    <div className="rounded-[32px] border border-white/70 bg-white/95 p-2 shadow-xl shadow-slate-900/5 transition hover:-translate-y-1 hover:shadow-2xl">
+                      <EnPromocion product={product} />
+                    </div>
                   </div>
                 </SwiperSlide>
               ))}

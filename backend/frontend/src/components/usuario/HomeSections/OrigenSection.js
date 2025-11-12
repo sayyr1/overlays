@@ -97,3 +97,4 @@ export default function OrigenSection({ title = 'Explora por Origen', limit = 6 
     </section>
   );
 }
+

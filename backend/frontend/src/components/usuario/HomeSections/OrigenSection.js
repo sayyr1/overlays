@@ -13,9 +13,7 @@ const Card = ({ label, keyName }) => (
       <p className="mt-1 text-sm text-[#5f6168]">Ver productos</p>
     </div>
     <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-brand/10 text-brand transition group-hover:bg-brand group-hover:text-white">
-      <span className="text-lg" aria-hidden="true">
-        →
-      </span>
+      <span className="text-lg" aria-hidden="true">&rarr;</span>
     </div>
   </Link>
 );
@@ -97,4 +95,3 @@ export default function OrigenSection({ title = 'Explora por Origen', limit = 6 
     </section>
   );
 }
-

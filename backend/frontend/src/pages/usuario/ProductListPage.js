@@ -296,8 +296,8 @@ const ProductListPage = () => {
     <div className="bg-gray-50 min-h-screen">
       <div className="container mx-auto space-y-6 p-6">
         <div className="text-center">
-          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Cat�logo</p>
-          <h1 className="text-3xl font-semibold text-gray-800 sm:text-4xl">Tienda en l�nea</h1>
+          <p className="text-xs uppercase tracking-[0.35em] text-slate-400">Catalogo</p>
+          <h1 className="text-3xl font-semibold text-gray-800 sm:text-4xl">Tienda en linea</h1>
           <p className="mt-2 text-sm text-slate-500">
             Experiencia fluida inspirada en apps modernas: desplaza, toca y descubre.
           </p>
@@ -319,7 +319,7 @@ const ProductListPage = () => {
             aria-live="polite"
           >
             <span className="mr-2 inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-400" />
-            Actualizando cat�logo...
+            Actualizando catalogo...
           </div>
         )}
 

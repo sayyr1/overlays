@@ -57,8 +57,8 @@ const MoreProductsSection = () => {
             Recién agregados
           </h2>
           <p className="mx-auto max-w-2xl text-base text-[#5f6168] sm:text-lg">
-            Productos fresh-from-production listos para publicar. Sincronizamos inventario en tiempo real para
-            garantizar disponibilidad y tallajes.
+            Descubre los productos más recientes añadidos a nuestro catálogo y mantente al día con
+            las últimas tendencias.
           </p>
         </div>
 

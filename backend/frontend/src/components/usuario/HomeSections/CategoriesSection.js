@@ -40,8 +40,8 @@ export default function CategoriesSection({ limit }) {
               Categorías destacadas
             </h2>
             <p className="text-base text-[#5f6168] md:max-w-xl">
-              Estructura tu escaparate con colecciones personalizadas. Utiliza las categorías para construir campañas,
-              filtros inteligentes y automatizaciones.
+             conoce las diferentes categorías de productos que ofrecemos y encuentra lo que más te
+             gusta.
             </p>
           </div>
           <Link

@@ -45,8 +45,7 @@ const FeaturedProductsSection = () => {
             Productos en promoción
           </h2>
           <p className="mx-auto max-w-2xl text-base text-[#5f6168] sm:text-lg">
-            Merchandising curado con descuentos dinámicos y disponibilidad garantizada. Actualizamos la
-            selección cada 12 horas para maximizar conversión.
+            Mercaderia en oferta o con descuento especial por tiempo limitado.
           </p>
         </div>
 

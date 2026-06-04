@@ -10,6 +10,7 @@ frontend/node_modules/
 
 # ⛔ No subir carpetas de build de React
 frontend/build/
+public/
 
 # 🧹 Archivos temporales o del sistema operativo
 .DS_Store

@@ -8,7 +8,7 @@ import Categoria from '../CardStyles/Categoria';
 const CategoriasPage = () => {
   const { categoria } = useParams();
   const [products, setProducts] = useState([]);
-  const [filters, setFilters] = useState({});
+  const [filters] = useState({});
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {

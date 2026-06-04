@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from '../../../api/axiosInstance';
 import { useCart } from '../../../context/CartContext';
@@ -6,11 +6,8 @@ import { useAuth } from '../../../context/AuthContext';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
 import './navbar.css';
 import { buildProductFilterUrl } from '../../../utils/productFilters';
-import { FiMenu, FiSearch } from 'react-icons/fi';
-import { HiOutlineShoppingBag } from 'react-icons/hi';
+import { FiMenu } from 'react-icons/fi';
 import LogoBg from '../../../assets/images/background.png';
-
-const createId = () => (window.crypto?.randomUUID ? window.crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 
 const resolveHref = item => {
   if (item.href) return item.href;
@@ -86,7 +83,6 @@ const NavbarTop = () => {
   const [loadingMenu, setLoadingMenu] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
-  const [showFloatingMenuToggle, setShowFloatingMenuToggle] = useState(false);
   const [isNavbarHidden, setIsNavbarHidden] = useState(false);
   const hoverTimerRef = useRef(null);
   const lastScrollYRef = useRef(0);
@@ -169,15 +165,11 @@ const NavbarTop = () => {
 
       if (isMobileMenuOpen) {
         setIsNavbarHidden(false);
-        if (isMobileViewport) {
-          setShowFloatingMenuToggle(true);
-        }
         return;
       }
 
       if (current < 60) {
         setIsNavbarHidden(false);
-        setShowFloatingMenuToggle(false);
         return;
       }
 
@@ -185,16 +177,6 @@ const NavbarTop = () => {
         setIsNavbarHidden(true);
       } else if (scrollingUp) {
         setIsNavbarHidden(false);
-      }
-
-      if (isMobileViewport) {
-        if (scrollingUp) {
-          setShowFloatingMenuToggle(true);
-        } else if (scrollingDown) {
-          setShowFloatingMenuToggle(false);
-        }
-      } else {
-        setShowFloatingMenuToggle(false);
       }
     };
 
@@ -287,10 +269,6 @@ const NavbarTop = () => {
     }, 120);
   };
 
-  const floatingToggleVisible = isMobileViewport && (showFloatingMenuToggle || isMobileMenuOpen);
-  const floatingToggleClasses = `lg:hidden fixed right-4 top-4 z-[60] inline-flex h-12 w-12 items-center justify-center rounded-full border border-white/20 bg-slate-900/95 text-white shadow-lg shadow-black/40 transition-all duration-200 ${
-    floatingToggleVisible ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 -translate-y-2'
-  }`;
   const navTransformClasses = isNavbarHidden ? '-translate-y-full' : 'translate-y-0';
   const navScrollClasses = isMobileViewport && isMobileMenuOpen ? 'max-h-screen overflow-y-auto' : '';
 

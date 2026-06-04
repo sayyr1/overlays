@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import axios from '../../../api/axiosInstance';
 import Nuevos from '../CardStyles/Nuevos';
 import { Swiper, SwiperSlide } from 'swiper/react';

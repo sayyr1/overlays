@@ -24,7 +24,7 @@ const OrigenRow = ({ value, keyName }) => {
     return () => {
       cancelled = true;
     };
-  }, [value]);
+  }, [keyName, value]);
 
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow">

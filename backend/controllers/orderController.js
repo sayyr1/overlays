@@ -1,6 +1,11 @@
-﻿import mongoose from 'mongoose';
+import mongoose from 'mongoose';
 import Order from '../models/Order.js';
 import Product from '../models/Product.js';
+import { getOrCreateVisitorSession, linkVisitorSessionToContact } from '../services/visitorTrackingService.js';
+import { upsertCRMContact } from '../services/crmContactService.js';
+import { upsertCartSnapshot, markCartSnapshotConverted } from '../services/cartSnapshotService.js';
+import { createCRMEvent } from '../services/crmEventService.js';
+import { handlePaidOrderAutomation } from '../services/crmAutomationService.js';
 
 const MEMBERSHIP_PRICE_KEY = {
   STANDARD: 'retail',
@@ -171,6 +176,47 @@ const finalizeReservedStock = (product, color, size, quantity) => {
   product.markModified('soldBySize');
 };
 
+const createOrUpdateCRMForOrder = async ({
+  req,
+  now,
+  processedItems,
+  contactName,
+  contactPhone,
+  contactEmail,
+  status = 'interested'
+}) => {
+  const { session, sessionId } = await getOrCreateVisitorSession(req);
+  let contact = null;
+
+  if (req.user?._id || contactName || contactPhone || contactEmail || session?.contact) {
+    contact = await upsertCRMContact({
+      userId: req.user?._id ?? null,
+      contactId: session?.contact || null,
+      name: contactName,
+      phone: contactPhone,
+      whatsapp: contactPhone,
+      email: contactEmail,
+      source: session?.source || '',
+      medium: session?.medium || '',
+      campaign: session?.campaign || '',
+      status,
+      interestedProductId: processedItems?.[0]?.product?._id || null,
+      lastSeenAt: now
+    });
+  }
+
+  if (contact?._id) {
+    await linkVisitorSessionToContact({
+      session,
+      sessionId,
+      contactId: contact._id,
+      userId: req.user?._id ?? null
+    });
+  }
+
+  return { session, sessionId, contact };
+};
+
 const expirePendingOrders = async () => {
   const now = new Date();
   const expiredOrders = await Order.find({
@@ -300,8 +346,36 @@ export const createOrder = async (req, res) => {
       ? requestedTotal
       : subtotal;
 
+    const { session, sessionId, contact } = await createOrUpdateCRMForOrder({
+      req,
+      now,
+      processedItems,
+      contactName,
+      contactPhone,
+      contactEmail,
+      status: 'interested'
+    });
+
+    const cartSnapshot = await upsertCartSnapshot({
+      session,
+      sessionId,
+      contactId: contact?._id || session?.contact || null,
+      userId: req.user?._id ?? null,
+      items: processedItems.map(item => item.orderItem),
+      status: 'checkout_started',
+      source: session?.source || '',
+      medium: session?.medium || '',
+      campaign: session?.campaign || '',
+      contactName,
+      contactPhone,
+      contactEmail
+    });
+
     const order = new Order({
       user: req.user?._id ?? null,
+      crmContact: contact?._id || null,
+      cartSnapshot: cartSnapshot?._id || null,
+      visitorSessionId: sessionId || '',
       items: processedItems.map(item => item.orderItem),
       subtotal,
       total: finalTotal,
@@ -327,13 +401,41 @@ export const createOrder = async (req, res) => {
 
     await order.save();
 
+    await createCRMEvent({
+      contactId: contact?._id || null,
+      session,
+      sessionId,
+      eventType: 'checkout_started',
+      productId: processedItems?.[0]?.product?._id || null,
+      cartSnapshotId: cartSnapshot?._id || null,
+      metadata: {
+        subtotal,
+        itemsCount: processedItems.length
+      }
+    });
+
+    await createCRMEvent({
+      contactId: contact?._id || null,
+      session,
+      sessionId,
+      eventType: 'order_created',
+      productId: processedItems?.[0]?.product?._id || null,
+      cartSnapshotId: cartSnapshot?._id || null,
+      orderId: order._id,
+      metadata: {
+        total: finalTotal,
+        orderNumber: order.orderNumber
+      }
+    });
+
     return res.status(201).json({
       orderId: order.orderNumber,
       id: order._id,
       status: order.status,
       total: order.total,
       totals: order.totals,
-      expiresAt: order.expiresAt
+      expiresAt: order.expiresAt,
+      crmContactId: contact?._id || null
     });
   } catch (error) {
     for (const item of processedItems) {
@@ -469,6 +571,29 @@ export const confirmOrder = async (req, res) => {
 
     await order.save();
 
+    const contact = await upsertCRMContact({
+      userId: order.user || null,
+      contactId: order.crmContact || null,
+      name: order.contactName || '',
+      phone: order.contactPhone || '',
+      whatsapp: order.contactPhone || '',
+      email: order.contactEmail || '',
+      status: 'customer',
+      interestedProductId: order.items?.[0]?.product || null,
+      lastSeenAt: now
+    });
+
+    if (contact?._id) {
+      order.crmContact = contact._id;
+      await order.save();
+      await handlePaidOrderAutomation({ order, contact });
+      await markCartSnapshotConverted({
+        sessionId: order.visitorSessionId || '',
+        orderId: order._id,
+        contactId: contact._id
+      });
+    }
+
     const populated = await Order.findById(id)
       .populate('user', 'name email membershipLevel')
       .populate('confirmedBy', 'name email');
@@ -532,7 +657,6 @@ export const cancelOrder = async (req, res) => {
 };
 
 export const clearOrderHistory = async (req, res) => {
-  // Borra todos los pedidos. Para los pedidos pendientes, libera las reservas antes de borrar.
   const orders = await Order.find({});
   const touched = new Set();
   const productCache = new Map();
@@ -551,8 +675,8 @@ export const clearOrderHistory = async (req, res) => {
       try {
         releaseReservedStock(product, item.color, item.size, item.quantity);
         touched.add(productId);
-      } catch (e) {
-        // continuar liberando el resto
+      } catch {
+        // Continuar liberando el resto
       }
     }
   }
@@ -561,7 +685,7 @@ export const clearOrderHistory = async (req, res) => {
     try {
       const product = productCache.get(productId);
       await product.save();
-    } catch (e) {
+    } catch {
       // noop
     }
   }

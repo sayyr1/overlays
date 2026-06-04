@@ -1,9 +1,12 @@
 import express from 'express';
 import Category from '../models/Category.js';
+import { protect, adminOnly, requirePermission } from '../middleware/authMiddleware.js';
+import { requireModuleEnabled } from '../middleware/moduleMiddleware.js';
 
 const router = express.Router();
 
-// Default keys to bootstrap and optionally protect from deletion
+router.use(requireModuleEnabled('categories'));
+
 const DEFAULT_KEYS = ['brand', 'type', 'size', 'collection', 'gender', 'color'];
 
 const ensureCategoryDocument = async () => {
@@ -34,11 +37,9 @@ const ensureCategoryDocument = async () => {
 
 const mapDocToResponse = doc => {
   const response = {};
-  // include all keys present in the map
   for (const [key, arr] of doc.valuesByKey.entries()) {
     response[key] = Array.isArray(arr) ? arr : [];
   }
-  // ensure defaults are present at least as empty arrays
   DEFAULT_KEYS.forEach(key => {
     if (!Object.prototype.hasOwnProperty.call(response, key)) {
       response[key] = [];
@@ -57,8 +58,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Add a value to a key (creates the key if missing)
-router.post('/', async (req, res) => {
+router.post('/', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key, value } = req.body || {};
   const trimmedKey = (key ?? '').toString().trim();
   const trimmedValue = (value ?? '').toString().trim();
@@ -82,8 +82,7 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Remove a value from a key
-router.delete('/', async (req, res) => {
+router.delete('/', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key, value } = req.body || {};
   const trimmedKey = (key ?? '').toString().trim();
   const trimmedValue = (value ?? '').toString().trim();
@@ -103,7 +102,6 @@ router.delete('/', async (req, res) => {
 
     doc.valuesByKey.set(trimmedKey, filtered);
     await doc.save();
-
     res.json(mapDocToResponse(doc));
   } catch (error) {
     console.error('Error al eliminar categoria:', error);
@@ -111,8 +109,7 @@ router.delete('/', async (req, res) => {
   }
 });
 
-// Create a new category key (empty values)
-router.post('/key', async (req, res) => {
+router.post('/key', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key } = req.body || {};
   const trimmedKey = (key ?? '').toString().trim();
   if (!trimmedKey) {
@@ -131,8 +128,7 @@ router.post('/key', async (req, res) => {
   }
 });
 
-// Delete a category key entirely (protect defaults)
-router.delete('/key', async (req, res) => {
+router.delete('/key', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key } = req.body || {};
   const trimmedKey = (key ?? '').toString().trim();
   if (!trimmedKey) {

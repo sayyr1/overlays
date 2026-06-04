@@ -2,8 +2,13 @@ import express from 'express';
 import Product from '../models/Product.js';
 import upload from '../middleware/upload.js';
 import cloudinary from '../utils/cloudinary.js';
+import { protect, adminOnly, requirePermission } from '../middleware/authMiddleware.js';
+import { requireModuleEnabled } from '../middleware/moduleMiddleware.js';
+import { handleProductBackInStock } from '../services/crmAutomationService.js';
 
 const router = express.Router();
+
+router.use(requireModuleEnabled('products'));
 
 const escapeRegex = value => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const normalizeString = value => (typeof value === 'string' ? value.trim() : '');
@@ -238,8 +243,16 @@ const formatProduct = product => {
   };
 };
 
+const getTotalStockQuantity = product => {
+  const stockBySize = mapSizes(product?.stockBySize);
+  return Object.values(stockBySize || {}).reduce((acc, qty) => acc + Number(qty || 0), 0);
+};
+
 router.post(
   '/upload-image',
+  protect,
+  adminOnly,
+  requirePermission('products', 'upload'),
   upload.array('images', 10),
   (req, res) => {
     if (!req.files || req.files.length === 0) {
@@ -414,7 +427,7 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-  router.post('/', async (req, res) => {
+  router.post('/', protect, adminOnly, requirePermission('products', 'create'), async (req, res) => {
     try {
       const payload = { ...req.body };
       payload.price = parsePricePayload(req.body.price);
@@ -445,6 +458,9 @@ router.get('/:id', async (req, res) => {
 
       const newProduct = new Product(payload);
       const saved = await newProduct.save();
+      if (getTotalStockQuantity(saved) > 0) {
+        await handleProductBackInStock(saved._id);
+      }
     res.status(201).json(formatProduct(saved));
   } catch (err) {
     console.error(err);
@@ -452,10 +468,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
+    const previousStock = getTotalStockQuantity(product);
 
     if (req.body.price) {
       product.price = parsePricePayload(req.body.price);
@@ -511,6 +528,9 @@ router.put('/:id', async (req, res) => {
 
     await Promise.all(toDelete.map(id => cloudinary.uploader.destroy(id)));
     const updated = await product.save();
+    if (previousStock <= 0 && getTotalStockQuantity(updated) > 0) {
+      await handleProductBackInStock(updated._id);
+    }
     res.json(formatProduct(updated));
   } catch (err) {
     console.error(err);
@@ -518,7 +538,7 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-router.delete('/:id/image/:public_id(*)', async (req, res) => {
+router.delete('/:id/image/:public_id(*)', protect, adminOnly, requirePermission('products', 'edit'), async (req, res) => {
   const { id, public_id } = req.params;
   try {
     const product = await Product.findById(id);
@@ -535,7 +555,7 @@ router.delete('/:id/image/:public_id(*)', async (req, res) => {
   }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', protect, adminOnly, requirePermission('products', 'delete'), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
@@ -549,7 +569,7 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-router.post('/order/:id', async (req, res) => {
+router.post('/order/:id', protect, adminOnly, requireModuleEnabled('inventory'), requirePermission('inventory', 'adjust'), async (req, res) => {
   try {
     const { color, size, quantity } = req.body || {};
     const normalizedSize = normalizeVariantSize(size);
@@ -613,7 +633,7 @@ router.post('/order/:id', async (req, res) => {
   }
 });
 
-router.post('/sell/:id', async (req, res) => {
+router.post('/sell/:id', protect, adminOnly, requireModuleEnabled('inventory'), requirePermission('inventory', 'adjust'), async (req, res) => {
   try {
     const { color, size, quantity } = req.body || {};
     const normalizedSize = normalizeVariantSize(size);
@@ -678,7 +698,7 @@ router.post('/sell/:id', async (req, res) => {
   }
 });
 
-router.post('/confirm/:id', async (req, res) => {
+router.post('/confirm/:id', protect, adminOnly, requireModuleEnabled(['inventory', 'reports']), requirePermission('inventory', 'confirm'), async (req, res) => {
   try {
     const { color, size, quantity } = req.body || {};
     const normalizedSize = normalizeVariantSize(size);
@@ -740,7 +760,7 @@ router.post('/confirm/:id', async (req, res) => {
     res.status(500).json({ message: 'Error al confirmar pedido' });
   }
 });
-router.get('/summary/sales', async (req, res) => {
+router.get('/summary/sales', protect, adminOnly, requireModuleEnabled('reports'), requirePermission('reports', 'view'), async (req, res) => {
   try {
     const products = await Product.find();
     const resumen = [];
@@ -764,7 +784,7 @@ router.get('/summary/sales', async (req, res) => {
   }
 });
 
-router.post('/reset-sales', async (req, res) => {
+router.post('/reset-sales', protect, adminOnly, requireModuleEnabled('reports'), requirePermission('reports', 'reset'), async (req, res) => {
   try {
     const products = await Product.find();
     for (const prod of products) {
@@ -778,7 +798,7 @@ router.post('/reset-sales', async (req, res) => {
   }
 });
 
-router.get('/analytics/overview', async (req, res) => {
+router.get('/analytics/overview', protect, adminOnly, requireModuleEnabled('reports'), requirePermission('reports', 'view'), async (req, res) => {
   try {
     const products = await Product.find();
     const today = new Date();

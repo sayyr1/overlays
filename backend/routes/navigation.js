@@ -1,7 +1,8 @@
 import express from 'express';
 import mongoose from 'mongoose';
 import NavigationMenu from '../models/NavigationMenu.js';
-import { protect, adminOnly } from '../middleware/authMiddleware.js';
+import { protect, adminOnly, requirePermission } from '../middleware/authMiddleware.js';
+import { requireModuleEnabled } from '../middleware/moduleMiddleware.js';
 
 const router = express.Router();
 
@@ -129,7 +130,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.put('/', protect, adminOnly, async (req, res) => {
+router.put('/', protect, adminOnly, requireModuleEnabled('menu'), requirePermission('menu', 'manage'), async (req, res) => {
   try {
     const menu = await ensureMenu();
     const sanitized = sanitizeMenuPayload(req.body);

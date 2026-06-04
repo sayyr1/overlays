@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "build": "cd frontend; npm install; npm run build; Copy-Item -Recurse -Force ./frontend/build ./build"
+    "build": "cd ..\\frontend; npm install; npm run build",
+    "set-user-role": "node scripts/setUserRole.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

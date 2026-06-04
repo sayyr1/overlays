@@ -99,6 +99,23 @@ const orderSchema = new mongoose.Schema({
     ref: 'User',
     default: null
   },
+  crmContact: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CRMContact',
+    default: null,
+    index: true
+  },
+  cartSnapshot: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'CartSnapshot',
+    default: null
+  },
+  visitorSessionId: {
+    type: String,
+    trim: true,
+    default: '',
+    index: true
+  },
   items: {
     type: [orderItemSchema],
     validate: [items => items.length > 0, 'El pedido debe contener productos']

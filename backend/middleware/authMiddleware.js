@@ -1,5 +1,16 @@
 import jwt from 'jsonwebtoken';
-import User from '../models/User.js';
+import User, { USER_ROLES } from '../models/User.js';
+import {
+  getEffectivePermissions,
+  hasPermission,
+  parsePermissionDescriptor
+} from '../constants/permissions.js';
+
+const ROLE_HIERARCHY = {
+  [USER_ROLES.CUSTOMER]: 1,
+  [USER_ROLES.ADMIN]: 2,
+  [USER_ROLES.SUPERADMIN]: 3
+};
 
 const getTokenFromRequest = req => {
   const authHeader = req.headers.authorization;
@@ -7,6 +18,12 @@ const getTokenFromRequest = req => {
     return authHeader.split(' ')[1];
   }
   return req.cookies?.access_token || null;
+};
+
+const normalizeUserRole = user => {
+  if (!user) return USER_ROLES.CUSTOMER;
+  if (user.role) return user.role;
+  return user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER;
 };
 
 export const protect = async (req, res, next) => {
@@ -18,26 +35,55 @@ export const protect = async (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
     const user = await User.findById(decoded.userId).select('-password');
 
     if (!user) {
       return res.status(404).json({ message: 'Usuario no encontrado' });
     }
 
+    user.role = normalizeUserRole(user);
+    user.effectivePermissions = getEffectivePermissions(user);
     req.user = user;
-    next();
+    return next();
   } catch (error) {
-    res.status(401).json({ message: 'Token invǭlido' });
+    return res.status(401).json({ message: 'Token inválido' });
   }
 };
 
-export const adminOnly = (req, res, next) => {
-  if (req.user?.isAdmin) {
-    next();
-  } else {
-    res.status(403).json({ message: 'Acceso denegado: solo administradores' });
+export const requireRole = minimumRole => (req, res, next) => {
+  const currentRole = normalizeUserRole(req.user);
+  const currentLevel = ROLE_HIERARCHY[currentRole] ?? 0;
+  const minimumLevel = ROLE_HIERARCHY[minimumRole] ?? Number.MAX_SAFE_INTEGER;
+
+  if (currentLevel >= minimumLevel) {
+    return next();
   }
+
+  return res.status(403).json({ message: 'Acceso denegado: permisos insuficientes' });
+};
+
+export const adminOnly = requireRole(USER_ROLES.ADMIN);
+export const superAdminOnly = requireRole(USER_ROLES.SUPERADMIN);
+
+export const requirePermission = (moduleOrDescriptor, action, options = {}) => (req, res, next) => {
+  const parsed = action
+    ? { moduleKey: moduleOrDescriptor, actionKey: action }
+    : parsePermissionDescriptor(moduleOrDescriptor);
+  const { moduleKey, actionKey } = parsed;
+
+  if (!moduleKey || !actionKey) {
+    return res.status(500).json({ message: 'Permiso mal configurado en servidor' });
+  }
+
+  if (hasPermission(req.user, moduleKey, actionKey)) {
+    return next();
+  }
+
+  const message = options.message || 'Acceso denegado: permiso insuficiente';
+  return res.status(403).json({
+    message,
+    permission: `${moduleKey}.${actionKey}`
+  });
 };
 
 export const optionalProtect = async (req, res, next) => {
@@ -52,6 +98,8 @@ export const optionalProtect = async (req, res, next) => {
     const user = await User.findById(decoded.userId).select('-password');
 
     if (user) {
+      user.role = normalizeUserRole(user);
+      user.effectivePermissions = getEffectivePermissions(user);
       req.user = user;
     }
   } catch (error) {

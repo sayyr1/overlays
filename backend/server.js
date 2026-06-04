@@ -29,6 +29,9 @@ app.set('trust proxy', 1);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const isDirectExecution = process.argv[1]
+  ? path.resolve(process.argv[1]) === __filename
+  : false;
 
 const LOCAL_ALLOWED_ORIGINS = [
   'http://localhost:3000',
@@ -171,7 +174,7 @@ if (!isVercelRuntime && hasLocalFrontendBuild) {
   });
 }
 
-if (!isVercelRuntime) {
+if (!isVercelRuntime && isDirectExecution) {
   initializeServer()
     .then(() => {
       const port = Number(process.env.PORT || 5000);

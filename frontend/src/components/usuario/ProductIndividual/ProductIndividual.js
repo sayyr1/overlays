@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams } from 'react-router-dom';
 import axios from '../../../api/axiosInstance';
 import { useCart } from '../../../context/CartContext';
@@ -96,6 +97,7 @@ const ProductDetail = () => {
   const { addItem } = useCart();
   const { membershipLevel } = useAuth();
   const { textMap, isModuleEnabled, settings } = usePublicConfig();
+  const modalRoot = typeof document !== 'undefined' ? document.body : null;
 
   const resetZoomDragState = useCallback(() => {
     const pointerId = zoomDragRef.current.pointerId;
@@ -716,7 +718,7 @@ const ProductDetail = () => {
               target="_blank"
               rel="noopener noreferrer"
               onClick={handleWhatsAppClick}
-              className="w-full py-3 text-center font-semibold rounded-lg border border-green-500 text-green-700 hover:bg-green-50 transition"
+              className="w-full py-3 text-center font-semibold rounded-lg bg-green-600 text-white shadow-lg shadow-green-600/30 hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition"
             >
               Pedir por WhatsApp
             </a>
@@ -743,95 +745,100 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      {isModalOpen && (
-        <div
-          className="fixed inset-0 z-[999] flex min-h-screen items-center justify-center bg-slate-900/95 backdrop-blur-sm px-4 sm:px-6"
-          onClick={handleCloseModal}
-        >
-          <div
-            className="relative flex w-full max-w-5xl flex-col items-center"
-            onClick={event => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-          >
+      {isModalOpen && modalRoot
+        ? createPortal(
+          (
             <div
-              ref={modalSurfaceRef}
-              className={`modal-zoom-surface ${isModalZoomed ? 'modal-zoomed' : ''}`}
-              onTouchStart={handleModalTouchStart}
-              onTouchMove={handleModalTouchMove}
-              onTouchEnd={handleModalTouchEnd}
-              style={{ touchAction: isModalZoomed ? 'none' : 'pan-y' }}
+              className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/95 backdrop-blur-sm px-4 sm:px-6"
+              onClick={handleCloseModal}
             >
-              {modalActiveImage ? (
-                <img
-                  ref={zoomImageRef}
-                  src={modalActiveImage.url}
-                  alt={modalActiveImage.public_id || `Imagen ${modalImageIndex + 1}`}
-                  className={zoomImageClassName}
-                  draggable={false}
-                  style={{
-                    transform: zoomTransform,
-                    transition: isZoomDragging ? 'none' : 'transform 300ms ease',
-                    touchAction: isModalZoomed ? 'none' : 'pan-y'
-                  }}
-                  onPointerDown={handleZoomPointerDown}
-                  onPointerMove={handleZoomPointerMove}
-                  onPointerUp={handleZoomPointerEnd}
-                  onPointerLeave={handleZoomPointerEnd}
-                  onPointerCancel={handleZoomPointerEnd}
-                  onDoubleClick={toggleModalZoom}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm text-white/70">
-                  Sin imagen disponible
+              <div
+                className="relative flex w-full max-w-5xl flex-col items-center"
+                onClick={event => event.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+              >
+                <div
+                  ref={modalSurfaceRef}
+                  className={`modal-zoom-surface ${isModalZoomed ? 'modal-zoomed' : ''}`}
+                  onTouchStart={handleModalTouchStart}
+                  onTouchMove={handleModalTouchMove}
+                  onTouchEnd={handleModalTouchEnd}
+                  style={{ touchAction: isModalZoomed ? 'none' : 'pan-y' }}
+                >
+                  {modalActiveImage ? (
+                    <img
+                      ref={zoomImageRef}
+                      src={modalActiveImage.url}
+                      alt={modalActiveImage.public_id || `Imagen ${modalImageIndex + 1}`}
+                      className={zoomImageClassName}
+                      draggable={false}
+                      style={{
+                        transform: zoomTransform,
+                        transition: isZoomDragging ? 'none' : 'transform 300ms ease',
+                        touchAction: isModalZoomed ? 'none' : 'pan-y'
+                      }}
+                      onPointerDown={handleZoomPointerDown}
+                      onPointerMove={handleZoomPointerMove}
+                      onPointerUp={handleZoomPointerEnd}
+                      onPointerLeave={handleZoomPointerEnd}
+                      onPointerCancel={handleZoomPointerEnd}
+                      onDoubleClick={toggleModalZoom}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm text-white/70">
+                      Sin imagen disponible
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
 
-            <div className="modal-controls">
-              <button
-                type="button"
-                onClick={showPrevImage}
-                className="modal-nav-button"
-                aria-label="Imagen anterior"
-                disabled={!hasMultipleImages}
-              >
-                <ChevronLeftIcon className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={handleCloseModal}
-                className="modal-nav-button"
-                aria-label="Cerrar galería"
-              >
-                <XMarkIcon className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={showNextImage}
-                className="modal-nav-button"
-                aria-label="Imagen siguiente"
-                disabled={!hasMultipleImages}
-              >
-                <ChevronRightIcon className="h-6 w-6" />
-              </button>
-            </div>
+                <div className="modal-controls">
+                  <button
+                    type="button"
+                    onClick={showPrevImage}
+                    className="modal-nav-button"
+                    aria-label="Imagen anterior"
+                    disabled={!hasMultipleImages}
+                  >
+                    <ChevronLeftIcon className="h-6 w-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseModal}
+                    className="modal-nav-button"
+                    aria-label="Cerrar galería"
+                  >
+                    <XMarkIcon className="h-6 w-6" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={showNextImage}
+                    className="modal-nav-button"
+                    aria-label="Imagen siguiente"
+                    disabled={!hasMultipleImages}
+                  >
+                    <ChevronRightIcon className="h-6 w-6" />
+                  </button>
+                </div>
 
-            <button
-              type="button"
-              onClick={toggleModalZoom}
-              className="modal-zoom-toggle"
-              aria-label={isModalZoomed ? 'Reducir zoom' : 'Ampliar zoom'}
-            >
-              {isModalZoomed ? (
-                <MagnifyingGlassMinusIcon className="h-5 w-5" />
-              ) : (
-                <MagnifyingGlassPlusIcon className="h-5 w-5" />
-              )}
-            </button>
-          </div>
-        </div>
-      )}
+                <button
+                  type="button"
+                  onClick={toggleModalZoom}
+                  className="modal-zoom-toggle"
+                  aria-label={isModalZoomed ? 'Reducir zoom' : 'Ampliar zoom'}
+                >
+                  {isModalZoomed ? (
+                    <MagnifyingGlassMinusIcon className="h-5 w-5" />
+                  ) : (
+                    <MagnifyingGlassPlusIcon className="h-5 w-5" />
+                  )}
+                </button>
+              </div>
+            </div>
+          ),
+          modalRoot
+        )
+        : null}
     </div>
   );
 };

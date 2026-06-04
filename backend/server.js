@@ -141,6 +141,14 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/', (req, res) => {
+  res.json({
+    ok: true,
+    service: 'niway-backend',
+    runtime: isVercelRuntime ? 'vercel' : 'node'
+  });
+});
+
 app.use('/api/brands', brandRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);

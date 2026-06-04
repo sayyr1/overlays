@@ -3,10 +3,13 @@
   "installCommand": "npm install",
   "buildCommand": "npm install --prefix frontend && CI=false npm run build --prefix frontend",
   "outputDirectory": "frontend/build",
-  "rewrites": [
+  "routes": [
     {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }

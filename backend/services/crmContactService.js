@@ -2,6 +2,7 @@ import CRMContact from '../models/CRMContact.js';
 import Order from '../models/Order.js';
 import { getCRMConfig } from './crmConfigService.js';
 import { normalizeEmail, normalizePhone, sanitizeTags, uniqueObjectIds } from '../utils/crmIdentity.js';
+import { normalizeLeadCode } from '../utils/leadCode.js';
 
 const CONTACT_STATUS_PRIORITY = {
   visitor: 1,
@@ -24,7 +25,7 @@ const mergeStatus = (currentStatus, nextStatus) => {
     : currentStatus;
 };
 
-export const findContactByIdentity = async ({ contactId = null, userId = null, phone = '', email = '' }) => {
+export const findContactByIdentity = async ({ contactId = null, userId = null, phone = '', email = '', leadCode = '' }) => {
   if (contactId) {
     const direct = await CRMContact.findById(contactId);
     if (direct) return direct;
@@ -32,10 +33,15 @@ export const findContactByIdentity = async ({ contactId = null, userId = null, p
 
   const phoneNormalized = normalizePhone(phone);
   const emailNormalized = normalizeEmail(email);
+  const normalizedLeadCode = normalizeLeadCode(leadCode);
   const orConditions = [];
   if (userId) orConditions.push({ user: userId });
   if (phoneNormalized) orConditions.push({ phoneNormalized });
   if (emailNormalized) orConditions.push({ emailNormalized });
+  if (normalizedLeadCode) {
+    orConditions.push({ leadCode: normalizedLeadCode });
+    orConditions.push({ leadCodeHistory: normalizedLeadCode });
+  }
 
   if (!orConditions.length) {
     return null;
@@ -54,6 +60,7 @@ export const upsertCRMContact = async ({
   source = '',
   medium = '',
   campaign = '',
+  leadCode = '',
   status = '',
   tags = [],
   notes = '',
@@ -63,12 +70,14 @@ export const upsertCRMContact = async ({
   const phoneNormalized = normalizePhone(phone || whatsapp);
   const whatsappNormalized = normalizePhone(whatsapp || phone);
   const emailNormalized = normalizeEmail(email);
+  const normalizedLeadCode = normalizeLeadCode(leadCode);
 
   let contact = await findContactByIdentity({
     contactId,
     userId,
     phone: phoneNormalized,
-    email: emailNormalized
+    email: emailNormalized,
+    leadCode: normalizedLeadCode
   });
 
   if (!contact) {
@@ -81,6 +90,8 @@ export const upsertCRMContact = async ({
       whatsappNormalized,
       email: email || '',
       emailNormalized,
+      leadCode: normalizedLeadCode,
+      leadCodeHistory: normalizedLeadCode ? [normalizedLeadCode] : [],
       source: source || '',
       medium: medium || '',
       campaign: campaign || '',
@@ -99,6 +110,10 @@ export const upsertCRMContact = async ({
     if (!contact.whatsappNormalized && whatsappNormalized) contact.whatsappNormalized = whatsappNormalized;
     if (!contact.email && email) contact.email = email;
     if (!contact.emailNormalized && emailNormalized) contact.emailNormalized = emailNormalized;
+    if (normalizedLeadCode) {
+      contact.leadCode = normalizedLeadCode;
+      contact.leadCodeHistory = Array.from(new Set([...(contact.leadCodeHistory || []), normalizedLeadCode]));
+    }
     if (!contact.source && source) contact.source = source;
     if (!contact.medium && medium) contact.medium = medium;
     if (!contact.campaign && campaign) contact.campaign = campaign;

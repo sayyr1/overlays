@@ -5,6 +5,7 @@ import { getOrCreateVisitorSession, linkVisitorSessionToContact } from '../servi
 import { upsertCRMContact } from '../services/crmContactService.js';
 import { createCRMEvent } from '../services/crmEventService.js';
 import { upsertCartSnapshot } from '../services/cartSnapshotService.js';
+import { generateLeadCode, normalizeLeadCode } from '../utils/leadCode.js';
 
 const router = express.Router();
 
@@ -89,9 +90,10 @@ router.post('/product-view', async (req, res) => {
 router.post('/whatsapp-click', async (req, res) => {
   const { productId = '' } = req.body || {};
   const { session, sessionId, trackingEnabled } = await getOrCreateVisitorSession(req);
+  const leadCode = normalizeLeadCode(req.body?.leadCode) || generateLeadCode();
 
   if (!trackingEnabled) {
-    return res.status(202).json({ tracked: false, sessionId });
+    return res.status(202).json({ tracked: false, sessionId, leadCode });
   }
 
   let contact = null;
@@ -106,6 +108,7 @@ router.post('/whatsapp-click', async (req, res) => {
       source: session?.source || '',
       medium: session?.medium || '',
       campaign: session?.campaign || '',
+      leadCode,
       status: 'interested',
       interestedProductId: productId || null,
       lastSeenAt: new Date()
@@ -121,6 +124,7 @@ router.post('/whatsapp-click', async (req, res) => {
       source: session?.source || '',
       medium: session?.medium || '',
       campaign: session?.campaign || '',
+      leadCode,
       status: 'interested',
       interestedProductId: productId || null,
       lastSeenAt: new Date()
@@ -143,12 +147,13 @@ router.post('/whatsapp-click', async (req, res) => {
     eventType: 'whatsapp_clicked',
     productId: productId || null,
     metadata: {
+      leadCode,
       href: req.body?.href || '',
       title: req.body?.title || ''
     }
   });
 
-  res.json({ tracked: true, sessionId });
+  res.json({ tracked: true, sessionId, leadCode, contactId: contact?._id || session?.contact || null });
 });
 
 router.post('/contact-capture', async (req, res) => {

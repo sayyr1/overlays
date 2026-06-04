@@ -6,6 +6,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
 import { trackWhatsAppClick } from '../../../services/crmTracking';
 import { getPriceForUser, formatCurrency } from '../../../utils/pricing';
+import { buildWhatsAppHref, generateLeadCode } from '../../../utils/whatsappLead';
 
 const ProductMobileCard = ({ product }) => {
   const navigate = useNavigate();
@@ -96,31 +97,34 @@ const ProductMobileCard = ({ product }) => {
     }
   }, [addItem, availableColors, availableSizes, clearNavigateFeedback, handleViewDetails, isAuthenticated, priceForUser, product]);
 
-  const buildWhatsAppHref = () => {
-    try {
-      const phone = String(settings?.whatsapp || '').replace(/\D/g, '');
-      const name = product?.name || '';
-      const price = formatCurrency(priceForUser || 0);
-      const url = `${window.location.origin}/product/${product?._id}`;
-      const message = `Hola 👋, me interesa este producto:%0A- Nombre: ${encodeURIComponent(name)}%0A- Precio: ${encodeURIComponent(price)}%0A- URL: ${encodeURIComponent(url)}`;
-      const base = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
-      return `${base}?text=${message}`;
-    } catch {
-      return 'https://wa.me/';
-    }
-  };
-
-  const handleWhatsAppClick = useCallback(event => {
-    event.stopPropagation();
-    if (!isModuleEnabled('crm') || !product?._id) {
-      return;
-    }
-
-    trackWhatsAppClick({
-      productId: product._id,
-      title: product.name,
-      href: buildWhatsAppHref()
+  const getWhatsAppHref = leadCode =>
+    buildWhatsAppHref({
+      phone: settings?.whatsapp || '',
+      title: product?.name || '',
+      price: formatCurrency(priceForUser || 0),
+      url: `${window.location.origin}/product/${product?._id}`,
+      leadCode
     });
+
+  const handleWhatsAppClick = useCallback(async event => {
+    event.stopPropagation();
+    event.preventDefault();
+
+    const leadCode = generateLeadCode();
+    const href = getWhatsAppHref(leadCode);
+
+    if (isModuleEnabled('crm') && product?._id) {
+      await trackWhatsAppClick({
+        productId: product._id,
+        title: product.name,
+        href,
+        leadCode
+      });
+    }
+
+    if (typeof window !== 'undefined') {
+      window.open(href, '_blank', 'noopener,noreferrer');
+    }
   }, [isModuleEnabled, product, priceForUser, settings]);
 
   const handlePressStart = () => setIsCardPressed(true);
@@ -228,7 +232,7 @@ const ProductMobileCard = ({ product }) => {
             <span className="text-base">＋</span>
           </button>
           <a
-            href={buildWhatsAppHref()}
+            href={getWhatsAppHref('')}
             target="_blank"
             rel="noopener noreferrer"
             onClick={handleWhatsAppClick}

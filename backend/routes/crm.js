@@ -9,10 +9,11 @@ import { CRM_TASK_STATUSES } from '../models/CRMTask.js';
 import { CRM_STATUSES } from '../models/CRMContact.js';
 import { getCRMConfig } from '../services/crmConfigService.js';
 import { getCRMDashboardData, getCRMKanbanData, getCRMContactDetail, getAbandonedCartsData, getProductInterestSummary } from '../services/crmAnalyticsService.js';
-import { upsertCRMContact } from '../services/crmContactService.js';
+import { findContactByIdentity, upsertCRMContact } from '../services/crmContactService.js';
 import { createCRMEvent } from '../services/crmEventService.js';
 import { buildSuggestedMessage } from '../services/crmMessageService.js';
 import { normalizeEmail, normalizePhone, sanitizeTags } from '../utils/crmIdentity.js';
+import { normalizeLeadCode } from '../utils/leadCode.js';
 
 const router = express.Router();
 
@@ -53,7 +54,9 @@ router.get('/contacts', requirePermission('crm', 'contactsView'), async (req, re
       { name: { $regex: q, $options: 'i' } },
       { phone: { $regex: q, $options: 'i' } },
       { whatsapp: { $regex: q, $options: 'i' } },
-      { email: { $regex: q, $options: 'i' } }
+      { email: { $regex: q, $options: 'i' } },
+      { leadCode: { $regex: q, $options: 'i' } },
+      { leadCodeHistory: { $regex: q, $options: 'i' } }
     ];
   }
 
@@ -76,6 +79,7 @@ router.post('/contacts', requirePermission('crm', 'contactsEdit'), async (req, r
     source: req.body?.source || '',
     medium: req.body?.medium || '',
     campaign: req.body?.campaign || '',
+    leadCode: req.body?.leadCode || '',
     status: req.body?.status || 'new_lead',
     tags: sanitizeTags(req.body?.tags || []),
     notes: req.body?.notes || '',
@@ -186,6 +190,71 @@ router.post('/contacts/:id/notes', requirePermission('crm', 'contactsEdit'), asy
 
   const populated = await note.populate('admin', 'name email');
   res.status(201).json(populated);
+});
+
+router.post('/contacts/link-whatsapp', requirePermission('crm', 'contactsEdit'), async (req, res) => {
+  const leadCode = normalizeLeadCode(req.body?.leadCode);
+  if (!leadCode) {
+    return res.status(400).json({ message: 'La referencia del lead es obligatoria' });
+  }
+
+  const contact = await findContactByIdentity({
+    leadCode
+  });
+
+  if (!contact) {
+    return res.status(404).json({ message: 'No se encontro un lead con esa referencia' });
+  }
+
+  const nextName = String(req.body?.name || '').trim();
+  const nextPhone = String(req.body?.phone || '').trim();
+  const nextWhatsapp = String(req.body?.whatsapp || nextPhone).trim();
+  const nextStatus = String(req.body?.status || 'contacted').trim();
+  const noteValue = String(req.body?.note || '').trim();
+
+  if (nextName) {
+    contact.name = nextName;
+  }
+  if (nextPhone) {
+    contact.phone = nextPhone;
+    contact.phoneNormalized = normalizePhone(nextPhone);
+  }
+  if (nextWhatsapp) {
+    contact.whatsapp = nextWhatsapp;
+    contact.whatsappNormalized = normalizePhone(nextWhatsapp);
+  } else if (nextPhone) {
+    contact.whatsapp = nextPhone;
+    contact.whatsappNormalized = normalizePhone(nextPhone);
+  }
+  contact.leadCode = leadCode;
+  contact.leadCodeHistory = Array.from(new Set([...(contact.leadCodeHistory || []), leadCode]));
+  contact.status = nextStatus || contact.status;
+  contact.lastContactedAt = new Date();
+  contact.lastSeenAt = new Date();
+  await contact.save();
+
+  if (noteValue) {
+    await CustomerNote.create({
+      contact: contact._id,
+      admin: req.user._id,
+      note: noteValue
+    });
+  }
+
+  await createCRMEvent({
+    contactId: contact._id,
+    adminId: req.user?._id || null,
+    eventType: 'manual_contact_done',
+    metadata: {
+      source: 'whatsapp_manual_link',
+      leadCode,
+      phone: nextPhone,
+      whatsapp: nextWhatsapp,
+      note: noteValue
+    }
+  });
+
+  res.json(contact);
 });
 
 router.get('/tasks', requirePermission('crm', 'tasksView'), async (req, res) => {

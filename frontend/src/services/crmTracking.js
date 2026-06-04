@@ -49,12 +49,13 @@ export const trackProductView = async ({ productId, title = '', path = '', name 
   });
 };
 
-export const trackWhatsAppClick = async ({ productId, title = '', href = '' }) => {
+export const trackWhatsAppClick = async ({ productId, title = '', href = '', leadCode = '' }) => {
   return safePost('/api/tracking/whatsapp-click', {
     sessionId: getStoredVisitorSessionId(),
     productId,
     title,
-    href
+    href,
+    leadCode
   });
 };
 

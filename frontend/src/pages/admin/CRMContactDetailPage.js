@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { createCRMNote, createCRMTask, getCRMContactDetail, updateCRMContact } from '../../api/crm';
+import { createCRMNote, createCRMTask, getCRMContactDetail, linkCRMWhatsAppLead, updateCRMContact } from '../../api/crm';
 
 const CRMContactDetailPage = () => {
   const { id } = useParams();
@@ -10,11 +10,23 @@ const CRMContactDetailPage = () => {
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState('');
   const [taskTitle, setTaskTitle] = useState('');
+  const [linkForm, setLinkForm] = useState({
+    name: '',
+    phone: '',
+    whatsapp: '',
+    note: ''
+  });
 
   const loadDetail = useCallback(async () => {
     try {
       const data = await getCRMContactDetail(id);
       setDetail(data);
+      setLinkForm({
+        name: data?.contact?.name || '',
+        phone: data?.contact?.phone || '',
+        whatsapp: data?.contact?.whatsapp || data?.contact?.phone || '',
+        note: ''
+      });
       setError('');
     } catch {
       setError('No se pudo cargar la ficha del contacto.');
@@ -70,6 +82,32 @@ const CRMContactDetailPage = () => {
     }
   };
 
+  const handleLinkChange = event => {
+    const { name, value } = event.target;
+    setLinkForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleLinkWhatsApp = async event => {
+    event.preventDefault();
+    if (!contact?.leadCode) return;
+    setSaving(true);
+    try {
+      await linkCRMWhatsAppLead({
+        leadCode: contact.leadCode,
+        name: linkForm.name,
+        phone: linkForm.phone,
+        whatsapp: linkForm.whatsapp,
+        note: linkForm.note
+      });
+      await loadDetail();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center text-slate-500">Cargando ficha...</div>;
   }
@@ -91,6 +129,11 @@ const CRMContactDetailPage = () => {
               <p className="mt-2 text-sm text-slate-500">
                 {contact.phone || contact.whatsapp || contact.email || 'Sin datos de contacto'}
               </p>
+              {contact.leadCode && (
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.3em] text-emerald-600">
+                  Ref WhatsApp: {contact.leadCode}
+                </p>
+              )}
             </div>
             <div className="flex flex-wrap gap-2">
               <button
@@ -191,6 +234,62 @@ const CRMContactDetailPage = () => {
                 </button>
               </form>
             </article>
+
+            {contact.leadCode && (
+              <article className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm">
+                <h2 className="text-lg font-semibold text-slate-900">Vincular chat de WhatsApp</h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  Cuando el cliente escriba por WhatsApp, registra aqui su numero real usando la referencia del lead.
+                </p>
+                <form onSubmit={handleLinkWhatsApp} className="mt-4 space-y-3">
+                  <input
+                    type="text"
+                    value={contact.leadCode}
+                    readOnly
+                    className="w-full rounded-xl border border-surface-200 bg-surface-50 px-3 py-2 text-sm font-semibold uppercase tracking-wide text-emerald-700"
+                  />
+                  <input
+                    type="text"
+                    name="name"
+                    value={linkForm.name}
+                    onChange={handleLinkChange}
+                    className="w-full rounded-xl border border-surface-200 px-3 py-2"
+                    placeholder="Nombre del cliente"
+                  />
+                  <input
+                    type="text"
+                    name="phone"
+                    value={linkForm.phone}
+                    onChange={handleLinkChange}
+                    className="w-full rounded-xl border border-surface-200 px-3 py-2"
+                    placeholder="Telefono"
+                  />
+                  <input
+                    type="text"
+                    name="whatsapp"
+                    value={linkForm.whatsapp}
+                    onChange={handleLinkChange}
+                    className="w-full rounded-xl border border-surface-200 px-3 py-2"
+                    placeholder="WhatsApp"
+                  />
+                  <textarea
+                    name="note"
+                    value={linkForm.note}
+                    onChange={handleLinkChange}
+                    rows={3}
+                    className="w-full rounded-xl border border-surface-200 px-3 py-2"
+                    placeholder="Nota del primer contacto"
+                  />
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+                  >
+                    Vincular numero al lead
+                  </button>
+                </form>
+              </article>
+            )}
           </div>
         </section>
 

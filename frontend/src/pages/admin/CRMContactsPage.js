@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getCRMContacts } from '../../api/crm';
+import { getCRMContacts, linkCRMWhatsAppLead } from '../../api/crm';
 
 const EMPTY_FILTERS = {
   q: '',
@@ -15,6 +15,16 @@ const CRMContactsPage = () => {
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [linkingLead, setLinkingLead] = useState(false);
+  const [linkLeadError, setLinkLeadError] = useState('');
+  const [linkLeadMessage, setLinkLeadMessage] = useState('');
+  const [leadLinkForm, setLeadLinkForm] = useState({
+    leadCode: '',
+    name: '',
+    phone: '',
+    whatsapp: '',
+    note: ''
+  });
 
   const loadContacts = async currentFilters => {
     try {
@@ -45,6 +55,38 @@ const CRMContactsPage = () => {
     event.preventDefault();
     setLoading(true);
     loadContacts(filters);
+  };
+
+  const handleLeadLinkChange = event => {
+    const { name, value } = event.target;
+    setLeadLinkForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleLeadLinkSubmit = async event => {
+    event.preventDefault();
+    setLinkingLead(true);
+    setLinkLeadError('');
+    setLinkLeadMessage('');
+
+    try {
+      const contact = await linkCRMWhatsAppLead(leadLinkForm);
+      setLinkLeadMessage(`Lead ${contact.leadCode || leadLinkForm.leadCode} vinculado correctamente.`);
+      setLeadLinkForm({
+        leadCode: '',
+        name: '',
+        phone: '',
+        whatsapp: '',
+        note: ''
+      });
+      loadContacts(filters);
+    } catch (requestError) {
+      setLinkLeadError(requestError?.response?.data?.message || 'No se pudo vincular el lead de WhatsApp.');
+    } finally {
+      setLinkingLead(false);
+    }
   };
 
   if (loading) {
@@ -122,6 +164,87 @@ const CRMContactsPage = () => {
           </div>
         </form>
 
+        <form onSubmit={handleLeadLinkSubmit} className="rounded-2xl border border-surface-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-2">
+            <h2 className="text-lg font-semibold text-slate-900">Vincular chat de WhatsApp</h2>
+            <p className="text-sm text-slate-500">
+              Usa la referencia enviada en el mensaje para convertir el lead anonimo en contacto real.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+            <label className="text-sm text-slate-600">
+              Referencia
+              <input
+                type="text"
+                name="leadCode"
+                value={leadLinkForm.leadCode}
+                onChange={handleLeadLinkChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2 uppercase"
+                placeholder="NW-AB12CD"
+                required
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              Nombre
+              <input
+                type="text"
+                name="name"
+                value={leadLinkForm.name}
+                onChange={handleLeadLinkChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
+                placeholder="Nombre del cliente"
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              Telefono
+              <input
+                type="text"
+                name="phone"
+                value={leadLinkForm.phone}
+                onChange={handleLeadLinkChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
+                placeholder="098..."
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              WhatsApp
+              <input
+                type="text"
+                name="whatsapp"
+                value={leadLinkForm.whatsapp}
+                onChange={handleLeadLinkChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
+                placeholder="593..."
+              />
+            </label>
+            <label className="text-sm text-slate-600 xl:col-span-1">
+              Nota
+              <input
+                type="text"
+                name="note"
+                value={leadLinkForm.note}
+                onChange={handleLeadLinkChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
+                placeholder="Ej: escribio desde catalogo"
+              />
+            </label>
+          </div>
+          {(linkLeadError || linkLeadMessage) && (
+            <p className={`mt-4 text-sm ${linkLeadError ? 'text-red-600' : 'text-emerald-600'}`}>
+              {linkLeadError || linkLeadMessage}
+            </p>
+          )}
+          <div className="mt-4 flex justify-end">
+            <button
+              type="submit"
+              disabled={linkingLead}
+              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {linkingLead ? 'Vinculando...' : 'Vincular lead'}
+            </button>
+          </div>
+        </form>
+
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
@@ -148,6 +271,11 @@ const CRMContactsPage = () => {
                       <td className="px-4 py-3">
                         <p className="font-semibold text-slate-900">{contact.name || 'Sin nombre'}</p>
                         <p className="text-slate-500">{contact.phone || contact.whatsapp || contact.email || 'Sin dato de contacto'}</p>
+                        {contact.leadCode && (
+                          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-emerald-600">
+                            Ref: {contact.leadCode}
+                          </p>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <span className="rounded-full bg-surface-100 px-2.5 py-1 text-xs font-semibold text-slate-600">

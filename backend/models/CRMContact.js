@@ -58,6 +58,16 @@ const crmContactSchema = new mongoose.Schema(
       lowercase: true,
       default: ''
     },
+    leadCode: {
+      type: String,
+      trim: true,
+      uppercase: true,
+      default: ''
+    },
+    leadCodeHistory: {
+      type: [String],
+      default: []
+    },
     source: {
       type: String,
       trim: true,
@@ -137,6 +147,14 @@ crmContactSchema.index(
   {
     unique: true,
     partialFilterExpression: { emailNormalized: { $type: 'string', $ne: '' } }
+  }
+);
+
+crmContactSchema.index(
+  { leadCode: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { leadCode: { $type: 'string', $ne: '' } }
   }
 );
 

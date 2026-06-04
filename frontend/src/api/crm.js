@@ -25,6 +25,11 @@ export const updateCRMContact = async (contactId, payload) => {
   return data;
 };
 
+export const linkCRMWhatsAppLead = async payload => {
+  const { data } = await axios.post('/api/crm/contacts/link-whatsapp', payload, { withCredentials: true });
+  return data;
+};
+
 export const createCRMNote = async (contactId, note) => {
   const { data } = await axios.post(`/api/crm/contacts/${contactId}/notes`, { note }, { withCredentials: true });
   return data;

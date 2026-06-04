@@ -15,6 +15,6 @@
     "multer-storage-cloudinary": "^4.0.0"
   },
   "scripts": {
-    "build": "npm run build --prefix frontend"
+    "build": "node scripts/build-for-vercel.mjs"
   }
 }

@@ -8,7 +8,7 @@ const brandingSettingsSchema = new mongoose.Schema({
   },
   logoUrl: { type: String, trim: true, default: '' },
   faviconUrl: { type: String, trim: true, default: '' },
-  navbarName: { type: String, trim: true, default: 'Niway Store' },
+  navbarName: { type: String, trim: true, default: 'Tu tienda' },
   primaryColor: { type: String, trim: true, default: '#0f766e' },
   secondaryColor: { type: String, trim: true, default: '#111827' },
   backgroundColor: { type: String, trim: true, default: '#0b1220' },

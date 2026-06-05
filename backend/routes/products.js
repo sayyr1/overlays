@@ -2,9 +2,10 @@ import express from 'express';
 import Product from '../models/Product.js';
 import upload from '../middleware/upload.js';
 import cloudinary from '../utils/cloudinary.js';
-import { protect, adminOnly, requirePermission } from '../middleware/authMiddleware.js';
+import { protect, adminOnly, optionalProtect, requirePermission } from '../middleware/authMiddleware.js';
 import { requireModuleEnabled } from '../middleware/moduleMiddleware.js';
 import { handleProductBackInStock } from '../services/crmAutomationService.js';
+import { getSystemSettings } from '../services/systemConfigService.js';
 
 const router = express.Router();
 
@@ -186,7 +187,47 @@ const mapSizes = mapData => {
   return mapData;
 };
 
-const formatProduct = product => {
+const isInternalUser = user => Boolean(
+  user?.role === 'superadmin' ||
+  user?.role === 'owner' ||
+  user?.role === 'sales' ||
+  user?.role === 'admin' ||
+  user?.isAdmin
+);
+
+const normalizeImageVisibility = visibility =>
+  visibility === 'internal' ? 'internal' : 'public';
+
+const parseImagesPayload = images =>
+  (Array.isArray(images) ? images : [])
+    .filter(image => image?.url && image?.public_id)
+    .map(image => ({
+      url: image.url,
+      public_id: image.public_id,
+      visibility: normalizeImageVisibility(image.visibility)
+    }));
+
+const splitProductImages = (images, imageVisibilityEnabled) => {
+  const normalizedImages = parseImagesPayload(images);
+
+  if (!imageVisibilityEnabled) {
+    return {
+      publicImages: normalizedImages.map(image => ({ ...image, visibility: 'public' })),
+      internalImages: []
+    };
+  }
+
+  return {
+    publicImages: normalizedImages.filter(image => image.visibility !== 'internal'),
+    internalImages: normalizedImages.filter(image => image.visibility === 'internal')
+  };
+};
+
+const formatProduct = (product, options = {}) => {
+  const {
+    includeInternalImages = false,
+    imageVisibilityEnabled = false
+  } = options;
   const plain = product.toObject();
   const price = plain.price || {};
   let variantMap = ensureMap(product.stockByColorSize);
@@ -225,6 +266,11 @@ const formatProduct = product => {
     ...uniqueColorsFromVariantMap(variantMap)
   ]);
 
+  const { publicImages, internalImages } = splitProductImages(
+    plain.images,
+    imageVisibilityEnabled
+  );
+
   return {
     ...plain,
     price: {
@@ -234,6 +280,9 @@ const formatProduct = product => {
       platinum: Number(price.platinum ?? price.retail ?? 0)
     },
     colors,
+    images: publicImages,
+    internalImages: includeInternalImages ? internalImages : [],
+    imageVisibilityEnabled: Boolean(imageVisibilityEnabled),
     stockBySize: stockBySizePlain,
     stockByColorSize: stockByColorSizePlain,
     soldBySize: soldBySizePlain,
@@ -248,6 +297,14 @@ const getTotalStockQuantity = product => {
   return Object.values(stockBySize || {}).reduce((acc, qty) => acc + Number(qty || 0), 0);
 };
 
+const getImageVisibilityContext = async req => {
+  const settings = await getSystemSettings();
+  return {
+    imageVisibilityEnabled: Boolean(settings?.enableInternalProductImages),
+    includeInternalImages: isInternalUser(req.user)
+  };
+};
+
 router.post(
   '/upload-image',
   protect,
@@ -260,7 +317,8 @@ router.post(
     }
     const images = req.files.map(file => ({
       url: file.path,
-      public_id: file.filename
+      public_id: file.filename,
+      visibility: 'public'
     }));
     return res.status(200).json({ images });
   },
@@ -272,10 +330,11 @@ router.post(
   }
 );
 
-router.get('/promocion', async (req, res) => {
+router.get('/promocion', optionalProtect, async (req, res) => {
   try {
+    const imageContext = await getImageVisibilityContext(req);
     const productosEnPromo = await Product.find({ onSale: true }).limit(6);
-    res.json(productosEnPromo.map(formatProduct));
+    res.json(productosEnPromo.map(product => formatProduct(product, imageContext)));
   } catch (error) {
     console.error('Error al obtener productos en promociÃ³n:', error);
     res.status(500).json({ message: 'Error al obtener productos en promociÃ³n' });
@@ -304,8 +363,9 @@ router.get('/filters-options', async (req, res) => {
   }
 });
 
-router.get('/filtrar', async (req, res) => {
+router.get('/filtrar', optionalProtect, async (req, res) => {
   try {
+    const imageContext = await getImageVisibilityContext(req);
     const {
       brand,
       type,
@@ -349,15 +409,16 @@ router.get('/filtrar', async (req, res) => {
     });
 
     const productos = await Product.find(filter);
-    res.json(productos.map(formatProduct));
+    res.json(productos.map(product => formatProduct(product, imageContext)));
   } catch (error) {
     console.error('Error al filtrar productos:', error);
     res.status(500).json({ message: 'Error al filtrar productos' });
   }
 });
 
-router.get('/filter', async (req, res) => {
+router.get('/filter', optionalProtect, async (req, res) => {
   try {
+    const imageContext = await getImageVisibilityContext(req);
     const {
       brand,
       type,
@@ -401,27 +462,29 @@ router.get('/filter', async (req, res) => {
     });
 
     const productos = await Product.find(filter);
-    res.json(productos.map(formatProduct));
+    res.json(productos.map(product => formatProduct(product, imageContext)));
   } catch (error) {
     console.error('Error al filtrar productos:', error);
     res.status(500).json({ message: 'Error al filtrar productos' });
   }
 });
 
-router.get('/', async (req, res) => {
+router.get('/', optionalProtect, async (req, res) => {
   try {
+    const imageContext = await getImageVisibilityContext(req);
     const products = await Product.find();
-    res.json(products.map(formatProduct));
+    res.json(products.map(product => formatProduct(product, imageContext)));
   } catch {
     res.status(500).json({ message: 'Error al obtener productos' });
   }
 });
 
-router.get('/:id', async (req, res) => {
+router.get('/:id', optionalProtect, async (req, res) => {
   try {
+    const imageContext = await getImageVisibilityContext(req);
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-    res.json(formatProduct(product));
+    res.json(formatProduct(product, imageContext));
   } catch {
     res.status(500).json({ message: 'Error al obtener producto' });
   }
@@ -429,6 +492,8 @@ router.get('/:id', async (req, res) => {
 
   router.post('/', protect, adminOnly, requirePermission('products', 'create'), async (req, res) => {
     try {
+      const settings = await getSystemSettings();
+      const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
       const payload = { ...req.body };
       payload.price = parsePricePayload(req.body.price);
       let stockByColorSizeMap = parseStockByColorSizePayload(
@@ -453,6 +518,10 @@ router.get('/:id', async (req, res) => {
       if (req.body.attributes && typeof req.body.attributes === 'object') {
         payload.attributes = req.body.attributes;
       }
+      payload.images = parseImagesPayload(req.body.images).map(image => ({
+        ...image,
+        visibility: imageVisibilityEnabled ? image.visibility : 'public'
+      }));
       payload.stockByColorSize = stockByColorSizeMap;
       payload.stockBySize = aggregatedBySize;
 
@@ -461,7 +530,12 @@ router.get('/:id', async (req, res) => {
       if (getTotalStockQuantity(saved) > 0) {
         await handleProductBackInStock(saved._id);
       }
-    res.status(201).json(formatProduct(saved));
+    res.status(201).json(
+      formatProduct(saved, {
+        includeInternalImages: true,
+        imageVisibilityEnabled
+      })
+    );
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message || 'Error al crear producto' });
@@ -470,6 +544,8 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), async (req, res) => {
   try {
+    const settings = await getSystemSettings();
+    const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
     const previousStock = getTotalStockQuantity(product);
@@ -517,7 +593,12 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
     const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'type', 'collection', 'gender', 'onSale', 'images', 'attributes'];
     fieldsToUpdate.forEach(field => {
       if (req.body[field] !== undefined) {
-        product[field] = req.body[field];
+        product[field] = field === 'images'
+          ? parseImagesPayload(req.body.images).map(image => ({
+              ...image,
+              visibility: imageVisibilityEnabled ? image.visibility : 'public'
+            }))
+          : req.body[field];
       }
     });
 
@@ -531,7 +612,12 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
     if (previousStock <= 0 && getTotalStockQuantity(updated) > 0) {
       await handleProductBackInStock(updated._id);
     }
-    res.json(formatProduct(updated));
+    res.json(
+      formatProduct(updated, {
+        includeInternalImages: true,
+        imageVisibilityEnabled
+      })
+    );
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: err.message || 'Error al actualizar producto' });

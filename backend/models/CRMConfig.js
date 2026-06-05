@@ -12,6 +12,16 @@ const crmConfigSchema = new mongoose.Schema(
       default: 4,
       min: 1
     },
+    recentEntryHours: {
+      type: Number,
+      default: 36,
+      min: 1
+    },
+    newCustomerHighlightDays: {
+      type: Number,
+      default: 7,
+      min: 1
+    },
     activeStatuses: {
       type: [String],
       default: () => [

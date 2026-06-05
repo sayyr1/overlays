@@ -69,7 +69,7 @@ const NAV_LINKS = [
 const AdminSidebar = ({ handleLogout, user, isSuperAdmin = false }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isModuleEnabled, loading } = usePublicConfig();
+  const { isModuleEnabled, loading, storeName } = usePublicConfig();
   const { hasPermission, hasAnyPermission } = useAuth();
   const [isDesktop, setIsDesktop] = useState(
     typeof window !== 'undefined' ? window.innerWidth >= 768 : true
@@ -82,6 +82,7 @@ const AdminSidebar = ({ handleLogout, user, isSuperAdmin = false }) => {
   }, []);
 
   const activePath = useMemo(() => location.pathname, [location.pathname]);
+  const isCrmRoute = activePath.startsWith('/crm');
   const filteredBaseLinks = useMemo(
     () =>
       NAV_LINKS.filter(item => {
@@ -140,7 +141,7 @@ const AdminSidebar = ({ handleLogout, user, isSuperAdmin = false }) => {
           </span>
           <div>
             <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Administrativo</p>
-            <p className="text-lg font-semibold text-slate-900">{user?.name ? 'Backoffice' : 'NIWAY STORE'}</p>
+            <p className="text-lg font-semibold text-slate-900">{user?.name ? 'Backoffice' : storeName}</p>
           </div>
         </div>
       </div>
@@ -186,19 +187,31 @@ const AdminSidebar = ({ handleLogout, user, isSuperAdmin = false }) => {
       </nav>
 
       <div className="px-6 pb-6 space-y-4">
-        <button
-          type="button"
-          onClick={() => navigate('/crear-producto')}
-          disabled={
-            !isModuleEnabled('products') ||
-            !isModuleEnabled('categories') ||
-            !hasPermission('products.create')
-          }
-          className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand text-white px-4 py-3 text-sm font-semibold shadow-brand-sm transition hover:bg-brand-dark"
-        >
-          <HiOutlinePlusCircle className="text-lg" />
-          Nuevo producto
-        </button>
+        {isCrmRoute ? (
+          <button
+            type="button"
+            onClick={() => navigate('/crm/tareas')}
+            disabled={!isModuleEnabled('crm') || !hasPermission('crm.tasksView')}
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-slate-950 text-white px-4 py-3 text-sm font-semibold shadow-brand-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <HiOutlineUsers className="text-lg" />
+            Ir a tareas CRM
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/crear-producto')}
+            disabled={
+              !isModuleEnabled('products') ||
+              !isModuleEnabled('categories') ||
+              !hasPermission('products.create')
+            }
+            className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-brand text-white px-4 py-3 text-sm font-semibold shadow-brand-sm transition hover:bg-brand-dark disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <HiOutlinePlusCircle className="text-lg" />
+            Nuevo producto
+          </button>
+        )}
 
         <div className="rounded-xl border border-surface-200 bg-surface-100 px-4 py-3 text-sm text-slate-600">
           <div className="flex items-center gap-2 font-medium text-slate-700">

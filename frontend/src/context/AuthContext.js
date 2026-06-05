@@ -3,6 +3,7 @@ import axios from '../api/axiosInstance';
 
 const AuthContext = createContext(null);
 const EMPTY_PERMISSIONS = {};
+const INTERNAL_ROLES = new Set(['sales', 'owner', 'admin', 'superadmin']);
 
 const parsePermission = (moduleOrDescriptor, action) => {
   if (action) {
@@ -93,7 +94,7 @@ export const AuthProvider = ({ children }) => {
       logout,
       role: user?.role ?? (user?.isAdmin ? 'admin' : 'customer'),
       isAuthenticated: Boolean(user),
-      isAdmin: Boolean(user?.isAdmin || user?.role === 'admin' || user?.role === 'superadmin'),
+      isAdmin: Boolean(user?.isAdmin || INTERNAL_ROLES.has(user?.role)),
       isSuperAdmin: user?.role === 'superadmin',
       membershipLevel: user?.membershipLevel ?? 'STANDARD',
       permissions: user?.effectivePermissions ?? EMPTY_PERMISSIONS,

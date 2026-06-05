@@ -2,8 +2,8 @@ import React from 'react';
 import ProductIndividual from '../../components/usuario/ProductIndividual/ProductIndividual';
 
 const ProductPublicPage = () => (
-  <div className="bg-gray-50 min-h-screen">
-    <div className="container mx-auto p-6">
+  <div className="min-h-screen bg-[#141414]">
+    <div className="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
       <ProductIndividual />
     </div>
   </div>

@@ -6,13 +6,12 @@
 
 @layer base {
   :root {
-    --primary-color: #0f766e;
-    --secondary-color: #111827;
-    --background-color: #0b1220;
-    --text-color: #0f172a;
-    /* Overlay for readability over the background image */
-    --app-bg-overlay: radial-gradient(1200px circle at 30% -10%, rgba(255,255,255,0.08), transparent 60%),
-                      linear-gradient(0deg, rgba(8,12,20,0.65), rgba(8,12,20,0.65));
+    --primary-color: #78d64b;
+    --secondary-color: #111111;
+    --background-color: #141414;
+    --text-color: #f3f4f6;
+    --app-bg-overlay: radial-gradient(900px circle at 50% -10%, rgba(120,214,75,0.08), transparent 45%),
+      linear-gradient(180deg, rgba(19,19,19,0.98), rgba(19,19,19,0.98));
   }
 
   html {
@@ -20,22 +19,20 @@
   }
 
   body {
-    @apply font-sans text-slate-900 antialiased;
+    @apply font-sans antialiased;
     color: var(--text-color);
-    /* Global background image with subtle overlay */
-    background-image: var(--app-bg-overlay), url('./assets/images/background.png');
+    background-image: var(--app-bg-overlay);
     background-size: cover;
-    background-position: center; /* keeps focal point centered */
     background-repeat: no-repeat;
-    background-attachment: fixed; /* elegant parallax-like stability */
-    background-color: var(--background-color); /* fallback color under image */
+    background-attachment: fixed;
+    background-color: var(--background-color);
   }
 
   h1,
   h2,
   h3,
   h4 {
-    @apply font-display tracking-tight text-slate-900;
+    @apply font-display tracking-tight text-white;
   }
 
   ::selection {
@@ -46,20 +43,18 @@
 
 @layer components {
   .content-surface {
-    background: rgba(255, 255, 255, 0.78);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: transparent;
   }
   .glass-card {
-    @apply rounded-3xl bg-white/80 backdrop-blur-md shadow-card-lg border border-white/40;
+    @apply rounded-3xl border border-white/10 bg-[#1c1c1c] shadow-card-lg;
   }
 
   .surface-card {
-    @apply rounded-2xl bg-white shadow-brand-sm border border-surface-200/60;
+    @apply rounded-2xl border border-white/10 bg-[#1c1c1c] shadow-brand-sm;
   }
 
   .pill-badge {
-    @apply inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand;
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-brand;
   }
 
   .metric-chip {
@@ -68,6 +63,46 @@
 
   .dash-grid {
     @apply grid gap-4 sm:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .market-swiper .swiper-slide {
+    height: auto;
+  }
+
+  .market-swiper-card {
+    height: 100%;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .market-swiper {
+    overflow: visible;
+  }
+
+  .market-swiper .swiper {
+    overflow: visible;
+  }
+
+  .market-swiper .swiper-slide {
+    width: min(78vw, 320px);
+  }
+
+  .market-swiper .swiper-button-prev,
+  .market-swiper .swiper-button-next {
+    display: none;
+  }
+
+  .market-swiper .swiper-pagination {
+    bottom: 0 !important;
   }
 }
 

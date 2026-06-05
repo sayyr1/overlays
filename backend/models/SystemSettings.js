@@ -6,8 +6,8 @@ const systemSettingsSchema = new mongoose.Schema({
     unique: true,
     default: 'default'
   },
-  businessName: { type: String, trim: true, default: 'Niway Store' },
-  tradeName: { type: String, trim: true, default: 'Niway Store' },
+  businessName: { type: String, trim: true, default: 'Tu negocio' },
+  tradeName: { type: String, trim: true, default: 'Tu tienda' },
   country: { type: String, trim: true, default: 'Ecuador' },
   currency: { type: String, trim: true, default: 'USD' },
   timezone: { type: String, trim: true, default: 'America/Guayaquil' },
@@ -20,7 +20,8 @@ const systemSettingsSchema = new mongoose.Schema({
     of: String,
     default: () => new Map()
   },
-  footerText: { type: String, trim: true, default: 'Todos los derechos reservados.' }
+  footerText: { type: String, trim: true, default: 'Todos los derechos reservados.' },
+  enableInternalProductImages: { type: Boolean, default: false }
 }, { timestamps: true });
 
 export default mongoose.model('SystemSettings', systemSettingsSchema);

@@ -1,25 +1,29 @@
 import React, { useEffect, useRef } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AiOutlineHome } from 'react-icons/ai';
-import { FiTag, FiPackage, FiUser, FiLogOut, FiSettings } from 'react-icons/fi';
+import { FiTag, FiUser } from 'react-icons/fi';
 import { HiOutlineShoppingBag } from 'react-icons/hi';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
+import {
+  getGuestOrderTracking,
+  subscribeGuestOrderTracking
+} from '../../../utils/guestOrderTracking';
 
 const navigationLinks = [
   { to: '/', label: 'Inicio', Icon: AiOutlineHome },
   { to: '/categorias', label: 'Categorias', Icon: FiTag },
-  { to: '/mis-pedidos', label: 'Pedidos', Icon: FiPackage, requiresAuth: true },
   { to: '/cart', label: 'Carrito', Icon: HiOutlineShoppingBag, withBadge: true }
 ];
 
 const NavbarBottom = () => {
   const { count } = useCart();
-  const { isAuthenticated, isAdmin, isSuperAdmin, logout, hasAnyPermission } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { isModuleEnabled, loading } = usePublicConfig();
   const navigate = useNavigate();
   const navRef = useRef(null);
+  const [guestOrderTracking, setGuestOrderTracking] = React.useState(() => getGuestOrderTracking());
 
   const getItemClasses = isActive =>
     `group flex flex-col items-center gap-1 text-[0.74rem] font-semibold leading-tight tracking-[0.03em] transition-colors duration-200 ${
@@ -32,42 +36,24 @@ const NavbarBottom = () => {
       navigate(`/login?redirect=${encodeURIComponent(link.to)}`);
     }
   };
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/', { replace: true });
-  };
-
   const sessionItem = isAuthenticated
-    ? { key: 'logout', label: 'Salir', Icon: FiLogOut, action: handleLogout }
+    ? { key: 'account', to: '/mis-pedidos', label: 'Cuenta', Icon: FiUser, requiresAuth: true }
     : { key: 'login', to: '/login', label: 'Entrar', Icon: FiUser };
+  const guestTrackingItem = !isAuthenticated && guestOrderTracking?.lookupToken
+    ? { key: 'guest-order', to: `/pedido/${guestOrderTracking.lookupToken}`, label: 'Pedido', Icon: FiUser }
+    : null;
 
   const categoriesEnabled = isModuleEnabled('categories');
   const ordersEnabled = isModuleEnabled('orders');
   const paymentsEnabled = isModuleEnabled('payments');
-  const canAccessAdmin = hasAnyPermission([
-    'reports.view',
-    'customers.view',
-    'products.view',
-    'inventory.view',
-    'orders.view',
-    'categories.manage',
-    'menu.manage'
-  ]);
-  const adminItem = isSuperAdmin
-    ? { to: '/super-admin', label: 'Super', Icon: FiSettings }
-    : isAdmin && canAccessAdmin
-      ? { to: '/admin-dashboard', label: 'Admin', Icon: FiSettings }
-    : null;
   const storeItems = navigationLinks.filter(link => {
     if (link.to === '/categorias') return categoriesEnabled && isModuleEnabled('products');
-    if (link.to === '/mis-pedidos') return ordersEnabled;
     if (link.to === '/cart') return ordersEnabled && paymentsEnabled;
     return true;
   });
-  const navItems = adminItem
-    ? [...storeItems.slice(0, 3), adminItem, ...storeItems.slice(3), sessionItem]
-    : [...storeItems, sessionItem];
+  const navItems = [...storeItems, ...(guestTrackingItem ? [guestTrackingItem] : []), sessionItem];
+
+  useEffect(() => subscribeGuestOrderTracking(setGuestOrderTracking), []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -119,23 +105,6 @@ const NavbarBottom = () => {
         >
           {navItems.map(link => {
             const key = link.to || link.key;
-
-            if (link.action) {
-              return (
-                <li key={key} className="flex justify-center">
-                  <button
-                    type="button"
-                    onClick={link.action}
-                    className={`${getItemClasses(false)} whitespace-nowrap hover:text-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40`}
-                  >
-                    <span className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-white transition-all duration-200 group-hover:bg-rose-400/20 group-hover:text-white">
-                      <link.Icon className="text-[1.35rem]" />
-                    </span>
-                    <span>{link.label}</span>
-                  </button>
-                </li>
-              );
-            }
 
             return (
               <li key={key} className="flex justify-center">

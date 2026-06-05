@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 import axios from '../../api/axiosInstance';
-import { useParams, Link } from 'react-router-dom';
-import Navbar from '../usuario/Navbar';
 import ProductImage from '../../components/usuario/ProductImage';
 import ProductInterestPanel from '../../components/crm/ProductInterestPanel';
 import { usePublicConfig } from '../../context/PublicConfigContext';
@@ -12,14 +11,48 @@ import {
   normalizeVariantColor
 } from '../../utils/inventory';
 
+const getInventoryHealthMeta = totalStock => {
+  if (!totalStock) {
+    return {
+      label: 'Sin stock',
+      className: 'border border-red-200 bg-red-50 text-red-700'
+    };
+  }
+
+  if (totalStock <= 5) {
+    return {
+      label: 'Stock bajo',
+      className: 'border border-amber-200 bg-amber-50 text-amber-700'
+    };
+  }
+
+  return {
+    label: 'Estable',
+    className: 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+  };
+};
+
+const getVariantPillClassName = qty => {
+  if (qty === 0) {
+    return 'border border-red-200 bg-red-50 text-red-700';
+  }
+
+  if (qty <= 5) {
+    return 'border border-amber-200 bg-amber-50 text-amber-700';
+  }
+
+  return 'border border-surface-200 bg-white text-slate-700';
+};
+
 const ProductDetailsPage = () => {
-  const { isModuleEnabled } = usePublicConfig();
+  const { isModuleEnabled, settings } = usePublicConfig();
   const { hasPermission } = useAuth();
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [error, setError] = useState('');
   const inventoryEnabled = isModuleEnabled('inventory') && hasPermission('inventory.view');
   const canViewProductInterest = isModuleEnabled('crm') && hasPermission('crm.productInterestView');
+  const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
 
   useEffect(() => {
     axios
@@ -57,19 +90,29 @@ const ProductDetailsPage = () => {
     return map;
   }, [product]);
 
-  const totalStock = useMemo(() => {
-    return Object.values(variantMatrix).reduce((acc, sizes) => {
-      const subtotal = Object.values(sizes || {}).reduce(
-        (inner, qty) => inner + Number(qty || 0),
-        0
-      );
-      return acc + subtotal;
-    }, 0);
-  }, [variantMatrix]);
+  const totalStock = useMemo(
+    () =>
+      Object.values(variantMatrix).reduce((acc, sizes) => {
+        const subtotal = Object.values(sizes || {}).reduce(
+          (inner, qty) => inner + Number(qty || 0),
+          0
+        );
+        return acc + subtotal;
+      }, 0),
+    [variantMatrix]
+  );
+
+  const inventoryMeta = useMemo(
+    () => getInventoryHealthMeta(totalStock),
+    [totalStock]
+  );
+
+  const publicImages = Array.isArray(product?.images) ? product.images : [];
+  const internalImages = Array.isArray(product?.internalImages) ? product.internalImages : [];
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-red-600">
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 text-red-600">
         {error}
       </div>
     );
@@ -77,138 +120,255 @@ const ProductDetailsPage = () => {
 
   if (!product) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">
-        Cargando...
+      <div className="min-h-screen flex items-center justify-center bg-surface-50 text-slate-500">
+        Cargando producto...
       </div>
     );
   }
 
   return (
-    <div className="bg-gray-50 min-h-screen">
-      <Navbar />
-      <div className="container mx-auto p-6">
-        <h2 className="text-3xl font-semibold text-gray-800 mb-4">{product.name}</h2>
-        <p className="text-lg text-gray-700 mb-4">
-          <strong>Codigo:</strong> {product.code}
-        </p>
+    <div className="min-h-screen bg-surface-50 px-4 py-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <header className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm lg:p-6">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-semibold text-slate-900">{product.name}</h1>
+                {inventoryEnabled && (
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${inventoryMeta.className}`}>
+                    {inventoryMeta.label}
+                  </span>
+                )}
+                {product.onSale && (
+                  <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-semibold text-fuchsia-700">
+                    En promocion
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-500">
+                <span>Cod. {product.code}</span>
+                <span>{product.gender || 'Sin genero'}</span>
+                <span>{product.type || 'Sin tipo'}</span>
+                {product.brand && <span>{product.brand}</span>}
+                {product.collection && <span>{product.collection}</span>}
+              </div>
+              <p className="max-w-3xl text-sm text-slate-500">
+                {product.description || 'Sin descripcion registrada para este producto.'}
+              </p>
+            </div>
 
-        <div className="flex gap-6 flex-wrap mb-6">
-          {product.images?.map(image => (
-            <ProductImage
-              key={image.public_id}
-              src={image.url}
-              alt={image.public_id}
-              className="w-1/3 sm:w-1/4 md:w-1/5 rounded-lg border border-gray-200 shadow-sm"
-            />
-          ))}
-        </div>
-
-        <section className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 mb-6 text-sm text-gray-700">
-          <p>
-            <strong>Precio retail:</strong> {formatCurrency(product.price?.retail ?? 0)}
-          </p>
-          <p>
-            <strong>Precio Gold:</strong>{' '}
-            {formatCurrency(product.price?.gold ?? product.price?.retail ?? 0)}
-          </p>
-          <p>
-            <strong>Precio Premium:</strong>{' '}
-            {formatCurrency(product.price?.premium ?? product.price?.retail ?? 0)}
-          </p>
-          <p>
-            <strong>Precio Platinum:</strong>{' '}
-            {formatCurrency(product.price?.platinum ?? product.price?.retail ?? 0)}
-          </p>
-        </section>
-
-        <p className="text-lg text-gray-700 mb-3">
-          <strong>Categoria:</strong> {product.category || product.type}
-        </p>
-        <p className="text-lg text-gray-700 mb-3">
-          <strong>Genero:</strong> {product.gender}
-        </p>
-        {inventoryEnabled && (
-          <p className="text-lg text-gray-700 mb-3">
-            <strong>Stock total:</strong> {totalStock}
-          </p>
-        )}
-
-        {product.colors?.length > 0 && (
-          <div className="mb-4">
-            <h4 className="text-lg font-semibold text-gray-700">Colores disponibles</h4>
-            <div className="flex flex-wrap gap-2 mt-2">
-              {Array.from(new Set(product.colors)).map(color => (
-                <span
-                  key={color}
-                  className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm"
-                >
-                  {color}
-                </span>
-              ))}
+            <div className="grid gap-3 sm:grid-cols-2 xl:w-[420px]">
+              <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Retail</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">
+                  {formatCurrency(product.price?.retail ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Gold</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">
+                  {formatCurrency(product.price?.gold ?? product.price?.retail ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Premium</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">
+                  {formatCurrency(product.price?.premium ?? product.price?.retail ?? 0)}
+                </p>
+              </div>
+              <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Platinum</p>
+                <p className="mt-1 text-xl font-semibold text-slate-900">
+                  {formatCurrency(product.price?.platinum ?? product.price?.retail ?? 0)}
+                </p>
+              </div>
             </div>
           </div>
-        )}
+        </header>
 
-        {inventoryEnabled && (
-          <div className="mb-6">
-            <h4 className="text-lg font-semibold text-gray-700">Stock por color y talla</h4>
-            {Object.keys(variantMatrix).length ? (
-              <div className="mt-3 space-y-4">
-                {Object.entries(variantMatrix).map(([color, sizes]) => {
-                  const totalByColor = Object.values(sizes || {}).reduce(
-                    (acc, qty) => acc + Number(qty || 0),
-                    0
-                  );
-                  const displayColor = colorLabelMap[color] || color;
-                  return (
-                    <div
-                      key={color}
-                      className="rounded-lg border border-gray-200 bg-white p-4 shadow-sm"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="text-md font-semibold text-gray-700">{displayColor}</p>
-                        <span className="text-sm text-gray-500">Total: {totalByColor}</span>
-                      </div>
-                      {Object.keys(sizes || {}).length ? (
-                        <ul className="mt-2 grid gap-2 sm:grid-cols-2 text-sm text-gray-700">
-                          {Object.entries(sizes).map(([size, qty]) => (
-                            <li
-                              key={`${color}-${size}`}
-                              className="flex justify-between rounded-md border border-gray-100 px-3 py-2"
-                            >
-                              <span className="font-medium">{size}</span>
-                              <span>{qty}</span>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="mt-2 text-sm text-gray-500">
-                          Sin tallas registradas para este color.
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+        <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Galeria</p>
+                <h2 className="mt-2 text-lg font-semibold text-slate-900">Imagenes del producto</h2>
               </div>
-            ) : (
-              <p className="mt-2 text-sm text-gray-500">No hay variantes registradas.</p>
-            )}
-          </div>
-        )}
+              <Link
+                to="/dashboard"
+                className="rounded-xl border border-surface-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
+              >
+                Volver al inventario
+              </Link>
+            </div>
 
-        <p className="text-lg text-gray-700 mb-6">
-          <strong>Descripcion:</strong> {product.description || 'Sin descripcion'}
-        </p>
+            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
+              {publicImages.length ? (
+                publicImages.map(image => (
+                  <div
+                    key={image.public_id}
+                    className="overflow-hidden rounded-3xl border border-surface-200 bg-surface-50"
+                  >
+                    <ProductImage
+                      src={image.url}
+                      alt={product.name}
+                      className="aspect-[4/5] w-full object-cover"
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="col-span-full rounded-2xl border border-dashed border-surface-200 bg-surface-50 px-4 py-10 text-center text-sm text-slate-500">
+                  Este producto no tiene fotos publicas cargadas.
+                </div>
+              )}
+            </div>
+
+            {imageVisibilityEnabled && (
+              <div className="mt-6">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Referencia interna</p>
+                <h3 className="mt-2 text-base font-semibold text-slate-900">Fotos para el equipo</h3>
+                <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
+                  {internalImages.length ? (
+                    internalImages.map(image => (
+                      <div
+                        key={`internal-${image.public_id}`}
+                        className="overflow-hidden rounded-3xl border border-slate-200 bg-slate-950/5"
+                      >
+                        <ProductImage
+                          src={image.url}
+                          alt={`${product.name} interna`}
+                          className="aspect-[4/5] w-full object-cover"
+                        />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="col-span-full rounded-2xl border border-dashed border-surface-200 bg-surface-50 px-4 py-8 text-center text-sm text-slate-500">
+                      No hay fotos internas cargadas para este producto.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {product.colors?.length > 0 && (
+              <div className="mt-6">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Colores</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {Array.from(new Set(product.colors)).map(color => (
+                    <span
+                      key={color}
+                      className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1.5 text-sm font-medium text-sky-700"
+                    >
+                      {color}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </article>
+
+          <article className="space-y-6">
+            <section className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+              <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Ficha</p>
+              <h2 className="mt-2 text-lg font-semibold text-slate-900">Resumen operativo</h2>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Categoria</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {product.category || product.type || 'Sin categoria'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Genero</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {product.gender || 'Sin genero'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Marca</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {product.brand || 'Sin marca'}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Coleccion</p>
+                  <p className="mt-1 text-sm font-semibold text-slate-900">
+                    {product.collection || 'Sin coleccion'}
+                  </p>
+                </div>
+                {inventoryEnabled && (
+                  <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3 sm:col-span-2">
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Stock total</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">{totalStock}</p>
+                    <p className="text-xs text-slate-500">
+                      {Object.keys(variantMatrix).length} colores registrados
+                    </p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {inventoryEnabled && (
+              <section className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+                <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Inventario</p>
+                <h2 className="mt-2 text-lg font-semibold text-slate-900">Stock por color y talla</h2>
+
+                {Object.keys(variantMatrix).length ? (
+                  <div className="mt-5 space-y-4">
+                    {Object.entries(variantMatrix).map(([color, sizes]) => {
+                      const totalByColor = Object.values(sizes || {}).reduce(
+                        (acc, qty) => acc + Number(qty || 0),
+                        0
+                      );
+                      const displayColor = colorLabelMap[color] || color;
+                      return (
+                        <div
+                          key={color}
+                          className="rounded-2xl border border-surface-200 bg-surface-50 p-4"
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="font-semibold text-slate-900">{displayColor}</p>
+                            <span className="text-sm text-slate-500">Total {totalByColor}</span>
+                          </div>
+
+                          {Object.keys(sizes || {}).length ? (
+                            <div className="mt-3 flex flex-wrap gap-2">
+                              {Object.entries(sizes).map(([size, qty]) => (
+                                <span
+                                  key={`${color}-${size}`}
+                                  className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${getVariantPillClassName(Number(qty || 0))}`}
+                                >
+                                  <span>{size}</span>
+                                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                                    {qty}
+                                  </span>
+                                </span>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="mt-3 text-sm text-slate-500">
+                              Sin tallas registradas para este color.
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-2xl border border-dashed border-surface-200 bg-surface-50 px-4 py-8 text-center text-sm text-slate-500">
+                    No hay variantes registradas.
+                  </div>
+                )}
+              </section>
+            )}
+          </article>
+        </section>
 
         {canViewProductInterest && (
-          <div className="mb-6">
+          <section className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
             <ProductInterestPanel productId={product._id} />
-          </div>
+          </section>
         )}
-
-        <Link to="/dashboard" className="text-blue-500 hover:text-blue-700 text-lg font-medium">
-          Volver al panel
-        </Link>
       </div>
     </div>
   );

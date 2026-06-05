@@ -1,3 +1,5 @@
+import { USER_ROLES } from '../models/User.js';
+
 export const PERMISSION_CATALOG = [
   {
     module: 'products',
@@ -103,24 +105,6 @@ export const PERMISSION_CATALOG = [
   }
 ];
 
-const ROLE_DEFAULTS = {
-  customer: {},
-  admin: PERMISSION_CATALOG.reduce((acc, group) => {
-    acc[group.module] = group.actions.reduce((actionAcc, action) => {
-      actionAcc[action.key] = true;
-      return actionAcc;
-    }, {});
-    return acc;
-  }, {}),
-  superadmin: PERMISSION_CATALOG.reduce((acc, group) => {
-    acc[group.module] = group.actions.reduce((actionAcc, action) => {
-      actionAcc[action.key] = true;
-      return actionAcc;
-    }, {});
-    return acc;
-  }, {})
-};
-
 export const createEmptyPermissionMatrix = () =>
   PERMISSION_CATALOG.reduce((acc, group) => {
     acc[group.module] = group.actions.reduce((actionAcc, action) => {
@@ -142,12 +126,76 @@ const buildPresetPermissions = entries => {
   return matrix;
 };
 
+const buildFullAccessPermissions = () =>
+  PERMISSION_CATALOG.reduce((acc, group) => {
+    acc[group.module] = group.actions.reduce((actionAcc, action) => {
+      actionAcc[action.key] = true;
+      return actionAcc;
+    }, {});
+    return acc;
+  }, {});
+
+export const ROLE_DEFINITIONS = [
+  {
+    key: USER_ROLES.SUPERADMIN,
+    label: 'Super Admin',
+    description: 'Control total del sistema, configuracion global, auditoria y acceso completo.'
+  },
+  {
+    key: USER_ROLES.OWNER,
+    label: 'Dueno',
+    description: 'Responsable del negocio con acceso completo al backoffice operativo.'
+  },
+  {
+    key: USER_ROLES.SALES,
+    label: 'Equipo de ventas',
+    description: 'Perfil comercial enfocado en CRM, clientes, pedidos y seguimiento.'
+  },
+  {
+    key: USER_ROLES.ADMIN,
+    label: 'Admin legado',
+    description: 'Perfil historico equivalente a acceso interno completo. Mantener solo por compatibilidad.'
+  },
+  {
+    key: USER_ROLES.CUSTOMER,
+    label: 'Cliente',
+    description: 'Usuario final de tienda sin acceso administrativo.'
+  }
+];
+
+const ROLE_DEFAULTS = {
+  [USER_ROLES.CUSTOMER]: {},
+  [USER_ROLES.SALES]: buildPresetPermissions([
+    ['products', ['view']],
+    ['inventory', ['view']],
+    ['orders', ['view', 'confirm', 'cancel', 'update']],
+    ['customers', ['view']],
+    ['memberships', ['manage']],
+    ['crm', ['dashboard', 'pipelineView', 'pipelineManage', 'contactsView', 'contactsEdit', 'eventsView', 'tasksView', 'tasksManage', 'abandonedView', 'abandonedManage', 'productInterestView']]
+  ]),
+  [USER_ROLES.OWNER]: buildFullAccessPermissions(),
+  [USER_ROLES.ADMIN]: buildFullAccessPermissions(),
+  [USER_ROLES.SUPERADMIN]: buildFullAccessPermissions()
+};
+
 export const PERMISSION_PRESETS = [
+  {
+    key: 'owner_default',
+    label: 'Dueno',
+    description: 'Acceso completo del backoffice sin privilegios de Super Admin.',
+    permissions: buildFullAccessPermissions()
+  },
+  {
+    key: 'sales_team',
+    label: 'Equipo de ventas',
+    description: 'CRM, clientes, pedidos y seguimiento comercial con enfoque operativo.',
+    permissions: ROLE_DEFAULTS[USER_ROLES.SALES]
+  },
   {
     key: 'full_admin',
     label: 'Admin total',
     description: 'Operacion completa del backoffice sin acceso Super Admin.',
-    permissions: null
+    permissions: buildFullAccessPermissions()
   },
   {
     key: 'catalog_manager',

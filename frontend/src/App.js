@@ -15,8 +15,18 @@ import ProductDetailsPage from './pages/admin/ProductDetailsPage';
 import ProductListPage from './pages/usuario/ProductListPage';
 import ProductPublicPage from './pages/usuario/ProductPublicPage';
 import OrigenListPage from './pages/usuario/OrigenListPage';
+import CategoriesBrowsePage from './pages/usuario/CategoriesBrowsePage';
+import BrandsPage from './pages/usuario/BrandsPage';
+import CollectionsPage from './pages/usuario/CollectionsPage';
+import OffersPage from './pages/usuario/OffersPage';
+import NewArrivalsPage from './pages/usuario/NewArrivalsPage';
+import BrandDetailPage from './pages/usuario/BrandDetailPage';
+import CollectionDetailPage from './pages/usuario/CollectionDetailPage';
+import OriginDetailPage from './pages/usuario/OriginDetailPage';
+import CategoryDetailPage from './pages/usuario/CategoryDetailPage';
 import CartPage from './pages/usuario/CartPage';
 import OrdersPage from './pages/usuario/OrdersPage';
+import PublicOrderPage from './pages/usuario/PublicOrderPage';
 import CategoryManagerPage from './pages/admin/CategoryManagerPage';
 import PedidosPage from './pages/admin/PedidosPage';
 import ResumenVentasPage from './pages/admin/ResumenVentasPage';
@@ -25,8 +35,6 @@ import MenuBuilderPage from './pages/admin/MenuBuilderPage';
 import Navbar from './pages/usuario/Navbar';
 import Navbaruser from './components/usuario/Navbar/NavbarUser';
 import MainHome from './components/usuario/MainHome/MainHome1';
-import CategoriasPage from './components/usuario/CategoriasPage/CategoriasPage';
-import CategoriesPage from './pages/admin/CategoriesPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
@@ -63,6 +71,7 @@ const AppContent = () => {
     '/admin-dashboard',
     '/crear-producto',
     '/editar-producto',
+    '/product-private',
     '/gestionar-categorias',
     '/menu-builder',
     '/ventas/resumen',
@@ -88,9 +97,11 @@ const AppContent = () => {
         id="main-content"
         tabIndex="-1"
         className={
-          isBackofficeRoute
-            ? 'ml-0 md:ml-72 min-h-screen bg-surface-50 pb-24 md:pb-16 pt-20 md:pt-24 transition-all duration-200'
-            : 'min-h-screen content-surface'
+          isOperationalAdminRoute
+            ? 'ml-0 md:ml-72 min-h-screen bg-surface-50 pb-24 md:pb-16 pt-28 md:pt-32 transition-all duration-200'
+            : isSuperAdminRoute
+              ? 'min-h-screen bg-surface-50'
+              : 'min-h-screen content-surface'
         }
       >
         <Routes>
@@ -179,6 +190,22 @@ const AppContent = () => {
 
           <Route path="/" element={<MainHome />} />
           <Route
+            path="/ofertas"
+            element={
+              <ModuleRoute required="products" title="Catalogo desactivado">
+                <OffersPage />
+              </ModuleRoute>
+            }
+          />
+          <Route
+            path="/nuevos"
+            element={
+              <ModuleRoute required="products" title="Catalogo desactivado">
+                <NewArrivalsPage />
+              </ModuleRoute>
+            }
+          />
+          <Route
             path="/origen"
             element={
               <ModuleRoute required={['products', 'categories']} title="Exploracion desactivada">
@@ -187,10 +214,34 @@ const AppContent = () => {
             }
           />
           <Route
+            path="/origen/:origen"
+            element={
+              <ModuleRoute required={['products', 'categories']} title="Exploracion desactivada">
+                <OriginDetailPage />
+              </ModuleRoute>
+            }
+          />
+          <Route
             path="/categorias"
             element={
               <ModuleRoute required={['products', 'categories']} title="Categorias desactivadas">
-                <CategoriesPage />
+                <CategoriesBrowsePage />
+              </ModuleRoute>
+            }
+          />
+          <Route
+            path="/marcas"
+            element={
+              <ModuleRoute required={['products', 'categories']} title="Marcas desactivadas">
+                <BrandsPage />
+              </ModuleRoute>
+            }
+          />
+          <Route
+            path="/colecciones"
+            element={
+              <ModuleRoute required={['products', 'categories']} title="Colecciones desactivadas">
+                <CollectionsPage />
               </ModuleRoute>
             }
           />
@@ -198,7 +249,23 @@ const AppContent = () => {
             path="/categoria/:categoria"
             element={
               <ModuleRoute required={['products', 'categories']} title="Categorias desactivadas">
-                <CategoriasPage />
+                <CategoryDetailPage />
+              </ModuleRoute>
+            }
+          />
+          <Route
+            path="/marcas/:brand"
+            element={
+              <ModuleRoute required={['products', 'categories']} title="Marcas desactivadas">
+                <BrandDetailPage />
+              </ModuleRoute>
+            }
+          />
+          <Route
+            path="/colecciones/:collection"
+            element={
+              <ModuleRoute required={['products', 'categories']} title="Colecciones desactivadas">
+                <CollectionDetailPage />
               </ModuleRoute>
             }
           />
@@ -246,6 +313,14 @@ const AppContent = () => {
                   <OrdersPage />
                 </ModuleRoute>
               </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pedido/:lookupToken"
+            element={
+              <ModuleRoute required="orders" title="Pedidos desactivados">
+                <PublicOrderPage />
+              </ModuleRoute>
             }
           />
           <Route

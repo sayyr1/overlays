@@ -26,7 +26,9 @@ const LoginPage = () => {
       const loggedUser = await login({ email, password });
       const destination = loggedUser?.role === 'superadmin'
         ? '/super-admin'
-        : safeRedirect;
+        : loggedUser?.isAdmin
+          ? '/admin-dashboard'
+          : safeRedirect;
       navigate(destination, { replace: true });
       window.setTimeout(() => {
         document.getElementById('main-content')?.focus();

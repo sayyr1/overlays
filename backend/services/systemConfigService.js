@@ -6,8 +6,8 @@ import TextSetting from '../models/TextSetting.js';
 import { ensureDefaultCRMConfig } from './crmConfigService.js';
 
 const DEFAULT_SYSTEM_SETTINGS = {
-  businessName: 'Niway Store',
-  tradeName: 'Niway Store',
+  businessName: 'Tu negocio',
+  tradeName: 'Tu tienda',
   country: 'Ecuador',
   currency: 'USD',
   timezone: 'America/Guayaquil',
@@ -16,13 +16,14 @@ const DEFAULT_SYSTEM_SETTINGS = {
   whatsapp: '',
   address: '',
   socialLinks: {},
-  footerText: 'Todos los derechos reservados.'
+  footerText: 'Todos los derechos reservados.',
+  enableInternalProductImages: false
 };
 
 const DEFAULT_BRANDING_SETTINGS = {
   logoUrl: '',
   faviconUrl: '',
-  navbarName: 'Niway Store',
+  navbarName: 'Tu tienda',
   primaryColor: '#0f766e',
   secondaryColor: '#111827',
   backgroundColor: '#0b1220',

@@ -5,6 +5,7 @@ import CRMContact from '../models/CRMContact.js';
 import CRMTask from '../models/CRMTask.js';
 import CartSnapshot from '../models/CartSnapshot.js';
 import CustomerNote from '../models/CustomerNote.js';
+import User, { USER_ROLES } from '../models/User.js';
 import { CRM_TASK_STATUSES } from '../models/CRMTask.js';
 import { CRM_STATUSES } from '../models/CRMContact.js';
 import { getCRMConfig } from '../services/crmConfigService.js';
@@ -20,6 +21,16 @@ const router = express.Router();
 router.use(protect, adminOnly, requireModuleEnabled('crm'));
 
 const parseBoolean = value => value === true || value === 'true';
+const ACTIONABLE_CONTACT_STATUSES = ['new_lead', 'contacted', 'link_sent', 'interested', 'cart_abandoned', 'inactive'];
+
+const getCrmOwners = async () => {
+  const owners = await User.find({ role: { $in: [USER_ROLES.SALES, USER_ROLES.OWNER, USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] } })
+    .select('name email role')
+    .sort({ name: 1, email: 1 })
+    .lean();
+
+  return owners;
+};
 
 router.get('/dashboard', requirePermission('crm', 'dashboard'), async (req, res) => {
   const data = await getCRMDashboardData();
@@ -27,8 +38,17 @@ router.get('/dashboard', requirePermission('crm', 'dashboard'), async (req, res)
 });
 
 router.get('/pipeline', requirePermission('crm', 'pipelineView'), async (req, res) => {
-  const contacts = await getCRMKanbanData();
-  res.json(contacts);
+  const [contacts, config] = await Promise.all([
+    getCRMKanbanData(),
+    getCRMConfig()
+  ]);
+  res.json({
+    contacts,
+    spotlightConfig: {
+      recentEntryHours: Number(config?.recentEntryHours || 36),
+      newCustomerHighlightDays: Number(config?.newCustomerHighlightDays || 7)
+    }
+  });
 });
 
 router.get('/contacts', requirePermission('crm', 'contactsView'), async (req, res) => {
@@ -36,6 +56,8 @@ router.get('/contacts', requirePermission('crm', 'contactsView'), async (req, re
     q = '',
     status = '',
     tag = '',
+    ownerId = '',
+    missingNextAction = 'false',
     onlyActionable = 'false'
   } = req.query || {};
 
@@ -43,11 +65,14 @@ router.get('/contacts', requirePermission('crm', 'contactsView'), async (req, re
   if (status) {
     query.status = status;
   }
+  if (ownerId) {
+    query.owner = ownerId;
+  }
   if (tag) {
     query.tags = tag;
   }
   if (parseBoolean(onlyActionable)) {
-    query.status = { $in: ['new_lead', 'contacted', 'link_sent', 'interested', 'cart_abandoned', 'inactive'] };
+    query.status = { $in: ACTIONABLE_CONTACT_STATUSES };
   }
   if (q) {
     query.$or = [
@@ -60,13 +85,57 @@ router.get('/contacts', requirePermission('crm', 'contactsView'), async (req, re
     ];
   }
 
-  const contacts = await CRMContact.find(query)
-    .sort({ lastSeenAt: -1, updatedAt: -1 })
-    .limit(300)
-    .lean();
+  let missingNextActionIds = [];
+  if (parseBoolean(missingNextAction)) {
+    const openTaskContactIds = await CRMTask.find({ status: { $in: ['pending', 'overdue'] } }).distinct('contact');
+    missingNextActionIds = await CRMContact.find({
+      status: { $in: ACTIONABLE_CONTACT_STATUSES },
+      _id: { $nin: openTaskContactIds }
+    }).distinct('_id');
+    query._id = { $in: missingNextActionIds };
+  }
+
+  const [contactsRaw, owners, openTasks] = await Promise.all([
+    CRMContact.find(query)
+      .populate('owner', 'name email role')
+      .sort({ lastSeenAt: -1, updatedAt: -1 })
+      .limit(300)
+      .lean(),
+    getCrmOwners(),
+    CRMTask.find({ status: { $in: ['pending', 'overdue'] } })
+      .select('contact title dueDate status')
+      .sort({ dueDate: 1, createdAt: -1 })
+      .lean()
+  ]);
+
+  const openTaskMap = new Map();
+  openTasks.forEach(task => {
+    const contactId = task.contact?.toString();
+    if (contactId && !openTaskMap.has(contactId)) {
+      openTaskMap.set(contactId, task);
+    }
+  });
+
+  const contacts = contactsRaw.map(contact => {
+    const nextTask = openTaskMap.get(contact._id.toString()) || null;
+    const nextActionRequired = ACTIONABLE_CONTACT_STATUSES.includes(contact.status) && !nextTask;
+
+    return {
+      ...contact,
+      nextActionRequired,
+      nextTask: nextTask
+        ? {
+            _id: nextTask._id,
+            title: nextTask.title,
+            dueDate: nextTask.dueDate,
+            status: nextTask.status
+          }
+        : null
+    };
+  });
 
   const statuses = CRM_STATUSES.map(value => ({ value, label: value }));
-  res.json({ contacts, statuses });
+  res.json({ contacts, statuses, owners });
 });
 
 router.post('/contacts', requirePermission('crm', 'contactsEdit'), async (req, res) => {
@@ -79,6 +148,7 @@ router.post('/contacts', requirePermission('crm', 'contactsEdit'), async (req, r
     source: req.body?.source || '',
     medium: req.body?.medium || '',
     campaign: req.body?.campaign || '',
+    ownerId: req.body?.ownerId || req.user?._id || null,
     leadCode: req.body?.leadCode || '',
     status: req.body?.status || 'new_lead',
     tags: sanitizeTags(req.body?.tags || []),
@@ -107,7 +177,36 @@ router.get('/contacts/:id', requirePermission('crm', 'contactsView'), async (req
   if (!detail) {
     return res.status(404).json({ message: 'Contacto no encontrado' });
   }
-  res.json(detail);
+  const owners = await getCrmOwners();
+  res.json({ ...detail, owners });
+});
+
+router.patch('/contacts/:id/stage', requirePermission('crm', 'pipelineManage'), async (req, res) => {
+  const contact = await CRMContact.findById(req.params.id);
+  if (!contact) {
+    return res.status(404).json({ message: 'Contacto no encontrado' });
+  }
+
+  const nextStatus = String(req.body?.status || '').trim();
+  if (!CRM_STATUSES.includes(nextStatus)) {
+    return res.status(400).json({ message: 'Estado CRM no valido.' });
+  }
+
+  contact.status = nextStatus;
+  contact.lastSeenAt = new Date();
+  await contact.save();
+
+  await createCRMEvent({
+    contactId: contact._id,
+    adminId: req.user?._id || null,
+    eventType: 'manual_contact_done',
+    metadata: {
+      source: 'pipeline_drag_drop',
+      status: nextStatus
+    }
+  });
+
+  res.json(contact);
 });
 
 router.put('/contacts/:id', requirePermission('crm', 'contactsEdit'), async (req, res) => {
@@ -134,6 +233,9 @@ router.put('/contacts/:id', requirePermission('crm', 'contactsEdit'), async (req
 
   if (Array.isArray(req.body?.tags)) {
     contact.tags = sanitizeTags(req.body.tags);
+  }
+  if (req.body?.ownerId !== undefined) {
+    contact.owner = req.body.ownerId || null;
   }
 
   if (req.body?.phone !== undefined) {
@@ -164,6 +266,79 @@ router.put('/contacts/:id', requirePermission('crm', 'contactsEdit'), async (req
   }
 
   res.json(contact);
+});
+
+router.post('/contacts/bulk-update', requirePermission('crm', 'contactsEdit'), async (req, res) => {
+  const contactIds = Array.isArray(req.body?.contactIds)
+    ? req.body.contactIds.filter(Boolean)
+    : [];
+
+  if (!contactIds.length) {
+    return res.status(400).json({ message: 'Selecciona al menos un contacto.' });
+  }
+
+  const updates = {};
+  if (req.body?.status !== undefined) {
+    updates.status = req.body.status;
+  }
+  if (req.body?.ownerId !== undefined) {
+    updates.owner = req.body.ownerId || null;
+  }
+  if (parseBoolean(req.body?.markContacted)) {
+    updates.lastContactedAt = new Date();
+    updates.lastSeenAt = new Date();
+  }
+
+  if (Object.keys(updates).length) {
+    await CRMContact.updateMany({ _id: { $in: contactIds } }, { $set: updates });
+  }
+
+  if (req.body?.addTag || req.body?.removeTag) {
+    const contacts = await CRMContact.find({ _id: { $in: contactIds } });
+    await Promise.all(
+      contacts.map(async contact => {
+        let nextTags = [...(contact.tags || [])];
+        if (req.body?.addTag) {
+          nextTags.push(req.body.addTag);
+        }
+        if (req.body?.removeTag) {
+          nextTags = nextTags.filter(tag => tag !== req.body.removeTag);
+        }
+        contact.tags = sanitizeTags(nextTags);
+        if (updates.lastContactedAt) {
+          contact.lastContactedAt = updates.lastContactedAt;
+          contact.lastSeenAt = updates.lastSeenAt;
+        }
+        if (updates.status) {
+          contact.status = updates.status;
+        }
+        if (Object.prototype.hasOwnProperty.call(updates, 'owner')) {
+          contact.owner = updates.owner;
+        }
+        await contact.save();
+      })
+    );
+  }
+
+  await Promise.all(
+    contactIds.map(contactId =>
+      createCRMEvent({
+        contactId,
+        adminId: req.user?._id || null,
+        eventType: 'manual_contact_done',
+        metadata: {
+          source: 'bulk_update',
+          status: req.body?.status || '',
+          ownerId: req.body?.ownerId || '',
+          addTag: req.body?.addTag || '',
+          removeTag: req.body?.removeTag || '',
+          markContacted: parseBoolean(req.body?.markContacted)
+        }
+      })
+    )
+  );
+
+  res.json({ success: true, updatedCount: contactIds.length });
 });
 
 router.post('/contacts/:id/notes', requirePermission('crm', 'contactsEdit'), async (req, res) => {
@@ -444,6 +619,8 @@ router.put('/config', requirePermission('crm', 'configManage'), async (req, res)
 
   [
     'abandonedCartHours',
+    'recentEntryHours',
+    'newCustomerHighlightDays',
     'postSaleFollowUpDays',
     'inactiveCustomerDays',
     'vipSpendThreshold',

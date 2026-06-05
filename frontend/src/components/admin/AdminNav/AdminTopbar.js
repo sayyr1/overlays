@@ -15,6 +15,7 @@ const routeTitles = {
   '/dashboard': 'Catalogo de productos',
   '/crear-producto': 'Nuevo producto',
   '/gestionar-categorias': 'Gestion de categorias',
+  '/product-private': 'Detalle de producto',
   '/menu-builder': 'Constructor de menu',
   '/crm': 'CRM',
   '/crm/pipeline': 'Pipeline CRM',
@@ -169,10 +170,15 @@ const AdminTopbar = ({ handleLogout, user }) => {
       .find(route => location.pathname.startsWith(route));
     return routeTitles[match] ?? 'Panel administrativo';
   }, [location.pathname]);
+  const isCrmRoute = location.pathname.startsWith('/crm');
+  const isCatalogRoute =
+    location.pathname.startsWith('/dashboard') ||
+    location.pathname.startsWith('/crear-producto') ||
+    location.pathname.startsWith('/editar-producto');
 
   const handleSubmit = event => {
     event.preventDefault();
-    if (!isModuleEnabled('inventory') || !hasAnyCatalogVisibility) {
+    if (!isCatalogRoute || !isModuleEnabled('inventory') || !hasAnyCatalogVisibility) {
       return;
     }
     const trimmed = searchTerm.trim();
@@ -212,6 +218,9 @@ const AdminTopbar = ({ handleLogout, user }) => {
     isModuleEnabled('products') &&
     isModuleEnabled('categories') &&
     hasPermission('products.create');
+  const showCatalogSearch = isCatalogRoute && inventoryEnabled && hasAnyCatalogVisibility;
+  const showCreateProductAction = productsEnabled && !isCrmRoute;
+  const showCrmTaskShortcut = isCrmRoute && hasPermission('crm.tasksView');
 
   return (
     <>
@@ -230,22 +239,31 @@ const AdminTopbar = ({ handleLogout, user }) => {
         </div>
 
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <form onSubmit={handleSubmit} className="relative flex-1">
-            <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
-              <HiOutlineMagnifyingGlass className="text-lg" aria-hidden="true" />
-            </span>
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={event => setSearchTerm(event.target.value)}
-              placeholder="Buscar por nombre, codigo o SKU"
-              disabled={!inventoryEnabled || !hasAnyCatalogVisibility}
-              className="w-full rounded-xl border border-surface-200 bg-white px-10 py-2.5 text-sm text-slate-600 shadow-sm focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
-            />
-          </form>
+          <div className="flex-1">
+            {showCatalogSearch ? (
+              <form onSubmit={handleSubmit} className="relative">
+                <span className="absolute inset-y-0 left-3 flex items-center text-slate-400">
+                  <HiOutlineMagnifyingGlass className="text-lg" aria-hidden="true" />
+                </span>
+                <input
+                  type="search"
+                  value={searchTerm}
+                  onChange={event => setSearchTerm(event.target.value)}
+                  placeholder="Buscar por nombre, codigo o SKU"
+                  className="w-full rounded-xl border border-surface-200 bg-white px-10 py-2.5 text-sm text-slate-600 shadow-sm focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                />
+              </form>
+            ) : (
+              <div className="rounded-xl border border-surface-200 bg-white px-4 py-2.5 text-sm text-slate-500 shadow-sm">
+                {isCrmRoute
+                  ? 'Trabaja leads, tareas y seguimiento desde este modulo.'
+                  : 'Navega el backoffice desde el menu lateral.'}
+              </div>
+            )}
+          </div>
 
           <div className="flex items-center gap-3">
-            {productsEnabled && (
+            {showCreateProductAction && (
               <button
                 type="button"
                 onClick={() => navigate('/crear-producto')}
@@ -253,6 +271,17 @@ const AdminTopbar = ({ handleLogout, user }) => {
               >
                 <HiOutlinePlusCircle className="text-lg" />
                 Crear producto
+              </button>
+            )}
+
+            {showCrmTaskShortcut && (
+              <button
+                type="button"
+                onClick={() => navigate('/crm/tareas')}
+                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-brand-sm transition hover:bg-slate-800"
+              >
+                <HiOutlinePlusCircle className="text-lg" />
+                Nueva tarea CRM
               </button>
             )}
 

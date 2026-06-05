@@ -52,6 +52,7 @@ export const findContactByIdentity = async ({ contactId = null, userId = null, p
 
 export const upsertCRMContact = async ({
   userId = null,
+  ownerId = null,
   contactId = null,
   name = '',
   phone = '',
@@ -83,6 +84,7 @@ export const upsertCRMContact = async ({
   if (!contact) {
     contact = new CRMContact({
       user: userId || null,
+      owner: ownerId || null,
       name: name || '',
       phone: phone || '',
       phoneNormalized,
@@ -103,6 +105,7 @@ export const upsertCRMContact = async ({
     });
   } else {
     if (!contact.user && userId) contact.user = userId;
+    if (!contact.owner && ownerId) contact.owner = ownerId;
     if (!contact.name && name) contact.name = name;
     if (!contact.phone && phone) contact.phone = phone;
     if (!contact.phoneNormalized && phoneNormalized) contact.phoneNormalized = phoneNormalized;

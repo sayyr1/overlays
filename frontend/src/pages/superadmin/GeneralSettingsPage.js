@@ -24,6 +24,7 @@ const GeneralSettingsPage = () => {
         whatsapp: data?.whatsapp || '',
         address: data?.address || '',
         footerText: data?.footerText || '',
+        enableInternalProductImages: Boolean(data?.enableInternalProductImages),
         socialLinks: {
           ...emptySocials,
           ...socialLinks
@@ -38,8 +39,11 @@ const GeneralSettingsPage = () => {
   }
 
   const handleChange = event => {
-    const { name, value } = event.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = event.target;
+    setForm(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
 
   const handleSocialChange = event => {
@@ -117,6 +121,31 @@ const GeneralSettingsPage = () => {
             className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2"
           />
         </label>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Fotos internas de producto
+              </h3>
+              <p className="mt-1 text-sm text-slate-500">
+                Separa fotos internas para el equipo y fotos publicas para la tienda.
+                Cuando esta opcion esta apagada, la tienda sigue mostrando solo fotos
+                publicas y el backoffice vuelve al flujo simple.
+              </p>
+            </div>
+            <label className="inline-flex items-center gap-3 text-sm font-medium text-slate-700">
+              <input
+                type="checkbox"
+                name="enableInternalProductImages"
+                checked={form.enableInternalProductImages}
+                onChange={handleChange}
+                className="h-4 w-4 rounded border-slate-300"
+              />
+              Activar
+            </label>
+          </div>
+        </div>
 
         <div className="grid gap-4 md:grid-cols-2">
           {Object.keys(form.socialLinks).map(key => (

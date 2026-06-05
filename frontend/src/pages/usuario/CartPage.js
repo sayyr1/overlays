@@ -5,7 +5,9 @@ import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { usePublicConfig } from '../../context/PublicConfigContext';
 import { captureContactLead, trackCheckoutStarted } from '../../services/crmTracking';
+import { saveGuestOrderTracking } from '../../utils/guestOrderTracking';
 import { formatCurrency } from '../../utils/pricing';
+import { ORDER_HOLD_LABEL } from '../../utils/orderConstants';
 import { formatOrderStatus, getOrderStatusBadgeClass } from '../../utils/orderStatus';
 
 const getOrderLabel = order => {
@@ -13,6 +15,27 @@ const getOrderLabel = order => {
   if (order.orderId) return order.orderId;
   if (order.id) return order.id.toString().slice(-6).toUpperCase();
   return '';
+};
+
+const buildOrderDestination = (order, isAuthenticated) => {
+  if (order?.lookupToken) {
+    return {
+      to: `/pedido/${order.lookupToken}`,
+      state: undefined
+    };
+  }
+
+  if (isAuthenticated) {
+    return {
+      to: '/mis-pedidos',
+      state: { highlightOrder: order?.id || order?.orderId }
+    };
+  }
+
+  return {
+    to: '/productos',
+    state: undefined
+  };
 };
 
 const CartPage = () => {
@@ -96,8 +119,8 @@ const CartPage = () => {
     setIsSubmitting(false);
     setSubmitError('');
     if (redirectToOrders && orderResult) {
-      const highlightOrder = orderResult.id || orderResult.orderId;
-      navigate('/mis-pedidos', { state: { highlightOrder } });
+      const destination = buildOrderDestination(orderResult, isAuthenticated);
+      navigate(destination.to, destination.state ? { state: destination.state } : undefined);
     }
   };
 
@@ -162,10 +185,29 @@ const CartPage = () => {
         items: items.map(item => ({ ...item }))
       };
       const { data } = await axios.post('/api/orders', payload, { withCredentials: true });
+      const shouldRedirectToGuestOrder = !isAuthenticated && data?.lookupToken;
+
+      if (shouldRedirectToGuestOrder) {
+        saveGuestOrderTracking({
+          lookupToken: data.lookupToken,
+          orderId: data.orderId || data.id || ''
+        });
+      }
+
       setCheckoutSummary(summary);
       setOrderResult(data);
       await clearCart();
       setSubmitError('');
+
+      if (shouldRedirectToGuestOrder) {
+        setCheckoutOpen(false);
+        navigate(`/pedido/${data.lookupToken}`, {
+          state: {
+            justCreated: true,
+            orderId: data.orderId || data.id || ''
+          }
+        });
+      }
     } catch (error) {
       const message =
         error?.response?.data?.message || 'No se pudo crear el pedido. Intenta nuevamente.';
@@ -218,6 +260,13 @@ const CartPage = () => {
     : null;
 
   const orderLabel = getOrderLabel(orderResult);
+  const orderDestination = buildOrderDestination(orderResult, isAuthenticated);
+  const hasPublicTracking = Boolean(orderResult?.lookupToken);
+  const orderActionLabel = hasPublicTracking
+    ? 'Seguir pedido'
+    : isAuthenticated
+      ? 'Ver pedido'
+      : 'Volver al catalogo';
 
   return (
     <div className="bg-gray-50 min-h-screen">
@@ -243,8 +292,10 @@ const CartPage = () => {
               </span>
             </div>
             <p className="mt-3 text-sm text-brand/90">
-              {textMap.order_created_message ||
-                'Hemos reservado tu stock durante 24 horas. Dirígete a la sección de pedidos para seguir el estado de tu orden.'}
+              {textMap.order_created_message || 'Tu pedido fue creado correctamente.'}
+            </p>
+            <p className="mt-1 text-sm text-brand/90">
+              {`Hemos reservado tu stock durante ${ORDER_HOLD_LABEL}. Sigue el estado de tu pedido desde su pagina de seguimiento.`}
             </p>
             {expirationLabel && (
               <p className="mt-1 text-xs text-brand/80">
@@ -253,11 +304,11 @@ const CartPage = () => {
             )}
             <div className="mt-4 flex flex-col gap-2 sm:flex-row">
               <Link
-                to="/mis-pedidos"
-                state={{ highlightOrder: orderResult.id || orderResult.orderId }}
+                to={orderDestination.to}
+                state={orderDestination.state}
                 className="inline-flex flex-1 items-center justify-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-brand-sm transition hover:bg-brand-dark"
               >
-                Ver pedido
+                {orderActionLabel}
               </Link>
               <button
                 type="button"
@@ -379,7 +430,7 @@ const CartPage = () => {
                 </p>
                 {expirationLabel && (
                   <p className="text-sm text-gray-500 mb-4">
-                    Tu pedido expira el {expirationLabel}. Pasadas 24 horas se liberara la reserva automaticamente.
+                    Tu pedido expira el {expirationLabel}. Pasadas {ORDER_HOLD_LABEL} se liberara la reserva automaticamente.
                   </p>
                 )}
                 <h4 className="text-sm font-semibold text-gray-700 mb-2">Métodos de pago activos</h4>
@@ -443,7 +494,7 @@ const CartPage = () => {
                     className="flex-1 rounded-md bg-brand px-4 py-2 text-white font-medium hover:bg-brand-dark transition"
                     type="button"
                   >
-                    Ver mis pedidos
+                    {hasPublicTracking ? 'Seguir pedido' : isAuthenticated ? 'Ver mis pedidos' : 'Volver al catalogo'}
                   </button>
                   <button
                     onClick={() => closeCheckout(false)}
@@ -459,10 +510,15 @@ const CartPage = () => {
                 <h3 className="text-2xl font-semibold text-gray-800">
                   {textMap.checkout_title || 'Datos de contacto'}
                 </h3>
-                <p className="text-sm text-gray-600">
-                  {textMap.payment_instructions ||
-                    'Guardaremos tu pedido como pendiente durante 24 horas. Completa los datos para poder contactarte y reservar el stock.'}
-                </p>
+                <div className="space-y-1 text-sm text-gray-600">
+                  <p>
+                    {textMap.payment_instructions ||
+                      'Completa el pago usando uno de los metodos activos y comparte el comprobante.'}
+                  </p>
+                  <p>
+                    {`Guardaremos tu pedido como pendiente durante ${ORDER_HOLD_LABEL}. Completa los datos para poder contactarte y reservar el stock.`}
+                  </p>
+                </div>
                 <div className="space-y-3">
                   <label className="block text-sm text-gray-700">
                     Nombre y apellido

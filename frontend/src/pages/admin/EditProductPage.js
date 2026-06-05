@@ -13,6 +13,14 @@ import {
   aggregateSizesFromVariants,
   buildNestedVariantsWithFallback
 } from '../../utils/inventory';
+import {
+  getImageKey,
+  isImageCover,
+  makeImageCover,
+  reorderImagesWithinVisibility,
+  sortImagesForPayload,
+  updateImageVisibility
+} from '../../utils/productImages';
 
 const createEmptyPrice = () => ({
   retail: '',
@@ -24,7 +32,7 @@ const createEmptyPrice = () => ({
 const DEFAULT_GENDERS = ['Unisex', 'Hombre', 'Mujer', 'Nino', 'Nina'];
 
 const EditProductPage = () => {
-  const { isModuleEnabled } = usePublicConfig();
+  const { isModuleEnabled, settings } = usePublicConfig();
   const { hasPermission } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
@@ -32,6 +40,7 @@ const EditProductPage = () => {
   const canUploadImages = hasPermission('products.upload');
   const canSeeInventory = hasPermission('inventory.view') || hasPermission('inventory.adjust');
   const canEditImages = hasPermission('products.edit');
+  const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
 
   const [form, setForm] = useState({
     name: '',
@@ -49,8 +58,11 @@ const EditProductPage = () => {
   const [activeColor, setActiveColor] = useState('');
   const [colorToAdd, setColorToAdd] = useState('');
   const [existingImages, setExistingImages] = useState([]);
-  const [files, setFiles] = useState([]);
-  const [previewImages, setPreviewImages] = useState([]);
+  const [pendingImages, setPendingImages] = useState([]);
+  const [uploadVisibility, setUploadVisibility] = useState('public');
+  const [coverImageKey, setCoverImageKey] = useState('');
+  const [draggedExistingImageKey, setDraggedExistingImageKey] = useState('');
+  const [draggedPendingImageKey, setDraggedPendingImageKey] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -156,7 +168,16 @@ const EditProductPage = () => {
 
         setVariantState(state);
         setActiveColor(Array.from(colorKeys)[0] || '');
-        setExistingImages(product.images || []);
+        setExistingImages([
+          ...((product.images || []).map(image => ({
+            ...image,
+            visibility: image.visibility || 'public'
+          }))),
+          ...((product.internalImages || []).map(image => ({
+            ...image,
+            visibility: image.visibility || 'internal'
+          })))
+        ]);
         setOriginalInventory({
           stockByColorSize: product.stockByColorSize || {},
           stockBySize: product.stockBySize || {},
@@ -185,9 +206,9 @@ const EditProductPage = () => {
 
   useEffect(
     () => () => {
-      previewImages.forEach(url => URL.revokeObjectURL(url));
+      pendingImages.forEach(item => URL.revokeObjectURL(item.previewUrl));
     },
-    [previewImages]
+    [pendingImages]
   );
 
   const selectedColors = useMemo(() => Object.keys(variantState), [variantState]);
@@ -362,11 +383,19 @@ const EditProductPage = () => {
 
   const handleNewImages = event => {
     const selected = event.target.files ? Array.from(event.target.files) : [];
-    setFiles(selected);
-    setPreviewImages(prev => {
-      prev.forEach(url => URL.revokeObjectURL(url));
-      return selected.map(file => URL.createObjectURL(file));
-    });
+    if (!selected.length) {
+      return;
+    }
+    setPendingImages(prev => [
+      ...prev,
+      ...selected.map(file => ({
+        clientId: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        visibility: imageVisibilityEnabled ? uploadVisibility : 'public'
+      }))
+    ]);
+    event.target.value = '';
   };
 
   const handleAttributeChange = (key, value) => {
@@ -379,20 +408,25 @@ const EditProductPage = () => {
     }));
   };
 
-  const removePreviewImage = index => {
-    setPreviewImages(prev => {
-      const target = prev[index];
-      if (target) {
-        URL.revokeObjectURL(target);
+  const removePreviewImage = imageKey => {
+    setPendingImages(prev => {
+      const target = prev.find(item => getImageKey(item) === imageKey);
+      if (target && getImageKey(target) === coverImageKey) {
+        setCoverImageKey('');
       }
-      return prev.filter((_, current) => current !== index);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
+      }
+      return prev.filter(item => getImageKey(item) !== imageKey);
     });
-    setFiles(prev => prev.filter((_, current) => current !== index));
   };
 
   const removeExistingImage = async publicId => {
     try {
       await axios.delete(`/api/products/${id}/image/${publicId}`, { withCredentials: true });
+      if (coverImageKey === publicId) {
+        setCoverImageKey('');
+      }
       setExistingImages(prev => prev.filter(img => img.public_id !== publicId));
     } catch (error) {
       console.error('Error al eliminar imagen', error);
@@ -410,23 +444,31 @@ const EditProductPage = () => {
     };
   }, [form.price]);
 
-  const uploadNewImages = async () => {
-    if (!files.length) return [];
+  const uploadNewImages = async imageItems => {
+    if (!imageItems.length) return [];
     const options = { maxSizeMB: 0.5, maxWidthOrHeight: 800, useWebWorker: true };
     const formData = new FormData();
-    for (const file of files) {
+    const normalizedItems = [];
+    for (const item of imageItems) {
       try {
-        const compressed = await imageCompression(file, options);
+        const compressed = await imageCompression(item.file, options);
         formData.append('images', compressed);
+        normalizedItems.push(item);
       } catch (error) {
         console.error('Error al comprimir imagen', error);
       }
     }
+    if (!normalizedItems.length) return [];
     try {
       const response = await axios.post('/api/products/upload-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      return response.data.images;
+      const uploaded = Array.isArray(response.data?.images) ? response.data.images : [];
+      return uploaded.map((image, index) => ({
+        ...image,
+        clientId: normalizedItems[index]?.clientId || image.public_id,
+        visibility: normalizedItems[index]?.visibility || 'public'
+      }));
     } catch (error) {
       console.error('Error al subir imagenes', error);
       return [];
@@ -475,8 +517,23 @@ const EditProductPage = () => {
       const productColors = inventoryEnabled && canSeeInventory
         ? Object.keys(sanitizedByColor)
         : originalInventory.colors;
-      const uploadedImages = canUploadImages ? await uploadNewImages() : [];
-      const images = [...existingImages, ...uploadedImages];
+      const orderedPendingImages = sortImagesForPayload(pendingImages, imageVisibilityEnabled);
+      const uploadedImages = canUploadImages ? await uploadNewImages(orderedPendingImages) : [];
+      let images = sortImagesForPayload([...existingImages, ...uploadedImages], imageVisibilityEnabled);
+
+      if (
+        imageVisibilityEnabled &&
+        images.length > 0 &&
+        !images.some(image => image.visibility !== 'internal')
+      ) {
+        window.alert('Mantén al menos una foto publica para la tienda o elimina las fotos internas.');
+        setSubmitting(false);
+        return;
+      }
+
+      if (coverImageKey) {
+        images = makeImageCover(images, coverImageKey, imageVisibilityEnabled);
+      }
 
       const attributes = {};
       dynamicAttributeKeys.forEach(k => {
@@ -503,11 +560,13 @@ const EditProductPage = () => {
 
       await axios.put(`/api/products/${id}`, payload, { withCredentials: true });
       window.alert('Producto actualizado correctamente');
-      setFiles([]);
-      setPreviewImages(prev => {
-        prev.forEach(url => URL.revokeObjectURL(url));
+      setPendingImages(prev => {
+        prev.forEach(item => URL.revokeObjectURL(item.previewUrl));
         return [];
       });
+      setDraggedExistingImageKey('');
+      setDraggedPendingImageKey('');
+      setCoverImageKey('');
       navigate('/dashboard');
     } catch (error) {
       console.error('Error al actualizar producto', error);
@@ -520,6 +579,157 @@ const EditProductPage = () => {
   if (loading) {
     return <div className="min-h-screen bg-gray-50 p-6 text-center text-gray-500">Cargando...</div>;
   }
+
+  const publicExistingImages = existingImages.filter(image => image.visibility !== 'internal');
+  const internalExistingImages = existingImages.filter(image => image.visibility === 'internal');
+  const publicPendingImages = pendingImages.filter(image => image.visibility !== 'internal');
+  const internalPendingImages = pendingImages.filter(image => image.visibility === 'internal');
+
+  const handleExistingVisibilityChange = (imageKey, nextVisibility) => {
+    setExistingImages(prev => updateImageVisibility(prev, imageKey, nextVisibility, imageVisibilityEnabled));
+    if (nextVisibility === 'internal' && coverImageKey === imageKey) {
+      setCoverImageKey('');
+    }
+  };
+
+  const handlePendingVisibilityChange = (imageKey, nextVisibility) => {
+    setPendingImages(prev => updateImageVisibility(prev, imageKey, nextVisibility, imageVisibilityEnabled));
+    if (nextVisibility === 'internal' && coverImageKey === imageKey) {
+      setCoverImageKey('');
+    }
+  };
+
+  const handleSetCoverImage = imageKey => {
+    if (existingImages.some(image => getImageKey(image) === imageKey)) {
+      setExistingImages(prev => makeImageCover(prev, imageKey, imageVisibilityEnabled));
+    }
+    if (pendingImages.some(image => getImageKey(image) === imageKey)) {
+      setPendingImages(prev => makeImageCover(prev, imageKey, imageVisibilityEnabled));
+    }
+    setCoverImageKey(imageKey);
+  };
+
+  const handleExistingDrop = (targetKey, visibility) => {
+    if (!draggedExistingImageKey) return;
+    setExistingImages(prev =>
+      reorderImagesWithinVisibility(prev, {
+        draggedKey: draggedExistingImageKey,
+        targetKey,
+        visibility,
+        enabled: imageVisibilityEnabled
+      })
+    );
+    setDraggedExistingImageKey('');
+  };
+
+  const handlePendingDrop = (targetKey, visibility) => {
+    if (!draggedPendingImageKey) return;
+    setPendingImages(prev =>
+      reorderImagesWithinVisibility(prev, {
+        draggedKey: draggedPendingImageKey,
+        targetKey,
+        visibility,
+        enabled: imageVisibilityEnabled
+      })
+    );
+    setDraggedPendingImageKey('');
+  };
+
+  const renderEditableImageSection = ({
+    title,
+    images,
+    visibility,
+    kind
+  }) => (
+    <div className="space-y-3">
+      {imageVisibilityEnabled && (
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+          {title}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-4">
+        {images.map((image, index) => {
+          const imageKey = getImageKey(image);
+          const cover = coverImageKey
+            ? coverImageKey === imageKey
+            : isImageCover(existingImages, imageKey, imageVisibilityEnabled);
+
+          return (
+            <div
+              key={imageKey}
+              draggable
+              onDragStart={() =>
+                kind === 'existing'
+                  ? setDraggedExistingImageKey(imageKey)
+                  : setDraggedPendingImageKey(imageKey)
+              }
+              onDragOver={event => event.preventDefault()}
+              onDrop={() =>
+                kind === 'existing'
+                  ? handleExistingDrop(imageKey, visibility)
+                  : handlePendingDrop(imageKey, visibility)
+              }
+              className="relative w-28 rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
+            >
+              <ProductImage
+                src={image.previewUrl || image.url}
+                alt={image.public_id || `preview-${index}`}
+                className="h-24 w-full rounded-md object-cover"
+              />
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="cursor-move text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Arrastrar
+                  </span>
+                  {cover && visibility === 'public' && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      {coverImageKey === imageKey ? 'Portada al guardar' : 'Portada'}
+                    </span>
+                  )}
+                </div>
+                {imageVisibilityEnabled && (
+                  <select
+                    value={image.visibility}
+                    onChange={event =>
+                      kind === 'existing'
+                        ? handleExistingVisibilityChange(imageKey, event.target.value)
+                        : handlePendingVisibilityChange(imageKey, event.target.value)
+                    }
+                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-700"
+                  >
+                    <option value="public">Publica</option>
+                    <option value="internal">Interna</option>
+                  </select>
+                )}
+                {visibility === 'public' && !cover && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetCoverImage(imageKey)}
+                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700"
+                  >
+                    Usar como portada
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  kind === 'existing'
+                    ? removeExistingImage(image.public_id)
+                    : removePreviewImage(imageKey)
+                }
+                disabled={kind === 'existing' && !canEditImages}
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"
+                aria-label="Eliminar imagen"
+              >
+                x
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -876,33 +1086,59 @@ const EditProductPage = () => {
 
           <div>
             <h4 className="mb-2 text-sm font-semibold text-gray-700">Imagenes actuales</h4>
-            <div className="flex flex-wrap gap-4">
-              {existingImages.map(image => (
-                <div key={image.public_id} className="relative h-24 w-24">
-                  <ProductImage
-                    src={image.url}
-                    alt={image.public_id}
-                    className="h-full w-full rounded-md object-cover"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeExistingImage(image.public_id)}
-                    disabled={!canEditImages}
-                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"
-                    aria-label="Eliminar imagen"
-                  >
-                    x
-                  </button>
-                </div>
-              ))}
-              {!existingImages.length && (
-                <p className="text-sm text-gray-500">No hay imagenes cargadas.</p>
+            <div className="space-y-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                La primera foto publica sera la portada de la tienda. Arrastra para ordenar.
+              </div>
+              {imageVisibilityEnabled ? (
+                <>
+                  {publicExistingImages.length
+                    ? renderEditableImageSection({
+                        title: 'Publicas',
+                        images: publicExistingImages,
+                        visibility: 'public',
+                        kind: 'existing'
+                      })
+                    : <p className="text-sm text-gray-500">No hay fotos publicas cargadas.</p>}
+                  {internalExistingImages.length
+                    ? renderEditableImageSection({
+                        title: 'Internas',
+                        images: internalExistingImages,
+                        visibility: 'internal',
+                        kind: 'existing'
+                      })
+                    : <p className="text-sm text-gray-500">No hay fotos internas cargadas.</p>}
+                </>
+              ) : (
+                <>
+                  {existingImages.length
+                    ? renderEditableImageSection({
+                        title: '',
+                        images: existingImages,
+                        visibility: 'public',
+                        kind: 'existing'
+                      })
+                    : <p className="text-sm text-gray-500">No hay imagenes cargadas.</p>}
+                </>
               )}
             </div>
           </div>
 
           <div>
             <h4 className="text-sm font-semibold text-gray-700">Agregar imagenes</h4>
+            {imageVisibilityEnabled && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+                <span>Destino:</span>
+                <select
+                  value={uploadVisibility}
+                  onChange={event => setUploadVisibility(event.target.value)}
+                  className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                >
+                  <option value="public">Publicas</option>
+                  <option value="internal">Internas</option>
+                </select>
+              </div>
+            )}
             <input
               type="file"
               accept="image/*"
@@ -916,25 +1152,35 @@ const EditProductPage = () => {
                 Tu perfil no tiene permiso para subir imagenes nuevas.
               </p>
             )}
-            {previewImages.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-4">
-                {previewImages.map((src, index) => (
-                  <div key={src} className="relative h-24 w-24">
-                    <ProductImage
-                      src={src}
-                      alt={`preview-${index}`}
-                      className="h-full w-full rounded-md object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePreviewImage(index)}
-                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"
-                      aria-label="Eliminar imagen"
-                    >
-                      x
-                    </button>
-                  </div>
-                ))}
+            {pendingImages.length > 0 && (
+              <div className="mt-4 space-y-4">
+                {imageVisibilityEnabled ? (
+                  <>
+                    {publicPendingImages.length
+                      ? renderEditableImageSection({
+                          title: 'Publicas nuevas',
+                          images: publicPendingImages,
+                          visibility: 'public',
+                          kind: 'pending'
+                        })
+                      : null}
+                    {internalPendingImages.length
+                      ? renderEditableImageSection({
+                          title: 'Internas nuevas',
+                          images: internalPendingImages,
+                          visibility: 'internal',
+                          kind: 'pending'
+                        })
+                      : null}
+                  </>
+                ) : (
+                  renderEditableImageSection({
+                    title: '',
+                    images: pendingImages,
+                    visibility: 'public',
+                    kind: 'pending'
+                  })
+                )}
               </div>
             )}
           </div>

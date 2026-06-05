@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getCRMConfig, updateCRMConfig } from '../../api/crm';
+import CRMSectionNav from '../../components/crm/CRMSectionNav';
 
 const CRMConfigPage = () => {
   const [config, setConfig] = useState(null);
@@ -51,6 +52,8 @@ const CRMConfigPage = () => {
   return (
     <div className="min-h-screen bg-surface-50 px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
+        <CRMSectionNav />
+
         <header className="rounded-3xl bg-white p-6 shadow-brand-sm">
           <p className="text-xs uppercase tracking-[0.35em] text-slate-400">CRM</p>
           <h1 className="mt-2 text-3xl font-semibold text-slate-900">Configuracion</h1>
@@ -73,6 +76,26 @@ const CRMConfigPage = () => {
                 type="number"
                 name="abandonedCartHours"
                 value={config.abandonedCartHours || 0}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              Horas para marcar entrada nueva
+              <input
+                type="number"
+                name="recentEntryHours"
+                value={config.recentEntryHours || 0}
+                onChange={handleChange}
+                className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
+              />
+            </label>
+            <label className="text-sm text-slate-600">
+              Dias para destacar cliente nuevo
+              <input
+                type="number"
+                name="newCustomerHighlightDays"
+                value={config.newCustomerHighlightDays || 0}
                 onChange={handleChange}
                 className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2"
               />

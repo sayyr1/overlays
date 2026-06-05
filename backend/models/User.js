@@ -2,9 +2,18 @@ import mongoose from 'mongoose';
 
 export const USER_ROLES = Object.freeze({
   CUSTOMER: 'customer',
+  SALES: 'sales',
+  OWNER: 'owner',
   ADMIN: 'admin',
   SUPERADMIN: 'superadmin'
 });
+
+export const INTERNAL_USER_ROLES = Object.freeze([
+  USER_ROLES.SALES,
+  USER_ROLES.OWNER,
+  USER_ROLES.ADMIN,
+  USER_ROLES.SUPERADMIN
+]);
 
 const userSchema = new mongoose.Schema({
   name: { type: String, required: true },
@@ -38,7 +47,7 @@ userSchema.pre('validate', function syncRoleFlags(next) {
     this.role = this.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER;
   }
 
-  this.isAdmin = this.role === USER_ROLES.ADMIN || this.role === USER_ROLES.SUPERADMIN;
+  this.isAdmin = INTERNAL_USER_ROLES.includes(this.role);
   next();
 });
 

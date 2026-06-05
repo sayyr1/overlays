@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import Counter from './Counter.js';
+import { ORDER_HOLD_WINDOW_MS } from '../constants/orderConfig.js';
 
 const statusEnum = [
   'PENDIENTE_PAGO',
@@ -116,6 +118,13 @@ const orderSchema = new mongoose.Schema({
     default: '',
     index: true
   },
+  lookupToken: {
+    type: String,
+    trim: true,
+    unique: true,
+    sparse: true,
+    index: true
+  },
   items: {
     type: [orderItemSchema],
     validate: [items => items.length > 0, 'El pedido debe contener productos']
@@ -198,7 +207,7 @@ const orderSchema = new mongoose.Schema({
 
 orderSchema.pre('validate', function preValidate(next) {
   if (!this.expiresAt) {
-    this.expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    this.expiresAt = new Date(Date.now() + ORDER_HOLD_WINDOW_MS);
   }
   if (this.total == null) {
     this.total = this.subtotal;
@@ -215,6 +224,15 @@ orderSchema.pre('validate', function preValidate(next) {
     }
   }
   next();
+});
+
+orderSchema.pre('save', function assignLookupToken(next) {
+  if (!this.isNew || this.lookupToken) {
+    return next();
+  }
+
+  this.lookupToken = crypto.randomBytes(18).toString('hex');
+  return next();
 });
 
 orderSchema.pre('save', async function assignOrderNumber(next) {

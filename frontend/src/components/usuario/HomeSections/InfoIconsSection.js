@@ -4,18 +4,18 @@ import { DocumentTextIcon, EyeIcon, UserPlusIcon } from '@heroicons/react/24/out
 const BENEFITS = [
   {
     icon: DocumentTextIcon,
-    title: 'Catalogo autogestionado',
-    text: 'Crea colecciones, controla precios dinamicos y edita inventario en segundos.'
+    title: 'Ficha clara',
+    text: 'Producto, precio, variantes y stock visibles para decidir rapido sin confusiones.'
   },
   {
     icon: EyeIcon,
-    title: 'Visibilidad omnicanal',
-    text: 'Optimiza producto para SEO, pauta ads y experiencias sociales.'
+    title: 'Compra visual',
+    text: 'La tienda prioriza imagen, ritmo y jerarquia para que navegar desde movil sea natural.'
   },
   {
     icon: UserPlusIcon,
-    title: 'Ecosistema de fidelizacion',
-    text: 'Perfiles unicos, membership tiers y beneficios exclusivos para tu comunidad.'
+    title: 'Seguimiento comercial',
+    text: 'Detras de la vista simple, el sistema registra interacciones para CRM y recuperacion.'
   }
 ];
 

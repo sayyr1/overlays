@@ -10,6 +10,7 @@ import {
   createOrder,
   getOrders,
   getOwnOrders,
+  getOrderByLookupToken,
   confirmOrder,
   cancelOrder,
   updateOrderStatus,
@@ -21,6 +22,7 @@ const router = express.Router();
 router.post('/', optionalProtect, requireModuleEnabled(['orders', 'payments']), createOrder);
 router.get('/', protect, adminOnly, requireModuleEnabled('orders'), requirePermission('orders', 'view'), getOrders);
 router.get('/mine', protect, requireModuleEnabled('orders'), getOwnOrders);
+router.get('/lookup/:lookupToken', requireModuleEnabled('orders'), getOrderByLookupToken);
 router.post('/:id/confirm', protect, adminOnly, requireModuleEnabled('orders'), requirePermission('orders', 'confirm'), confirmOrder);
 router.post('/:id/cancel', protect, adminOnly, requireModuleEnabled('orders'), requirePermission('orders', 'cancel'), cancelOrder);
 router.patch('/:id/status', protect, adminOnly, requireModuleEnabled('orders'), requirePermission('orders', 'update'), updateOrderStatus);

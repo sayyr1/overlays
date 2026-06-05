@@ -41,6 +41,29 @@ const sortModules = items =>
       (a.label || '').localeCompare(b.label || '')
   );
 
+const LEGACY_STORE_NAMES = new Set([
+  'niway store',
+  'tu tienda',
+  'tu negocio'
+]);
+
+const pickConfiguredName = (...values) => {
+  for (const value of values) {
+    const normalized = value?.trim();
+    if (!normalized) continue;
+    if (LEGACY_STORE_NAMES.has(normalized.toLowerCase())) continue;
+    return normalized;
+  }
+  return '';
+};
+
+const resolveStoreName = (settings, branding) =>
+  pickConfiguredName(
+    branding?.navbarName,
+    settings?.tradeName,
+    settings?.businessName
+  ) || 'Tu tienda';
+
 const applyBrandingToDocument = branding => {
   if (typeof document === 'undefined' || !branding) return;
   const root = document.documentElement;
@@ -55,6 +78,12 @@ const applyBrandingToDocument = branding => {
       existing.href = branding.faviconUrl;
     }
   }
+};
+
+const applyStoreNameToDocument = storeName => {
+  if (typeof document === 'undefined') return;
+  const normalized = storeName?.trim() || 'Tu tienda';
+  document.title = normalized;
 };
 
 const readSection = async section => {
@@ -151,6 +180,10 @@ export const PublicConfigProvider = ({ children }) => {
     applyBrandingToDocument(branding);
   }, [branding]);
 
+  useEffect(() => {
+    applyStoreNameToDocument(resolveStoreName(settings, branding));
+  }, [branding, settings]);
+
   const moduleMap = useMemo(() => toModuleMap(modules), [modules]);
 
   const isModuleEnabled = useCallback(
@@ -216,6 +249,8 @@ export const PublicConfigProvider = ({ children }) => {
     () => ({
       settings,
       branding,
+      storeName: resolveStoreName(settings, branding),
+      businessName: settings?.businessName?.trim() || settings?.tradeName?.trim() || 'Tu negocio',
       paymentMethods,
       textSettings,
       modules,

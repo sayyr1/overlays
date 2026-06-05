@@ -38,7 +38,8 @@ router.get('/settings', async (req, res) => {
     whatsapp: settings.whatsapp,
     address: settings.address,
     socialLinks: sanitizeMap(settings.socialLinks),
-    footerText: settings.footerText
+    footerText: settings.footerText,
+    enableInternalProductImages: Boolean(settings.enableInternalProductImages)
   });
 });
 

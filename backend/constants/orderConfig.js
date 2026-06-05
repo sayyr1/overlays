@@ -1,0 +1,3 @@
+export const ORDER_HOLD_HOURS = 2;
+
+export const ORDER_HOLD_WINDOW_MS = ORDER_HOLD_HOURS * 60 * 60 * 1000;

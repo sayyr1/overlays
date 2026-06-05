@@ -21,6 +21,12 @@ const crmContactSchema = new mongoose.Schema(
       default: null,
       index: true
     },
+    owner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true
+    },
     name: {
       type: String,
       trim: true,
@@ -159,6 +165,7 @@ crmContactSchema.index(
 );
 
 crmContactSchema.index({ status: 1, updatedAt: -1 });
+crmContactSchema.index({ owner: 1, status: 1, updatedAt: -1 });
 
 export { CRM_STATUSES };
 export default mongoose.model('CRMContact', crmContactSchema);

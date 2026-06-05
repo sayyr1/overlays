@@ -7,7 +7,7 @@ dotenv.config();
 const [, , email, role] = process.argv;
 
 if (!email || !role) {
-  console.error('Uso: node scripts/setUserRole.js <email> <customer|admin|superadmin>');
+  console.error('Uso: node scripts/setUserRole.js <email> <customer|sales|owner|admin|superadmin>');
   process.exit(1);
 }
 

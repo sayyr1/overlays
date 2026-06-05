@@ -13,6 +13,8 @@ const DEFAULT_SUGGESTED_MESSAGES = {
 
 const DEFAULT_CRM_CONFIG = {
   abandonedCartHours: 4,
+  recentEntryHours: 36,
+  newCustomerHighlightDays: 7,
   activeStatuses: [
     'visitor',
     'new_lead',

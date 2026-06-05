@@ -25,6 +25,16 @@ export const updateCRMContact = async (contactId, payload) => {
   return data;
 };
 
+export const updateCRMContactStage = async (contactId, status) => {
+  const { data } = await axios.patch(`/api/crm/contacts/${contactId}/stage`, { status }, { withCredentials: true });
+  return data;
+};
+
+export const bulkUpdateCRMContacts = async payload => {
+  const { data } = await axios.post('/api/crm/contacts/bulk-update', payload, { withCredentials: true });
+  return data;
+};
+
 export const linkCRMWhatsAppLead = async payload => {
   const { data } = await axios.post('/api/crm/contacts/link-whatsapp', payload, { withCredentials: true });
   return data;

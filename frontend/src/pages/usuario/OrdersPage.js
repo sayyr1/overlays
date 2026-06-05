@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import axios from '../../api/axiosInstance';
 import { usePublicConfig } from '../../context/PublicConfigContext';
 import { formatCurrency } from '../../utils/pricing';
+import { ORDER_HOLD_LABEL } from '../../utils/orderConstants';
 import {
   formatOrderStatus,
   getOrderStatusBadgeClass
@@ -133,7 +134,7 @@ const OrdersPage = () => {
                           </span>
                         </div>
                         <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                          Confirma tu deposito dentro de las proximas 24 horas. Pasada la fecha limite la reserva se libera automaticamente.
+                          Confirma tu deposito dentro de las proximas {ORDER_HOLD_LABEL}. Pasada la fecha limite la reserva se libera automaticamente.
                           {order.expiresAt && (
                             <p className="mt-1 text-xs text-amber-600">
                               Expira el {formatDateTime(order.expiresAt)}.

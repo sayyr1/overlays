@@ -19,6 +19,7 @@ import orderRoutes from './routes/orders.js';
 import { router as userRoutes } from './routes/users.js';
 import cartRoutes from './routes/cart.js';
 import { ensureDefaultSettings } from './services/systemConfigService.js';
+import { expirePendingOrders } from './controllers/orderController.js';
 
 dotenv.config();
 
@@ -97,6 +98,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 let initializationPromise = null;
+let orderExpirationInterval = null;
 
 const initializeServer = async () => {
   if (initializationPromise) {
@@ -122,6 +124,18 @@ const initializeServer = async () => {
   });
 
   return initializationPromise;
+};
+
+const startOrderExpirationTask = () => {
+  if (isVercelRuntime || orderExpirationInterval) {
+    return;
+  }
+
+  orderExpirationInterval = setInterval(() => {
+    expirePendingOrders().catch(error => {
+      console.error('Error expirando pedidos pendientes:', error);
+    });
+  }, 5 * 60 * 1000);
 };
 
 app.use(async (req, res, next) => {
@@ -177,6 +191,7 @@ if (!isVercelRuntime && hasLocalFrontendBuild) {
 if (!isVercelRuntime && isDirectExecution) {
   initializeServer()
     .then(() => {
+      startOrderExpirationTask();
       const port = Number(process.env.PORT || 5000);
       app.listen(port, () => {
         console.log(`Backend escuchando en puerto ${port}`);

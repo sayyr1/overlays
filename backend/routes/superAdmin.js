@@ -4,7 +4,7 @@ import {
   superAdminOnly
 } from '../middleware/authMiddleware.js';
 import AuditLog from '../models/AuditLog.js';
-import User, { USER_ROLES } from '../models/User.js';
+import User, { INTERNAL_USER_ROLES, USER_ROLES } from '../models/User.js';
 import SystemSettings from '../models/SystemSettings.js';
 import BrandingSettings from '../models/BrandingSettings.js';
 import ModuleConfig from '../models/ModuleConfig.js';
@@ -22,6 +22,7 @@ import { createAuditLog } from '../utils/auditLog.js';
 import {
   PERMISSION_CATALOG,
   PERMISSION_PRESETS,
+  ROLE_DEFINITIONS,
   getEffectivePermissions,
   getPermissionPreset,
   normalizePermissionMatrix
@@ -69,7 +70,8 @@ router.put('/settings', async (req, res) => {
     'phone',
     'whatsapp',
     'address',
-    'footerText'
+    'footerText',
+    'enableInternalProductImages'
   ];
 
   fields.forEach(field => {
@@ -138,13 +140,14 @@ router.get('/modules', async (req, res) => {
 
 router.get('/access-control', async (req, res) => {
   const users = await User.find({
-    role: { $in: [USER_ROLES.ADMIN, USER_ROLES.SUPERADMIN] }
+    role: { $in: INTERNAL_USER_ROLES }
   })
     .select('-password')
     .sort({ role: -1, name: 1, email: 1 });
 
   res.json({
     catalog: PERMISSION_CATALOG,
+    roles: ROLE_DEFINITIONS.filter(role => INTERNAL_USER_ROLES.includes(role.key)),
     presets: PERMISSION_PRESETS.map(preset => ({
       key: preset.key,
       label: preset.label,
@@ -164,8 +167,8 @@ router.put('/access-control/users/:id', async (req, res) => {
     return res.status(400).json({ message: 'No se editan permisos de superadmin desde esta vista' });
   }
 
-  if ((user.role || (user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER)) !== USER_ROLES.ADMIN) {
-    return res.status(400).json({ message: 'Solo se pueden configurar permisos para usuarios admin' });
+  if (!INTERNAL_USER_ROLES.includes(user.role || (user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER))) {
+    return res.status(400).json({ message: 'Solo se pueden configurar permisos para usuarios internos' });
   }
 
   const before = serializeAccessUser(user);

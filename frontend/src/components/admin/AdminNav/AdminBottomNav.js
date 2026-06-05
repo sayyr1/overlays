@@ -22,6 +22,7 @@ const NAV_ITEMS = [
 
 const AdminBottomNav = ({ handleLogout, isSuperAdmin = false }) => {
   const location = useLocation();
+  const isCrmRoute = location.pathname.startsWith('/crm');
   const { isModuleEnabled, loading } = usePublicConfig();
   const { hasPermission, hasAnyPermission } = useAuth();
 
@@ -47,7 +48,7 @@ const AdminBottomNav = ({ handleLogout, isSuperAdmin = false }) => {
           return isModuleEnabled('products') && hasAnyPermission(['products.view', 'inventory.view']);
         }
         if (item.to === '/crear-producto') {
-          return isModuleEnabled('products') && isModuleEnabled('categories') && hasPermission('products.create');
+          return !isCrmRoute && isModuleEnabled('products') && isModuleEnabled('categories') && hasPermission('products.create');
         }
         if (item.to === '/pedidos') return isModuleEnabled('orders') && hasPermission('orders.view');
         if (item.to === '/crm') return isModuleEnabled('crm') && hasPermission('crm.dashboard');

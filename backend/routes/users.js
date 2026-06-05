@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User, { USER_ROLES } from '../models/User.js';
+import User, { INTERNAL_USER_ROLES, USER_ROLES } from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
 import {
   protect,
@@ -154,6 +154,18 @@ router.put('/:id/role', protect, superAdminOnly, async (req, res) => {
     return res.status(400).json({ message: 'Rol inválido' });
   }
 
+  if (role === USER_ROLES.CUSTOMER) {
+    return res.status(400).json({
+      message: 'Esta ruta solo administra perfiles internos. No se puede asignar cliente desde aqui.'
+    });
+  }
+
+  if (role === USER_ROLES.ADMIN) {
+    return res.status(400).json({
+      message: 'El rol admin quedo como legado y ya no admite nuevas asignaciones.'
+    });
+  }
+
   try {
     const user = await User.findById(req.params.id).select('-password');
     if (!user) {
@@ -161,7 +173,7 @@ router.put('/:id/role', protect, superAdminOnly, async (req, res) => {
     }
 
     user.role = role;
-    if (role !== USER_ROLES.ADMIN) {
+    if (!INTERNAL_USER_ROLES.includes(role) || role === USER_ROLES.SUPERADMIN) {
       user.permissions = undefined;
     }
     await user.save();

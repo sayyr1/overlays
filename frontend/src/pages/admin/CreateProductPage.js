@@ -10,6 +10,14 @@ import {
   normalizeVariantSize,
   aggregateSizesFromVariants
 } from '../../utils/inventory';
+import {
+  getImageKey,
+  isImageCover,
+  makeImageCover,
+  reorderImagesWithinVisibility,
+  sortImagesForPayload,
+  updateImageVisibility
+} from '../../utils/productImages';
 
 const createEmptyPrice = () => ({
   retail: '',
@@ -27,26 +35,28 @@ const createInitialFormState = () => ({
   collection: '',
   gender: 'Unisex',
   attributes: {},
-  onSale: false,
-  files: null
+  onSale: false
 });
 
 const DEFAULT_GENDERS = ['Unisex', 'Hombre', 'Mujer', 'Nino', 'Nina'];
 
 const CreateProductPage = () => {
-  const { isModuleEnabled } = usePublicConfig();
+  const { isModuleEnabled, settings } = usePublicConfig();
   const { hasPermission } = useAuth();
   const [form, setForm] = useState(() => createInitialFormState());
   const [code, setCode] = useState('');
   const [categories, setCategories] = useState({});
   const [variantState, setVariantState] = useState({});
-  const [previewImages, setPreviewImages] = useState([]);
+  const [pendingImages, setPendingImages] = useState([]);
+  const [uploadVisibility, setUploadVisibility] = useState('public');
+  const [draggedImageKey, setDraggedImageKey] = useState('');
   const [colorToAdd, setColorToAdd] = useState('');
   const [activeColor, setActiveColor] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const inventoryEnabled = isModuleEnabled('inventory');
   const canUploadImages = hasPermission('products.upload');
   const canSeeInventory = hasPermission('inventory.view') || hasPermission('inventory.adjust');
+  const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
 
   const categoryGenderOptions = useMemo(
     () =>
@@ -99,9 +109,9 @@ const CreateProductPage = () => {
 
   useEffect(
     () => () => {
-      previewImages.forEach(url => URL.revokeObjectURL(url));
+      pendingImages.forEach(item => URL.revokeObjectURL(item.previewUrl));
     },
-    [previewImages]
+    [pendingImages]
   );
 
   const selectedColors = useMemo(() => Object.keys(variantState), [variantState]);
@@ -294,22 +304,53 @@ const CreateProductPage = () => {
     });
   };
 
-  const removePreviewImage = index => {
-    setPreviewImages(prev => {
-      const target = prev[index];
-      if (target) {
-        URL.revokeObjectURL(target);
+  const handleImageSelection = event => {
+    const files = event.target.files ? Array.from(event.target.files) : [];
+    if (!files.length) {
+      return;
+    }
+
+    setPendingImages(prev => [
+      ...prev,
+      ...files.map(file => ({
+        clientId: `pending-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        visibility: imageVisibilityEnabled ? uploadVisibility : 'public'
+      }))
+    ]);
+    event.target.value = '';
+  };
+
+  const removePreviewImage = imageKey => {
+    setPendingImages(prev => {
+      const target = prev.find(item => getImageKey(item) === imageKey);
+      if (target?.previewUrl) {
+        URL.revokeObjectURL(target.previewUrl);
       }
-      return prev.filter((_, currentIndex) => currentIndex !== index);
+      return prev.filter(item => getImageKey(item) !== imageKey);
     });
-    setForm(prev => {
-      if (!prev.files) {
-        return prev;
-      }
-      const files = Array.from(prev.files);
-      files.splice(index, 1);
-      return { ...prev, files };
-    });
+  };
+
+  const handleImageVisibilityChange = (imageKey, nextVisibility) => {
+    setPendingImages(prev => updateImageVisibility(prev, imageKey, nextVisibility, imageVisibilityEnabled));
+  };
+
+  const handleSetImageCover = imageKey => {
+    setPendingImages(prev => makeImageCover(prev, imageKey, imageVisibilityEnabled));
+  };
+
+  const handleImageDrop = (targetKey, visibility) => {
+    if (!draggedImageKey) return;
+    setPendingImages(prev =>
+      reorderImagesWithinVisibility(prev, {
+        draggedKey: draggedImageKey,
+        targetKey,
+        visibility,
+        enabled: imageVisibilityEnabled
+      })
+    );
+    setDraggedImageKey('');
   };
 
   const normalizedPrice = useMemo(() => {
@@ -322,25 +363,34 @@ const CreateProductPage = () => {
     };
   }, [form.price]);
 
-  const uploadImages = async files => {
-    if (!files || !files.length) {
+  const uploadImages = async imageItems => {
+    if (!imageItems || !imageItems.length) {
       return [];
     }
     const options = { maxSizeMB: 0.5, maxWidthOrHeight: 800, useWebWorker: true };
     const formData = new FormData();
-    for (const file of files) {
+    const normalizedItems = [];
+    for (const item of imageItems) {
       try {
-        const compressed = await imageCompression(file, options);
+        const compressed = await imageCompression(item.file, options);
         formData.append('images', compressed);
+        normalizedItems.push(item);
       } catch (error) {
         console.error('Error compressing image', error);
       }
+    }
+    if (!normalizedItems.length) {
+      return [];
     }
     try {
       const response = await axios.post('/api/products/upload-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
-      return response.data.images;
+      const uploaded = Array.isArray(response.data?.images) ? response.data.images : [];
+      return uploaded.map((image, index) => ({
+        ...image,
+        visibility: normalizedItems[index]?.visibility || 'public'
+      }));
     } catch (error) {
       console.error('Error uploading images', error);
       return [];
@@ -398,7 +448,21 @@ const CreateProductPage = () => {
     setSubmitting(true);
 
     try {
-      const images = canUploadImages && form.files?.length ? await uploadImages(form.files) : [];
+      const sortedPendingImages = sortImagesForPayload(pendingImages, imageVisibilityEnabled);
+
+      if (
+        imageVisibilityEnabled &&
+        sortedPendingImages.length > 0 &&
+        !sortedPendingImages.some(image => image.visibility !== 'internal')
+      ) {
+        window.alert('Agrega al menos una foto publica para la tienda o elimina las fotos internas.');
+        setSubmitting(false);
+        return;
+      }
+
+      const images = canUploadImages && sortedPendingImages.length
+        ? await uploadImages(sortedPendingImages)
+        : [];
       const stockBySize = inventoryEnabled && canSeeInventory ? aggregateSizesFromVariants(sanitizedVariants) : {};
       const productColors = inventoryEnabled && canSeeInventory ? Object.keys(groupedVariants) : [];
 
@@ -430,10 +494,11 @@ const CreateProductPage = () => {
       window.alert('Producto creado con exito');
       setForm(createInitialFormState());
       setVariantState({});
-      setPreviewImages(prev => {
-        prev.forEach(url => URL.revokeObjectURL(url));
+      setPendingImages(prev => {
+        prev.forEach(item => URL.revokeObjectURL(item.previewUrl));
         return [];
       });
+      setDraggedImageKey('');
       const newCode = Math.floor(1000 + Math.random() * 9000).toString();
       setCode(newCode);
     } catch (error) {
@@ -443,6 +508,81 @@ const CreateProductPage = () => {
       setSubmitting(false);
     }
   };
+
+  const publicPendingImages = pendingImages.filter(image => image.visibility !== 'internal');
+  const internalPendingImages = pendingImages.filter(image => image.visibility === 'internal');
+
+  const renderPendingImageSection = (images, title, visibility) => (
+    <div className="space-y-3">
+      {imageVisibilityEnabled && (
+        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+          {title}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-4">
+        {images.map((item, index) => {
+          const imageKey = getImageKey(item);
+          const cover = isImageCover(pendingImages, imageKey, imageVisibilityEnabled);
+
+          return (
+            <div
+              key={imageKey}
+              draggable
+              onDragStart={() => setDraggedImageKey(imageKey)}
+              onDragOver={event => event.preventDefault()}
+              onDrop={() => handleImageDrop(imageKey, visibility)}
+              className="relative w-28 rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
+            >
+              <img
+                src={item.previewUrl}
+                alt={`preview-${index}`}
+                className="h-24 w-full rounded-md object-cover"
+              />
+              <div className="mt-2 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="cursor-move text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Arrastrar
+                  </span>
+                  {cover && (
+                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                      Portada
+                    </span>
+                  )}
+                </div>
+                {imageVisibilityEnabled && (
+                  <select
+                    value={item.visibility}
+                    onChange={event => handleImageVisibilityChange(imageKey, event.target.value)}
+                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-700"
+                  >
+                    <option value="public">Publica</option>
+                    <option value="internal">Interna</option>
+                  </select>
+                )}
+                {visibility === 'public' && !cover && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetImageCover(imageKey)}
+                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-700"
+                  >
+                    Usar como portada
+                  </button>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => removePreviewImage(imageKey)}
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"
+                aria-label="Eliminar imagen"
+              >
+                x
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -789,19 +929,25 @@ const CreateProductPage = () => {
           <div>
             <label className="text-sm font-medium text-gray-700">
               Subir imagenes
+              {imageVisibilityEnabled && (
+                <span className="mt-2 flex items-center gap-2 text-xs font-normal text-slate-500">
+                  <span>Destino:</span>
+                  <select
+                    value={uploadVisibility}
+                    onChange={event => setUploadVisibility(event.target.value)}
+                    className="rounded-md border border-slate-200 px-2 py-1 text-xs text-slate-700"
+                  >
+                    <option value="public">Publicas</option>
+                    <option value="internal">Internas</option>
+                  </select>
+                </span>
+              )}
               <input
                 type="file"
                 accept="image/*"
                 multiple
                 disabled={!canUploadImages}
-                onChange={event => {
-                  const files = event.target.files ? Array.from(event.target.files) : [];
-                  setPreviewImages(prev => {
-                    prev.forEach(url => URL.revokeObjectURL(url));
-                    return files.map(file => URL.createObjectURL(file));
-                  });
-                  setForm(prev => ({ ...prev, files }));
-                }}
+                onChange={handleImageSelection}
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               />
             </label>
@@ -810,25 +956,19 @@ const CreateProductPage = () => {
                 Tu perfil no tiene permiso para subir imagenes.
               </p>
             )}
-            {previewImages.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-4">
-                {previewImages.map((src, index) => (
-                  <div key={src} className="relative">
-                    <img
-                      src={src}
-                      alt={`preview-${index}`}
-                      className="h-24 w-24 rounded-md object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removePreviewImage(index)}
-                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-white"
-                      aria-label="Eliminar imagen"
-                    >
-                      x
-                    </button>
-                  </div>
-                ))}
+            {pendingImages.length > 0 && (
+              <div className="mt-4 space-y-4">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  La primera foto publica sera la portada de la tienda. Arrastra para ordenar.
+                </div>
+                {imageVisibilityEnabled ? (
+                  <>
+                    {renderPendingImageSection(publicPendingImages, 'Publicas', 'public')}
+                    {renderPendingImageSection(internalPendingImages, 'Internas', 'internal')}
+                  </>
+                ) : (
+                  renderPendingImageSection(pendingImages, '', 'public')
+                )}
               </div>
             )}
           </div>

@@ -88,7 +88,12 @@ const productSchema = new mongoose.Schema({
   lastSoldAt: { type: Date },
   images: [{
     url: { type: String, required: true },
-    public_id: { type: String, required: true }
+    public_id: { type: String, required: true },
+    visibility: {
+      type: String,
+      enum: ['public', 'internal'],
+      default: 'public'
+    }
   }],
   onSale: { type: Boolean, default: false }
 }, {

@@ -2,20 +2,20 @@ import React from 'react';
 
 const SERVICE_GUARANTEES = [
   {
-    title: 'Envio express',
-    description: 'Gratis desde $50. Logistica nacional con cobertura 24h en principales ciudades.'
+    title: 'Compra sin registro',
+    description: 'Tu cliente puede crear su pedido sin abrir cuenta ni pasar por pasos innecesarios.'
   },
   {
-    title: 'Soporte 24/7',
-    description: 'Equipo concierge disponible por chat, mail o WhatsApp los 7 dias de la semana.'
+    title: 'Atencion por WhatsApp',
+    description: 'Cuando necesita ayuda, puede continuar la compra o resolver dudas desde el chat.'
   },
   {
-    title: 'Pagos protegidos',
-    description: 'Integraciones certificadas con tarjetas, wallets y debitos instantaneos.'
+    title: 'Reserva de stock',
+    description: 'Los pedidos quedan apartados para reducir friccion mientras se confirma el pago.'
   },
   {
-    title: 'Cambios sin friccion',
-    description: '30 dias para cambios o devoluciones con etiquetas prepagadas.'
+    title: 'Seguimiento claro',
+    description: 'Pedidos, estados y contacto visibles para que la experiencia no se sienta incierta.'
   }
 ];
 

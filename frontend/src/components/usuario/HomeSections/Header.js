@@ -1,14 +1,17 @@
 
 // src/components/HomeSections/Header.js
 import React from 'react';
+import { usePublicConfig } from '../../../context/PublicConfigContext';
 
 export default function Header() {
+  const { storeName } = usePublicConfig();
+
   return (
     <header className="bg-white shadow-md">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
           <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-          <span className="ml-2 text-xl font-bold uppercase">NIWAY STORE</span>
+          <span className="ml-2 text-xl font-bold uppercase">{storeName}</span>
         </div>
         <div className="hidden md:flex flex-1 mx-6">
           <input

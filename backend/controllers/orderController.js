@@ -6,6 +6,7 @@ import { upsertCRMContact } from '../services/crmContactService.js';
 import { upsertCartSnapshot, markCartSnapshotConverted } from '../services/cartSnapshotService.js';
 import { createCRMEvent } from '../services/crmEventService.js';
 import { handlePaidOrderAutomation } from '../services/crmAutomationService.js';
+import { ORDER_HOLD_WINDOW_MS } from '../constants/orderConfig.js';
 
 const MEMBERSHIP_PRICE_KEY = {
   STANDARD: 'retail',
@@ -217,7 +218,7 @@ const createOrUpdateCRMForOrder = async ({
   return { session, sessionId, contact };
 };
 
-const expirePendingOrders = async () => {
+export const expirePendingOrders = async () => {
   const now = new Date();
   const expiredOrders = await Order.find({
     status: ORDER_STATUSES.PENDING,
@@ -268,8 +269,7 @@ export const createOrder = async (req, res) => {
     contactPhone = '',
     contactEmail = '',
     contactAddress = '',
-    notes = '',
-    totals = {}
+    notes = ''
   } = req.body || {};
 
   if (!Array.isArray(items) || !items.length) {
@@ -341,10 +341,7 @@ export const createOrder = async (req, res) => {
       0
     );
 
-    const requestedTotal = Number(totals?.total ?? totals?.subtotal ?? subtotal);
-    const finalTotal = Number.isFinite(requestedTotal) && requestedTotal >= 0
-      ? requestedTotal
-      : subtotal;
+    const finalTotal = subtotal;
 
     const { session, sessionId, contact } = await createOrUpdateCRMForOrder({
       req,
@@ -390,7 +387,7 @@ export const createOrder = async (req, res) => {
       contactEmail,
       contactAddress,
       notes,
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      expiresAt: new Date(Date.now() + ORDER_HOLD_WINDOW_MS),
       statusHistory: [{
         status: ORDER_STATUSES.PENDING,
         note: notes,
@@ -435,6 +432,7 @@ export const createOrder = async (req, res) => {
       total: order.total,
       totals: order.totals,
       expiresAt: order.expiresAt,
+      lookupToken: order.lookupToken,
       crmContactId: contact?._id || null
     });
   } catch (error) {
@@ -520,6 +518,18 @@ export const getOwnOrders = async (req, res) => {
     .lean();
   const orders = await appendProductDetails(ordersRaw);
   return res.json(orders);
+};
+
+export const getOrderByLookupToken = async (req, res) => {
+  await expirePendingOrders();
+  const orderRaw = await Order.findOne({ lookupToken: req.params.lookupToken }).lean();
+
+  if (!orderRaw) {
+    return res.status(404).json({ message: 'Pedido no encontrado' });
+  }
+
+  const [order] = await appendProductDetails([orderRaw]);
+  return res.json(order);
 };
 
 export const confirmOrder = async (req, res) => {

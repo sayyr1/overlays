@@ -14,10 +14,10 @@ export const getCRMDashboardData = async () => {
   const config = await getCRMConfig();
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const recentWindow = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   const [
     leadsNew,
+    interestedLeads,
     abandonedCarts,
     tasksDueToday,
     tasksOverdue,
@@ -28,11 +28,15 @@ export const getCRMDashboardData = async () => {
     overdueTasks,
     lowStockProducts
   ] = await Promise.all([
-    CRMContact.countDocuments({ createdAt: { $gte: recentWindow }, status: { $in: ['visitor', 'new_lead', 'interested', 'contacted', 'link_sent'] } }),
+    CRMContact.countDocuments({ status: 'new_lead' }),
+    CRMContact.countDocuments({ status: 'interested' }),
     CartSnapshot.countDocuments({ status: { $in: ['abandoned', 'contacted'] } }),
     CRMTask.countDocuments({ status: { $in: ['pending', 'overdue'] }, dueDate: { $gte: todayStart, $lt: new Date(todayStart.getTime() + 24 * 60 * 60 * 1000) } }),
     CRMTask.countDocuments({ status: 'overdue' }),
-    CRMContact.countDocuments({ createdAt: { $gte: recentWindow }, status: { $in: ['customer', 'vip'] } }),
+    CRMContact.countDocuments({
+      status: { $in: ['customer', 'vip'] },
+      createdAt: { $gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) }
+    }),
     CRMContact.countDocuments({ ordersCount: { $gt: 1 } }),
     CRMContact.countDocuments({ status: 'inactive' }),
     CRMEvent.aggregate([
@@ -79,6 +83,12 @@ export const getCRMDashboardData = async () => {
     .filter(item => Number(lowStockMap.get(item.productId.toString()) || item.stock || 0) <= lowStockThreshold)
     .slice(0, 6);
 
+  const openTaskContacts = await CRMTask.find({ status: { $in: ['pending', 'overdue'] } }).distinct('contact');
+  const actionableWithoutTask = await CRMContact.countDocuments({
+    status: { $in: ['new_lead', 'contacted', 'link_sent', 'interested', 'cart_abandoned', 'inactive'] },
+    _id: { $nin: openTaskContacts }
+  });
+
   const recommendedActions = [];
   overdueTasks.forEach(task => {
     recommendedActions.push({
@@ -93,12 +103,14 @@ export const getCRMDashboardData = async () => {
   return {
     metrics: {
       leadsNew,
+      interestedLeads,
       abandonedCarts,
       tasksDueToday,
       tasksOverdue,
       newCustomers,
       recurrentCustomers,
-      inactiveCustomers
+      inactiveCustomers,
+      actionableWithoutTask
     },
     topInterestProducts,
     productsHighInterestLowStock,
@@ -110,7 +122,6 @@ export const getCRMKanbanData = async () => {
   await runCRMHousekeeping();
   const contacts = await CRMContact.find()
     .sort({ updatedAt: -1 })
-    .limit(200)
     .lean();
 
   const tasks = await CRMTask.find({ status: { $in: ['pending', 'overdue'] } })
@@ -127,11 +138,15 @@ export const getCRMKanbanData = async () => {
   return contacts.map(contact => {
     const lastEvent = eventMap.get(contact._id.toString());
     const nextTask = tasks.find(task => task.contact?.toString() === contact._id.toString());
+    const nextActionRequired =
+      ['new_lead', 'contacted', 'link_sent', 'interested', 'cart_abandoned', 'inactive'].includes(contact.status) &&
+      !nextTask;
     return {
       ...contact,
       lastEventType: lastEvent?.lastEventType || '',
       lastEventAt: lastEvent?.lastEventAt || contact.lastSeenAt,
       potentialCartValue: 0,
+      nextActionRequired,
       nextTask: nextTask
         ? {
             _id: nextTask._id,
@@ -147,7 +162,10 @@ export const getCRMKanbanData = async () => {
 export const getCRMContactDetail = async contactId => {
   await runCRMHousekeeping();
   const [contact, events, tasks, notes, orders, carts] = await Promise.all([
-    CRMContact.findById(contactId).populate('user', 'name email role').lean(),
+    CRMContact.findById(contactId)
+      .populate('user', 'name email role')
+      .populate('owner', 'name email role')
+      .lean(),
     CRMEvent.find({ contact: contactId })
       .populate('product', 'name code images')
       .populate('order', 'orderNumber total status createdAt')
@@ -180,7 +198,12 @@ export const getCRMContactDetail = async contactId => {
   });
 
   return {
-    contact,
+    contact: {
+      ...contact,
+      nextActionRequired:
+        ['new_lead', 'contacted', 'link_sent', 'interested', 'cart_abandoned', 'inactive'].includes(contact.status) &&
+        !tasks.some(task => ['pending', 'overdue'].includes(task.status))
+    },
     events,
     tasks,
     notes,

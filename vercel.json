@@ -26,11 +26,5 @@
       "src": "/(.*)",
       "dest": "/index.html"
     }
-  ],
-  "crons": [
-    {
-      "path": "/api/internal/expire-pending-orders",
-      "schedule": "*/5 * * * *"
-    }
   ]
 }

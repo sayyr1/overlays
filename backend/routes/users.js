@@ -21,6 +21,31 @@ import { getEffectivePermissions, normalizePermissionMatrix } from '../constants
 const router = express.Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
+const resolveCookieDomain = () => {
+  const rawValue = String(process.env.COOKIE_DOMAIN || '').trim();
+  if (!rawValue) {
+    return '';
+  }
+
+  const normalizedValue = rawValue
+    .replace(/^https?:\/\//i, '')
+    .replace(/\/.*$/, '')
+    .replace(/:\d+$/, '')
+    .trim()
+    .replace(/^\.+/, '');
+
+  if (!normalizedValue || normalizedValue === 'localhost') {
+    return '';
+  }
+
+  if (!/^[a-z0-9.-]+$/i.test(normalizedValue)) {
+    console.warn('COOKIE_DOMAIN invalido, se ignorara:', rawValue);
+    return '';
+  }
+
+  return normalizedValue;
+};
+
 const getAuthCookieOptions = () => {
   const cookieOptions = {
     httpOnly: true,
@@ -28,8 +53,9 @@ const getAuthCookieOptions = () => {
     secure: isProduction
   };
 
-  if (process.env.COOKIE_DOMAIN) {
-    cookieOptions.domain = process.env.COOKIE_DOMAIN;
+  const cookieDomain = resolveCookieDomain();
+  if (cookieDomain) {
+    cookieOptions.domain = cookieDomain;
   }
 
   return cookieOptions;

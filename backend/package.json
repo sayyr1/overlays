@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "build": "cd ..\\frontend; npm install; npm run build",
-    "set-user-role": "node scripts/setUserRole.js"
+    "set-user-role": "node scripts/setUserRole.js",
+    "reset-user-access": "node scripts/resetUserAccess.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

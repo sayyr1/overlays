@@ -1,5 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import axios from '../api/axiosInstance';
+import axios, {
+  clearStoredAuthToken,
+  setStoredAuthToken
+} from '../api/axiosInstance';
 
 const AuthContext = createContext(null);
 const EMPTY_PERMISSIONS = {};
@@ -27,6 +30,7 @@ export const AuthProvider = ({ children }) => {
       const { data } = await axios.get('/api/users/verify-token', { withCredentials: true });
       setUser(data.user);
     } catch {
+      clearStoredAuthToken();
       setUser(null);
     } finally {
       setLoading(false);
@@ -39,12 +43,14 @@ export const AuthProvider = ({ children }) => {
 
   const login = useCallback(async credentials => {
     const { data } = await axios.post('/api/users/login', credentials, { withCredentials: true });
+    setStoredAuthToken(data.token);
     setUser(data.user);
     return data.user;
   }, []);
 
   const register = useCallback(async payload => {
     const { data } = await axios.post('/api/users/register', payload, { withCredentials: true });
+    setStoredAuthToken(data.token);
     setUser(data.user);
     return data.user;
   }, []);
@@ -53,6 +59,7 @@ export const AuthProvider = ({ children }) => {
     try {
       await axios.post('/api/users/logout', {}, { withCredentials: true });
     } finally {
+      clearStoredAuthToken();
       setUser(null);
     }
   }, []);

@@ -62,10 +62,14 @@ const getAuthCookieOptions = () => {
 };
 
 const attachAuthCookie = (res, token) => {
-  res.cookie('access_token', token, {
-    ...getAuthCookieOptions(),
-    maxAge: 60 * 60 * 1000
-  });
+  try {
+    res.cookie('access_token', token, {
+      ...getAuthCookieOptions(),
+      maxAge: 60 * 60 * 1000
+    });
+  } catch (error) {
+    console.error('No se pudo adjuntar cookie de autenticacion:', error);
+  }
 };
 
 const PASSWORD_MIN_LENGTH = 6;
@@ -224,15 +228,43 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const valid = await bcrypt.compare(password, user.password);
+    let valid = false;
+    try {
+      valid = await bcrypt.compare(password, user.password);
+    } catch (error) {
+      console.error('Error validando contrasena de usuario:', error);
+      return res.status(500).json({
+        message: 'No se pudo validar la contrasena del usuario'
+      });
+    }
+
     if (!valid) return res.status(401).json({ message: 'Contrasena incorrecta' });
 
-    const token = generateToken(user._id, user.role, user.isAdmin);
+    let token = '';
+    try {
+      token = generateToken(user._id, user.role, user.isAdmin);
+    } catch (error) {
+      console.error('Error generando token de acceso:', error);
+      return res.status(500).json({
+        message: error?.message || 'No se pudo generar el token de acceso'
+      });
+    }
+
     attachAuthCookie(res, token);
+
+    let serializedUser;
+    try {
+      serializedUser = serializeUser(user);
+    } catch (error) {
+      console.error('Error serializando usuario autenticado:', error);
+      return res.status(500).json({
+        message: 'No se pudo preparar la sesion del usuario'
+      });
+    }
 
     res.json({
       token,
-      user: serializeUser(user)
+      user: serializedUser
     });
   } catch (error) {
     console.error(error);

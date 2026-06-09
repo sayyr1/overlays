@@ -28,6 +28,15 @@ const normalizeUserRole = user => {
   return user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER;
 };
 
+const buildSafeEffectivePermissions = user => {
+  try {
+    return getEffectivePermissions(user);
+  } catch (error) {
+    console.error('Error calculando permisos efectivos en authMiddleware:', error);
+    return {};
+  }
+};
+
 export const protect = async (req, res, next) => {
   const token = getTokenFromRequest(req);
 
@@ -44,7 +53,7 @@ export const protect = async (req, res, next) => {
     }
 
     user.role = normalizeUserRole(user);
-    user.effectivePermissions = getEffectivePermissions(user);
+    user.effectivePermissions = buildSafeEffectivePermissions(user);
     req.user = user;
     return next();
   } catch (error) {
@@ -101,7 +110,7 @@ export const optionalProtect = async (req, res, next) => {
 
     if (user) {
       user.role = normalizeUserRole(user);
-      user.effectivePermissions = getEffectivePermissions(user);
+      user.effectivePermissions = buildSafeEffectivePermissions(user);
       req.user = user;
     }
   } catch (error) {

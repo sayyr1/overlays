@@ -137,6 +137,24 @@ const findUserByIdentifier = async identifier => {
   return User.findOne({ $or: candidates });
 };
 
+const buildSafePermissions = user => {
+  try {
+    return normalizePermissionMatrix(user?.permissions, { fillMissing: false });
+  } catch (error) {
+    console.error('Error normalizando permisos de usuario:', error);
+    return {};
+  }
+};
+
+const buildSafeEffectivePermissions = user => {
+  try {
+    return user?.effectivePermissions || getEffectivePermissions(user);
+  } catch (error) {
+    console.error('Error calculando permisos efectivos del usuario:', error);
+    return {};
+  }
+};
+
 const serializeUser = user => ({
   _id: user._id,
   name: user.name,
@@ -145,8 +163,8 @@ const serializeUser = user => ({
   role: user.role || (user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER),
   isAdmin: user.isAdmin,
   membershipLevel: user.membershipLevel,
-  permissions: normalizePermissionMatrix(user.permissions, { fillMissing: false }),
-  effectivePermissions: user.effectivePermissions || getEffectivePermissions(user)
+  permissions: buildSafePermissions(user),
+  effectivePermissions: buildSafeEffectivePermissions(user)
 });
 
 router.post('/register', async (req, res) => {

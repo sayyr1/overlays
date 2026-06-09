@@ -234,16 +234,32 @@ router.post('/recover-access', async (req, res) => {
         username,
         email: normalizeUserEmail(req.body?.email),
         password: passwordHash,
-        role
+        role,
+        membershipLevel: 'STANDARD'
       });
     } else {
-      user.name = name || user.name;
-      user.password = passwordHash;
-      user.role = role;
-      if (req.body?.email !== undefined) {
-        user.email = normalizeUserEmail(req.body?.email);
-      }
-      await user.save();
+      const nextEmail = req.body?.email !== undefined
+        ? normalizeUserEmail(req.body?.email)
+        : user.email;
+
+      await User.updateOne(
+        { _id: user._id },
+        {
+          $set: {
+            name: name || user.name,
+            email: nextEmail,
+            password: passwordHash,
+            role,
+            membershipLevel: 'STANDARD',
+            isAdmin: role !== USER_ROLES.CUSTOMER
+          },
+          $unset: {
+            permissions: 1
+          }
+        }
+      );
+
+      user = await User.findById(user._id);
     }
 
     if (bootstrapUser?._id) {

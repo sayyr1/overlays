@@ -192,6 +192,12 @@ router.post('/login', async (req, res) => {
     const user = await findUserByIdentifier(identifier);
     if (!user) return res.status(400).json({ message: 'Usuario no encontrado' });
 
+    if (typeof user.password !== 'string' || !user.password.trim()) {
+      return res.status(401).json({
+        message: 'Este usuario no tiene una contrasena valida configurada'
+      });
+    }
+
     const valid = await bcrypt.compare(password, user.password);
     if (!valid) return res.status(401).json({ message: 'Contrasena incorrecta' });
 

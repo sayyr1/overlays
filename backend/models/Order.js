@@ -205,7 +205,7 @@ const orderSchema = new mongoose.Schema({
   timestamps: true
 });
 
-orderSchema.pre('validate', function preValidate(next) {
+orderSchema.pre('validate', function preValidate() {
   if (!this.expiresAt) {
     this.expiresAt = new Date(Date.now() + ORDER_HOLD_WINDOW_MS);
   }
@@ -223,34 +223,27 @@ orderSchema.pre('validate', function preValidate(next) {
       this.totals.items = this.items?.length ?? 0;
     }
   }
-  next();
 });
 
-orderSchema.pre('save', function assignLookupToken(next) {
+orderSchema.pre('save', function assignLookupToken() {
   if (!this.isNew || this.lookupToken) {
-    return next();
+    return;
   }
 
   this.lookupToken = crypto.randomBytes(18).toString('hex');
-  return next();
 });
 
-orderSchema.pre('save', async function assignOrderNumber(next) {
+orderSchema.pre('save', async function assignOrderNumber() {
   if (!this.isNew || this.orderNumber) {
-    return next();
+    return;
   }
 
-  try {
-    const counter = await Counter.findOneAndUpdate(
-      { name: 'orders' },
-      { $inc: { seq: 1 } },
-      { new: true, upsert: true }
-    );
-    this.orderNumber = counter.seq;
-    return next();
-  } catch (error) {
-    return next(error);
-  }
+  const counter = await Counter.findOneAndUpdate(
+    { name: 'orders' },
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true }
+  );
+  this.orderNumber = counter.seq;
 });
 
 export default mongoose.model('Order', orderSchema);

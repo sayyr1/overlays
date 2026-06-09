@@ -1,13 +1,13 @@
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import User, { USER_ROLES } from '../models/User.js';
+import User, { USER_ROLES, normalizeUserEmail, normalizeUsername } from '../models/User.js';
 
 dotenv.config();
 
-const [, , email, role] = process.argv;
+const [, , identifier, role] = process.argv;
 
-if (!email || !role) {
-  console.error('Uso: node scripts/setUserRole.js <email> <customer|sales|owner|admin|superadmin>');
+if (!identifier || !role) {
+  console.error('Uso: node scripts/setUserRole.js <usuario|email> <customer|sales|owner|admin|superadmin>');
   process.exit(1);
 }
 
@@ -23,7 +23,15 @@ if (!process.env.MONGO_URI) {
 
 await mongoose.connect(process.env.MONGO_URI);
 
-const user = await User.findOne({ email });
+const normalizedEmail = normalizeUserEmail(identifier);
+const normalizedUsername = normalizeUsername(identifier);
+
+const user = await User.findOne({
+  $or: [
+    ...(normalizedUsername ? [{ username: normalizedUsername }] : []),
+    ...(normalizedEmail && normalizedEmail.includes('@') ? [{ email: normalizedEmail }] : [])
+  ]
+});
 if (!user) {
   console.error('Usuario no encontrado');
   process.exit(1);
@@ -32,5 +40,5 @@ if (!user) {
 user.role = role;
 await user.save();
 
-console.log(`Usuario ${email} actualizado a rol ${role}`);
+console.log(`Usuario ${user.username} actualizado a rol ${role}`);
 await mongoose.disconnect();

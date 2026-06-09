@@ -37,7 +37,7 @@ const CategoriasPage = () => {
   }, [filters, categoria]);
 
   return (
-    <div className="flex flex-col gap-8 pt-16">
+    <div className="flex flex-col gap-8 px-4 pt-16 sm:px-6 lg:px-8">
       <h2 className="text-3xl text-center font-bold text-gray-800 mb-6">
         {categoria ? `Categoría: ${categoria}` : 'En Oferta'}
       </h2>
@@ -48,7 +48,7 @@ const CategoriasPage = () => {
       ) : products.length === 0 ? (
         <p className="text-center text-gray-500 col-span-full">No hay productos disponibles.</p>
       ) : (
-        <section className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8 px-4">
+        <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {products.map(p => (
             <Categoria key={p._id} product={p} />
           ))}

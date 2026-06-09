@@ -501,8 +501,8 @@ const ProductListPage = () => {
           </div>
         )}
 
-        <div className="hidden lg:flex lg:items-start lg:gap-8">
-          <aside className="w-[300px] shrink-0">
+        <div className="hidden lg:flex lg:items-start lg:gap-6 xl:gap-8">
+          <aside className="w-[260px] shrink-0 xl:w-[300px]">
             <div className="sticky top-28">
               <ProductFilters
                 variant="sidebar"
@@ -514,7 +514,7 @@ const ProductListPage = () => {
           </aside>
 
           <div className="min-w-0 flex-1 space-y-5">
-            <section className="flex items-center justify-between gap-4">
+            <section className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div>
                 <p className="text-sm font-semibold text-white">
                   {visibleProducts.length} productos {searchTerm ? 'relevantes para tu busqueda' : 'disponibles'}
@@ -524,7 +524,7 @@ const ProductListPage = () => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center xl:justify-end">
                 {isRefreshing && (
                   <div
                     className="rounded-full bg-[#222] px-4 py-2 text-center text-sm text-white/70 ring-1 ring-white/10"
@@ -536,7 +536,7 @@ const ProductListPage = () => {
                   </div>
                 )}
 
-                <div className="relative w-[220px]">
+                <div className="relative w-full sm:w-[220px]">
                   <select
                     value={sortKey}
                     onChange={event => updateUrl(activeFilters, searchTerm, event.target.value)}

@@ -1,7 +1,13 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import User, { INTERNAL_USER_ROLES, USER_ROLES } from '../models/User.js';
+import User, {
+  INTERNAL_USER_ROLES,
+  USER_ROLES,
+  isSystemGeneratedEmail,
+  normalizeUserEmail,
+  normalizeUsername
+} from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
 import {
   protect,
@@ -15,23 +21,97 @@ import { getEffectivePermissions, normalizePermissionMatrix } from '../constants
 const router = express.Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
-const attachAuthCookie = (res, token) => {
+const getAuthCookieOptions = () => {
   const cookieOptions = {
     httpOnly: true,
     sameSite: isProduction ? 'none' : 'lax',
-    secure: isProduction,
-    maxAge: 60 * 60 * 1000
+    secure: isProduction
   };
+
   if (process.env.COOKIE_DOMAIN) {
     cookieOptions.domain = process.env.COOKIE_DOMAIN;
   }
-  res.cookie('access_token', token, cookieOptions);
+
+  return cookieOptions;
+};
+
+const attachAuthCookie = (res, token) => {
+  res.cookie('access_token', token, {
+    ...getAuthCookieOptions(),
+    maxAge: 60 * 60 * 1000
+  });
+};
+
+const PASSWORD_MIN_LENGTH = 6;
+
+const sanitizeName = value => String(value || '').trim();
+const sanitizePassword = value => String(value || '');
+const sanitizeIdentifier = value => String(value || '').trim();
+
+const getResolvedUserRole = user =>
+  user?.role || (user?.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER);
+
+const isCustomerUser = user => getResolvedUserRole(user) === USER_ROLES.CUSTOMER;
+
+const customerUserFilter = {
+  $or: [
+    { role: USER_ROLES.CUSTOMER },
+    { role: { $exists: false }, isAdmin: { $ne: true } }
+  ]
+};
+
+const getUserRouteErrorPayload = error => {
+  if (error?.code === 11000) {
+    const duplicatedField = Object.keys(error.keyPattern || error.keyValue || {})[0] || '';
+    if (duplicatedField === 'username') {
+      return { status: 400, message: 'El nombre de usuario ya esta registrado' };
+    }
+    if (duplicatedField === 'email') {
+      return { status: 400, message: 'El correo ya esta registrado' };
+    }
+    return { status: 400, message: 'Ya existe un usuario con esos datos' };
+  }
+
+  if (error?.name === 'ValidationError') {
+    const firstMessage = Object.values(error.errors || {})[0]?.message;
+    return {
+      status: 400,
+      message: firstMessage || 'Los datos del usuario no son validos'
+    };
+  }
+
+  return {
+    status: 500,
+    message: error?.message || 'Error interno al procesar usuario'
+  };
+};
+
+const findUserByIdentifier = async identifier => {
+  const normalizedIdentifier = sanitizeIdentifier(identifier);
+  const normalizedEmail = normalizeUserEmail(normalizedIdentifier);
+  const normalizedUserName = normalizeUsername(normalizedIdentifier);
+  const candidates = [];
+
+  if (normalizedUserName) {
+    candidates.push({ username: normalizedUserName });
+  }
+
+  if (normalizedEmail && normalizedEmail.includes('@')) {
+    candidates.push({ email: normalizedEmail });
+  }
+
+  if (!candidates.length) {
+    return null;
+  }
+
+  return User.findOne({ $or: candidates });
 };
 
 const serializeUser = user => ({
   _id: user._id,
   name: user.name,
-  email: user.email,
+  username: user.username || normalizeUsername(user.email?.split('@')[0] || user.name || 'usuario'),
+  email: isSystemGeneratedEmail(user.email) ? '' : user.email,
   role: user.role || (user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER),
   isAdmin: user.isAdmin,
   membershipLevel: user.membershipLevel,
@@ -40,52 +120,97 @@ const serializeUser = user => ({
 });
 
 router.post('/register', async (req, res) => {
-  const { name, email, password } = req.body;
+  try {
+    const name = sanitizeName(req.body?.name);
+    const username = normalizeUsername(req.body?.username);
+    const email = normalizeUserEmail(req.body?.email);
+    const password = sanitizePassword(req.body?.password);
 
-  const exist = await User.findOne({ email });
-  if (exist) return res.status(400).json({ message: 'Email ya registrado' });
+    if (!name) {
+      return res.status(400).json({ message: 'El nombre es obligatorio' });
+    }
 
-  const hashed = await bcrypt.hash(password, 10);
-  const user = await User.create({
-    name,
-    email,
-    password: hashed,
-    role: USER_ROLES.CUSTOMER
-  });
+    if (!username) {
+      return res.status(400).json({ message: 'El nombre de usuario es obligatorio' });
+    }
 
-  const token = generateToken(user._id, user.role, user.isAdmin);
-  attachAuthCookie(res, token);
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      return res.status(400).json({
+        message: `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`
+      });
+    }
 
-  res.status(201).json({
-    token,
-    user: serializeUser(user)
-  });
+    const existingUsers = await User.find({
+      $or: [
+        { username },
+        ...(email ? [{ email }] : [])
+      ]
+    }).select('username email');
+
+    if (existingUsers.some(user => user.username === username)) {
+      return res.status(400).json({ message: 'El nombre de usuario ya esta registrado' });
+    }
+
+    if (email && existingUsers.some(user => user.email === email)) {
+      return res.status(400).json({ message: 'El correo ya esta registrado' });
+    }
+
+    const hashed = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name,
+      username,
+      email,
+      password: hashed,
+      role: USER_ROLES.CUSTOMER
+    });
+
+    const token = generateToken(user._id, user.role, user.isAdmin);
+    attachAuthCookie(res, token);
+
+    res.status(201).json({
+      token,
+      user: serializeUser(user)
+    });
+  } catch (error) {
+    console.error(error);
+    const payload = getUserRouteErrorPayload(error);
+    res.status(payload.status).json({ message: payload.message });
+  }
 });
 
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
+  try {
+    const identifier = sanitizeIdentifier(
+      req.body?.username || req.body?.identifier || req.body?.email
+    );
+    const password = sanitizePassword(req.body?.password);
 
-  const user = await User.findOne({ email });
-  if (!user) return res.status(400).json({ message: 'Usuario no encontrado' });
+    if (!identifier || !password) {
+      return res.status(400).json({ message: 'Usuario y contrasena son obligatorios' });
+    }
 
-  const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(401).json({ message: 'Contraseña incorrecta' });
+    const user = await findUserByIdentifier(identifier);
+    if (!user) return res.status(400).json({ message: 'Usuario no encontrado' });
 
-  const token = generateToken(user._id, user.role, user.isAdmin);
-  attachAuthCookie(res, token);
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) return res.status(401).json({ message: 'Contrasena incorrecta' });
 
-  res.json({
-    token,
-    user: serializeUser(user)
-  });
+    const token = generateToken(user._id, user.role, user.isAdmin);
+    attachAuthCookie(res, token);
+
+    res.json({
+      token,
+      user: serializeUser(user)
+    });
+  } catch (error) {
+    console.error(error);
+    const payload = getUserRouteErrorPayload(error);
+    res.status(payload.status).json({ message: payload.message });
+  }
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('access_token', {
-    httpOnly: true,
-    sameSite: 'lax',
-    secure: isProduction
-  });
+  res.clearCookie('access_token', getAuthCookieOptions());
   res.status(204).end();
 });
 
@@ -107,51 +232,68 @@ router.get('/verify-token', async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findById(decoded.userId).select('-password');
 
-    if (!user) return res.status(401).json({ message: 'Token inválido' });
+    if (!user) return res.status(401).json({ message: 'Token invalido' });
 
     return res.json({ valid: true, user: serializeUser(user) });
   } catch (err) {
-    return res.status(401).json({ message: 'Token expirado o inválido' });
+    return res.status(401).json({ message: 'Token expirado o invalido' });
   }
 });
 
-router.get('/', protect, adminOnly, requireModuleEnabled('customers'), requirePermission('customers', 'view'), async (req, res) => {
-  try {
-    const users = await User.find().select('-password');
-    res.json(users.map(serializeUser));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error al obtener usuarios' });
+router.get(
+  '/',
+  protect,
+  adminOnly,
+  requireModuleEnabled('customers'),
+  requirePermission('customers', 'view'),
+  async (req, res) => {
+    try {
+      const users = await User.find(customerUserFilter).select('-password');
+      res.json(users.map(serializeUser));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Error al obtener usuarios' });
+    }
   }
-});
+);
 
-router.put('/:id/membership', protect, adminOnly, requireModuleEnabled('memberships'), requirePermission('memberships', 'manage'), async (req, res) => {
-  const { membershipLevel } = req.body;
-  if (!['STANDARD', 'GOLD', 'PREMIUM', 'PLATINUM'].includes(membershipLevel)) {
-    return res.status(400).json({ message: 'Nivel de cliente inválido' });
+router.put(
+  '/:id/membership',
+  protect,
+  adminOnly,
+  requireModuleEnabled('memberships'),
+  requirePermission('memberships', 'manage'),
+  async (req, res) => {
+    const { membershipLevel } = req.body;
+    if (!['STANDARD', 'GOLD', 'PREMIUM', 'PLATINUM'].includes(membershipLevel)) {
+      return res.status(400).json({ message: 'Nivel de cliente invalido' });
+    }
+
+    try {
+      const user = await User.findById(req.params.id).select('-password');
+      if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+      if (!isCustomerUser(user)) {
+        return res.status(400).json({
+          message: 'Solo se puede cambiar la membresia de usuarios cliente'
+        });
+      }
+
+      user.membershipLevel = membershipLevel;
+      await user.save();
+
+      res.json(serializeUser(user));
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Error al actualizar nivel de cliente' });
+    }
   }
-
-  try {
-    const user = await User.findByIdAndUpdate(
-      req.params.id,
-      { membershipLevel },
-      { new: true, runValidators: true }
-    ).select('-password');
-
-    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
-
-    res.json(serializeUser(user));
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: 'Error al actualizar nivel de cliente' });
-  }
-});
+);
 
 router.put('/:id/role', protect, superAdminOnly, async (req, res) => {
   const { role } = req.body || {};
 
   if (!Object.values(USER_ROLES).includes(role)) {
-    return res.status(400).json({ message: 'Rol inválido' });
+    return res.status(400).json({ message: 'Rol invalido' });
   }
 
   if (role === USER_ROLES.CUSTOMER) {

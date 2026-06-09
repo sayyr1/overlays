@@ -26,7 +26,7 @@ const NavbarBottom = () => {
   const [guestOrderTracking, setGuestOrderTracking] = React.useState(() => getGuestOrderTracking());
 
   const getItemClasses = isActive =>
-    `group flex flex-col items-center gap-1 text-[0.74rem] font-semibold leading-tight tracking-[0.03em] transition-colors duration-200 ${
+    `group flex min-w-0 flex-col items-center gap-1 text-center text-[0.68rem] font-semibold leading-tight tracking-[0.03em] transition-colors duration-200 ${
       isActive ? 'text-white drop-shadow-[0_0_10px_rgba(45,212,191,0.36)]' : 'text-white/85 hover:text-white'
     }`;
 
@@ -100,18 +100,18 @@ const NavbarBottom = () => {
     >
       <div className="pointer-events-auto w-full max-w-xl rounded-[2.25rem] border border-white/15 bg-gradient-to-r from-slate-950/95 via-slate-900/95 to-slate-950/95 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <ul
-          className="grid items-stretch gap-1.5 px-4 py-3 sm:gap-2 sm:py-4"
+          className="grid items-stretch gap-1 px-2.5 py-3 sm:gap-2 sm:px-4 sm:py-4"
           style={{ gridTemplateColumns }}
         >
           {navItems.map(link => {
             const key = link.to || link.key;
 
             return (
-              <li key={key} className="flex justify-center">
+              <li key={key} className="flex min-w-0 justify-center">
                 <NavLink
                   to={link.to}
                   onClick={event => handleProtectedNav(event, link)}
-                  className={({ isActive }) => `${getItemClasses(isActive)} whitespace-nowrap`}
+                  className={({ isActive }) => getItemClasses(isActive)}
                 >
                   <span className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/5 text-white/90 transition-all duration-200 group-hover:bg-white/15 group-hover:text-white group-aria-[current=page]:bg-white/15 group-aria-[current=page]:text-white">
                     <link.Icon className="text-[1.35rem]" />
@@ -121,7 +121,7 @@ const NavbarBottom = () => {
                       </span>
                     )}
                   </span>
-                  <span>{link.label}</span>
+                  <span className="max-w-full truncate">{link.label}</span>
                 </NavLink>
               </li>
             );

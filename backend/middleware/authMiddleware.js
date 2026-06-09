@@ -48,7 +48,7 @@ export const protect = async (req, res, next) => {
     req.user = user;
     return next();
   } catch (error) {
-    return res.status(401).json({ message: 'Token inválido' });
+    return res.status(401).json({ message: 'Token invalido' });
   }
 };
 
@@ -105,7 +105,7 @@ export const optionalProtect = async (req, res, next) => {
       req.user = user;
     }
   } catch (error) {
-    console.warn('Token no válido ignorado en optionalProtect');
+    console.warn('Token no valido ignorado en optionalProtect');
   }
 
   return next();

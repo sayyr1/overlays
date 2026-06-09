@@ -164,7 +164,7 @@ const parsePricePayload = (rawPrice = {}) => {
   const platinum = Number(rawPrice.platinum ?? retail);
 
   if ([retail, gold, premium, platinum].some(value => Number.isNaN(value) || value < 0)) {
-    throw new Error('Precios invÃ¡lidos');
+    throw new Error('Precios invalidos');
   }
 
   return { retail, gold, premium, platinum };
@@ -326,7 +326,7 @@ router.post(
     console.error('Error en upload-image:', err);
     return res
       .status(500)
-      .json({ message: 'Error interno subiendo imÃ¡genes', error: err.message });
+      .json({ message: 'Error interno subiendo imagenes', error: err.message });
   }
 );
 
@@ -336,8 +336,8 @@ router.get('/promocion', optionalProtect, async (req, res) => {
     const productosEnPromo = await Product.find({ onSale: true }).limit(6);
     res.json(productosEnPromo.map(product => formatProduct(product, imageContext)));
   } catch (error) {
-    console.error('Error al obtener productos en promociÃ³n:', error);
-    res.status(500).json({ message: 'Error al obtener productos en promociÃ³n' });
+    console.error('Error al obtener productos en promocion:', error);
+    res.status(500).json({ message: 'Error al obtener productos en promocion' });
   }
 });
 
@@ -624,14 +624,17 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
   }
 });
 
-router.delete('/:id/image/:public_id(*)', protect, adminOnly, requirePermission('products', 'edit'), async (req, res) => {
-  const { id, public_id } = req.params;
+router.delete('/:id/image/*public_id', protect, adminOnly, requirePermission('products', 'edit'), async (req, res) => {
+  const { id } = req.params;
+  const publicId = Array.isArray(req.params.public_id)
+    ? req.params.public_id.join('/')
+    : req.params.public_id;
   try {
     const product = await Product.findById(id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
 
-    await cloudinary.uploader.destroy(public_id);
-    product.images = product.images.filter(img => img.public_id !== public_id);
+    await cloudinary.uploader.destroy(publicId);
+    product.images = product.images.filter(img => img.public_id !== publicId);
     await product.save();
 
     return res.json({ message: 'Imagen eliminada correctamente', images: product.images });
@@ -648,7 +651,7 @@ router.delete('/:id', protect, adminOnly, requirePermission('products', 'delete'
 
     await Promise.all(product.images.map(img => cloudinary.uploader.destroy(img.public_id)));
     await product.deleteOne();
-    res.json({ message: 'Producto e imÃ¡genes eliminados' });
+    res.json({ message: 'Producto e imagenes eliminados' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Error al eliminar producto' });

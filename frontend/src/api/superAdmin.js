@@ -14,6 +14,8 @@ export const updateSuperAdminModule = (key, payload) =>
 
 export const getSuperAdminAccessControl = () =>
   axios.get('/api/super-admin/access-control', { withCredentials: true });
+export const createSuperAdminAccessControlUser = payload =>
+  axios.post('/api/super-admin/access-control/users', payload, { withCredentials: true });
 export const updateSuperAdminAccessControlUser = (id, payload) =>
   axios.put(`/api/super-admin/access-control/users/${id}`, payload, { withCredentials: true });
 export const updateSuperAdminUserRole = (id, payload) =>

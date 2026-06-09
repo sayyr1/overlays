@@ -410,18 +410,20 @@ const NavbarTop = () => {
               </Link>
             </div>
 
-            <div className="hidden lg:flex items-center justify-between py-3 gap-4">
-              <Link to="/" className="flex items-center gap-3 flex-shrink-0" aria-label="Volver al inicio">
+            <div className="hidden lg:flex lg:flex-wrap lg:items-center lg:justify-between lg:gap-4 lg:py-3 xl:flex-nowrap">
+              <Link to="/" className="flex min-w-0 items-center gap-3 xl:flex-shrink-0" aria-label="Volver al inicio">
                 <span className="inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 shadow">
                   <img src={brandLogo} alt="Logo" className="h-full w-full object-cover" />
                 </span>
-                <span className="text-brand text-2xl font-extrabold tracking-tight">{brandName}</span>
+                <span className="truncate text-brand text-2xl font-extrabold tracking-tight">
+                  {brandName}
+                </span>
               </Link>
 
-              <div className="flex flex-1 items-center gap-4">
+              <div className="flex min-w-0 flex-1 items-center gap-4 xl:min-w-0">
                 <form
                   onSubmit={submitSearch}
-                  className="flex min-w-[280px] max-w-3xl flex-1 items-center gap-3 rounded-md border border-white/15 bg-[#232323] px-4 py-2"
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-md border border-white/15 bg-[#232323] px-4 py-2 xl:max-w-3xl"
                 >
                   <FiSearch className="text-base text-white/55" />
                   <input
@@ -439,7 +441,7 @@ const NavbarTop = () => {
                   </button>
                 </form>
 
-                <ul className="flex items-center gap-4 text-[11px] uppercase tracking-wide">
+                <ul className="hidden xl:flex xl:flex-wrap xl:items-center xl:gap-4 text-[11px] uppercase tracking-wide">
                   {loadingMenu && (
                     <li className="text-white/60 text-xs">Cargando menu...</li>
                   )}
@@ -474,7 +476,7 @@ const NavbarTop = () => {
                 </ul>
               </div>
 
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex shrink-0 flex-wrap items-center justify-end gap-4 text-sm">
                 {ordersEnabled && paymentsEnabled && (
                   <Link
                     to="/cart"
@@ -604,14 +606,16 @@ const NavbarTop = () => {
                 </button>
                 <Link
                   to="/"
-                  className="flex items-center gap-2 text-brand"
+                  className="mx-3 flex min-w-0 flex-1 items-center gap-2 text-brand"
                   onClick={() => setIsMobileMenuOpen(false)}
                   aria-label="Volver al inicio"
                 >
                   <span className="inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-white/20 bg-white/10 shadow">
                     <img src={brandLogo} alt="Logo" className="h-full w-full object-cover" />
                   </span>
-                  <span className="text-2xl font-extrabold tracking-tight">{brandName}</span>
+                  <span className="truncate text-xl font-extrabold tracking-tight sm:text-2xl">
+                    {brandName}
+                  </span>
                 </Link>
                 <span className="h-9 w-9" aria-hidden="true" />
               </div>
@@ -749,10 +753,10 @@ const MegaMenuPanel = ({ item, onClose }) => {
 
   return (
     <div
-      className="absolute left-1/2 top-full z-40 mt-2 w-[1040px] max-w-[calc(100vw-3rem)] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#232320] text-white shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
+      className="absolute left-1/2 top-full z-40 mt-2 w-[calc(100vw-3rem)] max-w-[1040px] -translate-x-1/2 overflow-hidden rounded-2xl border border-white/10 bg-[#232320] text-white shadow-[0_24px_80px_rgba(0,0,0,0.42)]"
       onMouseLeave={onClose}
     >
-      <div className="grid min-h-[360px] grid-cols-[240px_minmax(0,1fr)_320px]">
+      <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)] xl:min-h-[360px] xl:grid-cols-[240px_minmax(0,1fr)_320px]">
         <div className="border-r border-white/8 bg-[#2b2b27] px-3 py-4">
           <div className="mb-3 px-3 text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">
             Explorar
@@ -800,7 +804,7 @@ const MegaMenuPanel = ({ item, onClose }) => {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <div className="grid grid-cols-1 gap-x-6 gap-y-3 2xl:grid-cols-2">
             {(activeColumn?.items || []).map((columnItem, columnItemIndex) => {
               const href = columnItem.href || '#';
               return (
@@ -824,7 +828,7 @@ const MegaMenuPanel = ({ item, onClose }) => {
           </div>
 
           {secondaryColumns.length > 0 && (
-            <div className="mt-6 grid grid-cols-2 gap-4 border-t border-white/8 pt-5">
+            <div className="mt-6 hidden grid-cols-2 gap-4 border-t border-white/8 pt-5 xl:grid">
               {secondaryColumns.map((column, secondaryIndex) => (
                 <div
                   key={column.id || `secondary-column-${secondaryIndex}`}
@@ -851,7 +855,7 @@ const MegaMenuPanel = ({ item, onClose }) => {
           )}
         </div>
 
-        <div className="border-l border-white/8 bg-[#1d1d1a] p-5">
+        <div className="hidden border-l border-white/8 bg-[#1d1d1a] p-5 xl:block">
           {item.megaMenu?.featured ? (
             <div className="flex h-full flex-col rounded-[1.4rem] border border-white/8 bg-white/[0.03] p-4">
               {item.megaMenu.featured.imageUrl && (

@@ -26,9 +26,9 @@ const Categoria = ({ product }) => {
       onClick={handleClick}
       className="
         relative group
-        w-full sm:w-[420px] bg-white rounded-2xl shadow-md
+        h-full w-full bg-white rounded-2xl shadow-md
         border-l-4 border-gray-500 overflow-hidden
-        mx-auto my-6 flex flex-col cursor-pointer
+        mx-auto flex flex-col cursor-pointer
         hover:shadow-lg hover:-translate-y-1 transition-all duration-300
         focus:outline-none
       "
@@ -45,9 +45,9 @@ const Categoria = ({ product }) => {
         />
       </div>
 
-      <div className="px-5 py-4 flex justify-between items-center">
-        <h3 className="text-lg font-semibold text-gray-800">{product.name}</h3>
-        <span className="text-xl font-bold text-red-600">
+      <div className="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="line-clamp-2 text-lg font-semibold text-gray-800">{product.name}</h3>
+        <span className="shrink-0 text-xl font-bold text-red-600">
           {formatCurrency(price)}
         </span>
       </div>

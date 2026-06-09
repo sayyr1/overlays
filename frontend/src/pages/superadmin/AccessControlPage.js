@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  createSuperAdminAccessControlUser,
   getSuperAdminAccessControl,
   updateSuperAdminAccessControlUser,
   updateSuperAdminUserRole
@@ -31,7 +32,8 @@ const STATUS_TONE = {
 };
 
 const getUserDisplayName = user => user?.name || 'Sin nombre';
-const getUserDisplayEmail = user => user?.email || 'Sin email';
+const getUserDisplayUsername = user => user?.username || 'sin-usuario';
+const getUserDisplayEmail = user => user?.email || '';
 
 const AccessControlPage = () => {
   const [catalog, setCatalog] = useState([]);
@@ -45,6 +47,15 @@ const AccessControlPage = () => {
   const [loading, setLoading] = useState(true);
   const [savingId, setSavingId] = useState('');
   const [error, setError] = useState('');
+  const [createForm, setCreateForm] = useState({
+    name: '',
+    username: '',
+    email: '',
+    password: '',
+    role: 'sales'
+  });
+  const [createStatus, setCreateStatus] = useState(null);
+  const [creatingUser, setCreatingUser] = useState(false);
 
   const setUserStatus = useCallback((userId, tone, message) => {
     setStatusByUser(prev => ({
@@ -142,6 +153,11 @@ const AccessControlPage = () => {
     [roles]
   );
 
+  const createRoleOptions = useMemo(
+    () => roles.filter(role => ['superadmin', 'owner', 'sales'].includes(role.key)),
+    [roles]
+  );
+
   const roleCards = useMemo(
     () =>
       PRIMARY_ROLE_ORDER.map(roleKey => {
@@ -163,6 +179,49 @@ const AccessControlPage = () => {
     const totalUsers = users.length;
     return { totalModules, totalActions, totalUsers };
   }, [catalog, users]);
+
+  const handleCreateInputChange = event => {
+    const { name, value } = event.target;
+    setCreateForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleCreateUser = async event => {
+    event.preventDefault();
+    setCreatingUser(true);
+    setCreateStatus(null);
+
+    try {
+      await createSuperAdminAccessControlUser({
+        name: createForm.name.trim(),
+        username: createForm.username.trim(),
+        email: createForm.email.trim(),
+        password: createForm.password,
+        role: createForm.role
+      });
+      setCreateForm({
+        name: '',
+        username: '',
+        email: '',
+        password: '',
+        role: 'sales'
+      });
+      await loadAccessControl();
+      setCreateStatus({
+        tone: 'success',
+        message: 'Usuario interno creado correctamente.'
+      });
+    } catch (requestError) {
+      setCreateStatus({
+        tone: 'error',
+        message: requestError?.response?.data?.message || 'No se pudo crear el usuario.'
+      });
+    } finally {
+      setCreatingUser(false);
+    }
+  };
 
   const updatePermission = (userId, moduleKey, actionKey, value) => {
     setDrafts(prev => ({
@@ -368,6 +427,125 @@ const AccessControlPage = () => {
         ))}
       </div>
 
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+        <div className="rounded-[28px] bg-white p-6 shadow-brand-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            Alta interna
+          </p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">
+            Crear usuarios para operacion y administracion
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            Genera accesos para equipo de ventas, dueno de tienda o nuevos super admin
+            usando nombre de usuario y contrasena. El correo queda opcional.
+          </p>
+
+          {createStatus?.message && (
+            <div
+              className={`mt-4 rounded-2xl px-4 py-3 text-sm ${
+                STATUS_TONE[createStatus.tone] || STATUS_TONE.info
+              }`}
+            >
+              {createStatus.message}
+            </div>
+          )}
+
+          <form onSubmit={handleCreateUser} className="mt-5 grid gap-4 md:grid-cols-2">
+            <label className="text-sm text-slate-600">
+              Nombre
+              <input
+                type="text"
+                name="name"
+                value={createForm.name}
+                onChange={handleCreateInputChange}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800"
+                placeholder="Nombre completo"
+                required
+              />
+            </label>
+
+            <label className="text-sm text-slate-600">
+              Nombre de usuario
+              <input
+                type="text"
+                name="username"
+                value={createForm.username}
+                onChange={handleCreateInputChange}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800"
+                placeholder="usuario.equipo"
+                required
+              />
+            </label>
+
+            <label className="text-sm text-slate-600">
+              Correo opcional
+              <input
+                type="email"
+                name="email"
+                value={createForm.email}
+                onChange={handleCreateInputChange}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800"
+                placeholder="correo@empresa.com"
+              />
+            </label>
+
+            <label className="text-sm text-slate-600">
+              Rol
+              <select
+                name="role"
+                value={createForm.role}
+                onChange={handleCreateInputChange}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800"
+              >
+                {createRoleOptions.map(role => (
+                  <option key={role.key} value={role.key}>
+                    {role.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="text-sm text-slate-600 md:col-span-2">
+              Contrasena inicial
+              <input
+                type="password"
+                name="password"
+                value={createForm.password}
+                onChange={handleCreateInputChange}
+                className="mt-1 w-full rounded-xl border border-slate-200 px-4 py-3 text-slate-800"
+                placeholder="Minimo 6 caracteres"
+                minLength={6}
+                required
+              />
+            </label>
+
+            <div className="md:col-span-2 flex flex-wrap justify-end gap-3">
+              <button
+                type="submit"
+                disabled={creatingUser}
+                className="rounded-xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white disabled:opacity-60"
+              >
+                {creatingUser ? 'Creando...' : 'Crear usuario interno'}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <aside className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-brand-sm">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">
+            Identidad
+          </p>
+          <h3 className="mt-2 text-xl font-semibold text-slate-950">
+            Nuevo acceso basado en username
+          </h3>
+          <div className="mt-4 space-y-3 text-sm leading-6 text-slate-500">
+            <p>El login principal ahora usa nombre de usuario en lugar de correo.</p>
+            <p>Las cuentas anteriores pueden seguir entrando con correo mientras migran.</p>
+            <p>Los nuevos usuarios internos se crean desde esta vista, no desde el registro publico.</p>
+          </div>
+        </aside>
+      </div>
+
       {visiblePresets.length > 0 && (
         <div className="rounded-[28px] bg-white p-6 shadow-brand-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -426,20 +604,25 @@ const AccessControlPage = () => {
               return (
                 <article key={user._id} className="rounded-[28px] bg-white p-6 shadow-brand-sm">
                   <div className="flex flex-col gap-4 border-b border-slate-100 pb-5 lg:flex-row lg:items-center lg:justify-between">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-3">
-                        <h3 className="text-xl font-semibold text-slate-950">
-                          {getUserDisplayName(user)}
-                        </h3>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-xl font-semibold text-slate-950">
+                            {getUserDisplayName(user)}
+                          </h3>
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             ROLE_TONE[user.role] || ROLE_TONE.admin
                           }`}
                         >
-                          {activeRole?.label || user.role}
+                            {activeRole?.label || user.role}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500">{getUserDisplayEmail(user)}</p>
+                      <p className="text-sm font-medium text-slate-700">
+                        @{getUserDisplayUsername(user)}
+                      </p>
+                      {getUserDisplayEmail(user) && (
+                        <p className="text-sm text-slate-500">{getUserDisplayEmail(user)}</p>
+                      )}
                     </div>
 
                     {!isSuperAdmin ? (
@@ -626,7 +809,12 @@ const AccessControlPage = () => {
                           Admin legado
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500">{getUserDisplayEmail(user)}</p>
+                      <p className="text-sm font-medium text-slate-700">
+                        @{getUserDisplayUsername(user)}
+                      </p>
+                      {getUserDisplayEmail(user) && (
+                        <p className="text-sm text-slate-500">{getUserDisplayEmail(user)}</p>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-3">

@@ -16,6 +16,7 @@ const formatCurrency = value =>
   new Intl.NumberFormat('es-EC', { style: 'currency', currency: 'USD' }).format(Number(value ?? 0));
 
 const MEMBERSHIP_LEVELS = ['STANDARD', 'GOLD', 'PREMIUM', 'PLATINUM'];
+const INTERNAL_ROLES = new Set(['sales', 'owner', 'admin', 'superadmin']);
 
 const AdminDashboard = () => {
   const { loading: modulesLoading, isModuleEnabled } = usePublicConfig();
@@ -97,7 +98,9 @@ const AdminDashboard = () => {
       if (customersEnabled) {
         const usersRes = responses.find(item => item.key === 'users');
         const sortedUsers = Array.isArray(usersRes?.data)
-          ? [...usersRes.data].sort((a, b) => a.name.localeCompare(b.name))
+          ? [...usersRes.data]
+              .filter(user => !user?.isAdmin && !INTERNAL_ROLES.has(user?.role))
+              .sort((a, b) => a.name.localeCompare(b.name))
           : [];
         setUsers(sortedUsers);
       } else {
@@ -316,31 +319,35 @@ const AdminDashboard = () => {
         )}
 
         {customersEnabled && (
-          <section className="surface-card p-6">
-            <h2 className="text-lg font-semibold text-slate-900">Clientes</h2>
+          <section className="rounded-3xl border border-surface-200 bg-white p-6 shadow-brand-sm">
+            <h2 className="text-lg font-semibold text-slate-950">Clientes</h2>
             <div className="mt-4 overflow-x-auto">
               <table className="min-w-full divide-y divide-surface-200">
-                <thead className="bg-surface-100 text-left text-xs uppercase text-slate-500">
+                <thead className="bg-slate-100 text-left text-xs uppercase text-slate-600">
                   <tr>
                     <th className="px-4 py-2">Nombre</th>
+                    <th className="px-4 py-2">Usuario</th>
                     <th className="px-4 py-2">Correo</th>
                     <th className="px-4 py-2">Nivel</th>
                     <th className="px-4 py-2 text-right">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-200 text-sm text-slate-700">
+                <tbody className="divide-y divide-slate-200 bg-white text-sm text-slate-700">
                   {users.map(user => (
-                    <tr key={user._id}>
-                      <td className="px-4 py-2">{user.name}</td>
-                      <td className="px-4 py-2">{user.email}</td>
-                      <td className="px-4 py-2">{user.membershipLevel}</td>
+                    <tr key={user._id} className="transition hover:bg-slate-50">
+                      <td className="px-4 py-3 text-slate-800">{user.name}</td>
+                      <td className="px-4 py-2 font-medium text-slate-900">
+                        {user.username ? `@${user.username}` : 'Sin usuario'}
+                      </td>
+                      <td className="px-4 py-2 text-slate-700">{user.email || 'Sin correo'}</td>
+                      <td className="px-4 py-2 font-medium text-slate-800">{user.membershipLevel}</td>
                       <td className="px-4 py-2 text-right">
                         {membershipsEnabled ? (
                           <select
                             value={user.membershipLevel}
                             onChange={event => handleMembershipChange(user._id, event.target.value)}
                             disabled={updatingUserId === user._id}
-                            className="rounded-lg border border-surface-200 px-3 py-2 text-sm focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-800 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
                           >
                             {MEMBERSHIP_LEVELS.map(option => (
                               <option key={option} value={option}>
@@ -354,6 +361,13 @@ const AdminDashboard = () => {
                       </td>
                     </tr>
                   ))}
+                  {!users.length && (
+                    <tr>
+                      <td colSpan={5} className="px-4 py-8 text-center text-sm text-slate-500">
+                        No hay clientes registrados.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>

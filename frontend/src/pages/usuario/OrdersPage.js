@@ -156,7 +156,7 @@ const OrdersPage = () => {
                           </ul>
                         </div>
                         <div className="rounded-xl border border-surface-200 bg-surface-100 px-4 py-3 text-sm text-slate-600">
-                          <p className="font-semibold text-slate-800">Métodos de pago activos</p>
+                          <p className="font-semibold text-slate-800">Metodos de pago activos</p>
                           {activePaymentMethods.length ? (
                             activePaymentMethods.map(method => (
                               <div key={method._id} className="mt-2 rounded-lg border border-surface-200 bg-white px-3 py-2">
@@ -165,11 +165,11 @@ const OrdersPage = () => {
                                 {method.bankName && <p>Banco: {method.bankName}</p>}
                                 {method.accountNumber && <p>Cuenta: {method.accountNumber}</p>}
                                 {method.accountOwner && <p>Titular: {method.accountOwner}</p>}
-                                {method.accountId && <p>Identificación: {method.accountId}</p>}
+                                {method.accountId && <p>Identificacion: {method.accountId}</p>}
                               </div>
                             ))
                           ) : (
-                            <p className="mt-2">No hay métodos de pago configurados actualmente.</p>
+                            <p className="mt-2">No hay metodos de pago configurados actualmente.</p>
                           )}
                         </div>
                         <div className="flex flex-col gap-2 sm:flex-row">
@@ -286,6 +286,7 @@ const OrdersPage = () => {
 };
 
 export default OrdersPage;
+
 
 
 

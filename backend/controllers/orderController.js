@@ -70,6 +70,15 @@ const adjustMapValue = (map, key, delta) => {
 
 const toNumber = value => Number(value || 0);
 
+const runNonCriticalTask = async (label, task) => {
+  try {
+    return await task();
+  } catch (error) {
+    console.error(`Error no critico en ${label}:`, error);
+    return null;
+  }
+};
+
 const getPriceForMembership = (product, membershipLevel = 'STANDARD') => {
   const key = MEMBERSHIP_PRICE_KEY[membershipLevel?.toUpperCase?.()] || 'retail';
   const price = product.price || {};
@@ -241,6 +250,9 @@ export const expirePendingOrders = async () => {
         productCache.set(productId, product);
       }
       const product = productCache.get(productId);
+      if (!product) {
+        continue;
+      }
       releaseReservedStock(product, item.color, item.size, item.quantity);
     }
 
@@ -343,30 +355,49 @@ export const createOrder = async (req, res) => {
 
     const finalTotal = subtotal;
 
-    const { session, sessionId, contact } = await createOrUpdateCRMForOrder({
-      req,
-      now,
-      processedItems,
-      contactName,
-      contactPhone,
-      contactEmail,
-      status: 'interested'
+    let session = null;
+    let sessionId = '';
+    let contact = null;
+    let cartSnapshot = null;
+
+    const crmContext = await runNonCriticalTask('crm previo a crear pedido', async () => {
+      const nextContext = await createOrUpdateCRMForOrder({
+        req,
+        now,
+        processedItems,
+        contactName,
+        contactPhone,
+        contactEmail,
+        status: 'interested'
+      });
+
+      const nextCartSnapshot = await upsertCartSnapshot({
+        session: nextContext.session,
+        sessionId: nextContext.sessionId,
+        contactId: nextContext.contact?._id || nextContext.session?.contact || null,
+        userId: req.user?._id ?? null,
+        items: processedItems.map(item => item.orderItem),
+        status: 'checkout_started',
+        source: nextContext.session?.source || '',
+        medium: nextContext.session?.medium || '',
+        campaign: nextContext.session?.campaign || '',
+        contactName,
+        contactPhone,
+        contactEmail
+      });
+
+      return {
+        ...nextContext,
+        cartSnapshot: nextCartSnapshot
+      };
     });
 
-    const cartSnapshot = await upsertCartSnapshot({
-      session,
-      sessionId,
-      contactId: contact?._id || session?.contact || null,
-      userId: req.user?._id ?? null,
-      items: processedItems.map(item => item.orderItem),
-      status: 'checkout_started',
-      source: session?.source || '',
-      medium: session?.medium || '',
-      campaign: session?.campaign || '',
-      contactName,
-      contactPhone,
-      contactEmail
-    });
+    if (crmContext) {
+      session = crmContext.session;
+      sessionId = crmContext.sessionId;
+      contact = crmContext.contact;
+      cartSnapshot = crmContext.cartSnapshot;
+    }
 
     const order = new Order({
       user: req.user?._id ?? null,
@@ -398,32 +429,36 @@ export const createOrder = async (req, res) => {
 
     await order.save();
 
-    await createCRMEvent({
-      contactId: contact?._id || null,
-      session,
-      sessionId,
-      eventType: 'checkout_started',
-      productId: processedItems?.[0]?.product?._id || null,
-      cartSnapshotId: cartSnapshot?._id || null,
-      metadata: {
-        subtotal,
-        itemsCount: processedItems.length
-      }
-    });
+    await runNonCriticalTask('evento checkout_started', () =>
+      createCRMEvent({
+        contactId: contact?._id || null,
+        session,
+        sessionId,
+        eventType: 'checkout_started',
+        productId: processedItems?.[0]?.product?._id || null,
+        cartSnapshotId: cartSnapshot?._id || null,
+        metadata: {
+          subtotal,
+          itemsCount: processedItems.length
+        }
+      })
+    );
 
-    await createCRMEvent({
-      contactId: contact?._id || null,
-      session,
-      sessionId,
-      eventType: 'order_created',
-      productId: processedItems?.[0]?.product?._id || null,
-      cartSnapshotId: cartSnapshot?._id || null,
-      orderId: order._id,
-      metadata: {
-        total: finalTotal,
-        orderNumber: order.orderNumber
-      }
-    });
+    await runNonCriticalTask('evento order_created', () =>
+      createCRMEvent({
+        contactId: contact?._id || null,
+        session,
+        sessionId,
+        eventType: 'order_created',
+        productId: processedItems?.[0]?.product?._id || null,
+        cartSnapshotId: cartSnapshot?._id || null,
+        orderId: order._id,
+        metadata: {
+          total: finalTotal,
+          orderNumber: order.orderNumber
+        }
+      })
+    );
 
     return res.status(201).json({
       orderId: order.orderNumber,
@@ -581,27 +616,33 @@ export const confirmOrder = async (req, res) => {
 
     await order.save();
 
-    const contact = await upsertCRMContact({
-      userId: order.user || null,
-      contactId: order.crmContact || null,
-      name: order.contactName || '',
-      phone: order.contactPhone || '',
-      whatsapp: order.contactPhone || '',
-      email: order.contactEmail || '',
-      status: 'customer',
-      interestedProductId: order.items?.[0]?.product || null,
-      lastSeenAt: now
-    });
+    const contact = await runNonCriticalTask('actualizar contacto por pago', () =>
+      upsertCRMContact({
+        userId: order.user || null,
+        contactId: order.crmContact || null,
+        name: order.contactName || '',
+        phone: order.contactPhone || '',
+        whatsapp: order.contactPhone || '',
+        email: order.contactEmail || '',
+        status: 'customer',
+        interestedProductId: order.items?.[0]?.product || null,
+        lastSeenAt: now
+      })
+    );
 
     if (contact?._id) {
       order.crmContact = contact._id;
       await order.save();
-      await handlePaidOrderAutomation({ order, contact });
-      await markCartSnapshotConverted({
-        sessionId: order.visitorSessionId || '',
-        orderId: order._id,
-        contactId: contact._id
-      });
+      await runNonCriticalTask('automatizacion de cliente pagado', () =>
+        handlePaidOrderAutomation({ order, contact })
+      );
+      await runNonCriticalTask('convertir carrito a compra', () =>
+        markCartSnapshotConverted({
+          sessionId: order.visitorSessionId || '',
+          orderId: order._id,
+          contactId: contact._id
+        })
+      );
     }
 
     const populated = await Order.findById(id)

@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -23,26 +23,33 @@ const LoginPage = () => {
     setError('');
 
     try {
-      const loggedUser = await login({ email, password });
-      const destination = loggedUser?.role === 'superadmin'
-        ? '/super-admin'
-        : loggedUser?.isAdmin
-          ? '/admin-dashboard'
-          : safeRedirect;
+      const loggedUser = await login({ username, password });
+      const destination = safeRedirect !== '/'
+        ? safeRedirect
+        : loggedUser?.role === 'superadmin'
+          ? '/super-admin'
+          : loggedUser?.isAdmin
+            ? '/admin-dashboard'
+            : '/';
       navigate(destination, { replace: true });
       window.setTimeout(() => {
         document.getElementById('main-content')?.focus();
       }, 50);
     } catch (err) {
-      const message = err.response?.data?.message || 'Error al iniciar sesión';
+      const message = err.response?.data?.message || err.message || 'Error al iniciar sesion';
       setError(message);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md bg-white p-8 rounded-lg shadow-lg">
-        <h2 className="text-3xl font-semibold text-center text-gray-800 mb-6">Iniciar Sesión</h2>
+      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
+        <h2 className="mb-3 text-center text-3xl font-semibold text-gray-800">
+          Iniciar sesion
+        </h2>
+        <p className="mb-6 text-center text-sm text-gray-500">
+          Usa tu nombre de usuario para entrar al sistema.
+        </p>
         {error && (
           <p className="mb-4 text-center text-sm text-red-500">
             {error}
@@ -51,12 +58,13 @@ const LoginPage = () => {
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <input
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="Correo electrónico"
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              placeholder="Nombre de usuario"
               required
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoComplete="username"
+              className="w-full rounded-md border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
@@ -64,15 +72,16 @@ const LoginPage = () => {
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder="Contraseña"
+              placeholder="Contrasena"
               required
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              autoComplete="current-password"
+              className="w-full rounded-md border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <div>
             <button
               type="submit"
-              className="w-full p-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300"
+              className="w-full rounded-md bg-blue-600 p-3 text-white transition duration-300 hover:bg-blue-700"
             >
               Entrar
             </button>
@@ -84,7 +93,7 @@ const LoginPage = () => {
             to={registerLink}
             className="mt-2 inline-flex w-full items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:text-gray-900"
           >
-            Registrate
+            Crear cuenta
           </Link>
         </div>
       </div>

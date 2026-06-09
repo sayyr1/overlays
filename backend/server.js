@@ -41,26 +41,29 @@ const LOCAL_ALLOWED_ORIGINS = [
   'http://127.0.0.1:5000'
 ];
 
-const DEFAULT_ALLOWED_ORIGINS = [
-  ...LOCAL_ALLOWED_ORIGINS,
-  'https://niway.store',
-  'https://www.niway.store'
-];
+const DEFAULT_ALLOWED_ORIGINS = [...LOCAL_ALLOWED_ORIGINS];
 
 const parseAllowedOrigins = () =>
-  String(process.env.CORS_ORIGINS || '')
-    .split(',')
-    .map(item => item.trim())
+  [
+    process.env.PUBLIC_APP_URL,
+    process.env.PUBLIC_WEB_URL,
+    process.env.STORE_URL,
+    process.env.FRONTEND_URL,
+    process.env.APP_URL,
+    ...String(process.env.CORS_ORIGINS || '').split(',')
+  ]
+    .map(item => String(item || '').trim())
     .filter(Boolean);
 
 const allowVercelPreviewOrigins = () => {
-  const value = String(process.env.ALLOW_VERCEL_PREVIEW_ORIGINS ?? 'true').trim().toLowerCase();
+  const value = String(process.env.ALLOW_VERCEL_PREVIEW_ORIGINS ?? 'false').trim().toLowerCase();
   return !['false', '0', 'no'].includes(value);
 };
 
 const allowedOrigins = new Set([
   ...DEFAULT_ALLOWED_ORIGINS,
-  ...parseAllowedOrigins()
+  ...parseAllowedOrigins(),
+  ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [])
 ]);
 
 const isOriginAllowed = origin => {
@@ -99,6 +102,8 @@ app.use(cookieParser());
 
 let initializationPromise = null;
 let orderExpirationInterval = null;
+let lastOrderExpirationRunAt = 0;
+let pendingOrderExpirationPromise = null;
 
 const initializeServer = async () => {
   if (initializationPromise) {
@@ -138,9 +143,62 @@ const startOrderExpirationTask = () => {
   }, 5 * 60 * 1000);
 };
 
+const runPendingOrderExpiration = async ({ force = false } = {}) => {
+  const now = Date.now();
+  if (!force && now - lastOrderExpirationRunAt < 60 * 1000) {
+    return false;
+  }
+
+  if (!pendingOrderExpirationPromise) {
+    pendingOrderExpirationPromise = expirePendingOrders()
+      .then(() => {
+        lastOrderExpirationRunAt = Date.now();
+        return true;
+      })
+      .finally(() => {
+        pendingOrderExpirationPromise = null;
+      });
+  }
+
+  return pendingOrderExpirationPromise;
+};
+
+const mutatingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+const isTrustedCookieMutation = req => {
+  if (!mutatingMethods.has(req.method)) {
+    return true;
+  }
+
+  if (!req.cookies?.access_token) {
+    return true;
+  }
+
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    return true;
+  }
+
+  const origin = req.headers.origin;
+  if (origin) {
+    return isOriginAllowed(origin);
+  }
+
+  const referer = req.headers.referer;
+  if (referer) {
+    try {
+      return isOriginAllowed(new URL(referer).origin);
+    } catch {
+      return false;
+    }
+  }
+
+  return false;
+};
+
 app.use(async (req, res, next) => {
   try {
     await initializeServer();
+    await runPendingOrderExpiration();
     next();
   } catch (error) {
     console.error('Error inicializando servidor:', error);
@@ -148,6 +206,16 @@ app.use(async (req, res, next) => {
       message: 'No se pudo inicializar el backend'
     });
   }
+});
+
+app.use((req, res, next) => {
+  if (isTrustedCookieMutation(req)) {
+    return next();
+  }
+
+  return res.status(403).json({
+    message: 'Solicitud bloqueada por validacion de origen'
+  });
 });
 
 app.get('/health', (req, res) => {
@@ -161,9 +229,26 @@ app.get('/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     ok: true,
-    service: 'niway-backend',
+    service: 'store-backend',
     runtime: isVercelRuntime ? 'vercel' : 'node'
   });
+});
+
+app.get('/api/internal/expire-pending-orders', async (req, res) => {
+  try {
+    const userAgent = String(req.headers['user-agent'] || '');
+    const isCronRequest = userAgent.includes('vercel-cron/1.0');
+
+    if (isVercelRuntime && !isCronRequest) {
+      return res.status(403).json({ message: 'Ruta interna no disponible' });
+    }
+
+    await runPendingOrderExpiration({ force: true });
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error('Error ejecutando expiracion interna de pedidos:', error);
+    return res.status(500).json({ message: 'No se pudo ejecutar la expiracion de pedidos' });
+  }
 });
 
 app.use('/api/brands', brandRoutes);
@@ -183,7 +268,7 @@ const hasLocalFrontendBuild = fs.existsSync(buildPath);
 
 if (!isVercelRuntime && hasLocalFrontendBuild) {
   app.use(express.static(buildPath));
-  app.get('*', (req, res) => {
+  app.get('/{*path}', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
   });
 }

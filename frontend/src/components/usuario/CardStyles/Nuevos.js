@@ -22,7 +22,7 @@ const Nuevos = ({ product }) => {
     <button
       type="button"
       onClick={handleClick}
-      className="relative group w-full sm:w-[420px] bg-white rounded-2xl shadow-md border-l-4 border-gray-500 overflow-hidden mx-auto my-6 flex flex-col cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus:outline-none"
+      className="relative group h-full w-full bg-white rounded-2xl shadow-md border-l-4 border-gray-500 overflow-hidden mx-auto flex flex-col cursor-pointer hover:shadow-lg hover:-translate-y-1 transition-all duration-300 focus:outline-none"
     >
       <div className="absolute top-3 left-3 bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded shadow z-20">
         Nuevo
@@ -41,7 +41,7 @@ const Nuevos = ({ product }) => {
       </div>
 
       <div className="px-5 py-4 flex flex-col gap-1">
-        <h3 className="text-lg font-semibold text-gray-800 mb-1">{product.name}</h3>
+        <h3 className="mb-1 line-clamp-2 text-lg font-semibold text-gray-800">{product.name}</h3>
         <span className="text-2xl font-bold text-red-600 leading-tight">
           {formatCurrency(price)}
         </span>

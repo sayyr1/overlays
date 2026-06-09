@@ -1,10 +1,17 @@
 import express from 'express';
+import bcrypt from 'bcryptjs';
 import {
   protect,
   superAdminOnly
 } from '../middleware/authMiddleware.js';
 import AuditLog from '../models/AuditLog.js';
-import User, { INTERNAL_USER_ROLES, USER_ROLES } from '../models/User.js';
+import User, {
+  INTERNAL_USER_ROLES,
+  USER_ROLES,
+  isSystemGeneratedEmail,
+  normalizeUserEmail,
+  normalizeUsername
+} from '../models/User.js';
 import SystemSettings from '../models/SystemSettings.js';
 import BrandingSettings from '../models/BrandingSettings.js';
 import ModuleConfig from '../models/ModuleConfig.js';
@@ -29,6 +36,7 @@ import {
 } from '../constants/permissions.js';
 
 const router = express.Router();
+const PASSWORD_MIN_LENGTH = 6;
 
 const sanitizePaymentMethod = method => {
   const plain = method?.toObject ? method.toObject() : { ...(method || {}) };
@@ -41,7 +49,8 @@ const sanitizePaymentMethod = method => {
 const serializeAccessUser = user => ({
   _id: user._id,
   name: user.name,
-  email: user.email,
+  username: user.username || normalizeUsername(user.email?.split('@')[0] || user.name || 'usuario'),
+  email: isSystemGeneratedEmail(user.email) ? '' : user.email,
   role: user.role || (user.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER),
   isAdmin: user.isAdmin,
   membershipLevel: user.membershipLevel,
@@ -138,12 +147,78 @@ router.get('/modules', async (req, res) => {
   res.json(modules);
 });
 
+router.post('/access-control/users', async (req, res) => {
+  try {
+    const name = String(req.body?.name || '').trim();
+    const username = normalizeUsername(req.body?.username);
+    const email = normalizeUserEmail(req.body?.email);
+    const password = String(req.body?.password || '');
+    const role = String(req.body?.role || '');
+
+    if (!name) {
+      return res.status(400).json({ message: 'El nombre es obligatorio' });
+    }
+
+    if (!username) {
+      return res.status(400).json({ message: 'El nombre de usuario es obligatorio' });
+    }
+
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      return res.status(400).json({
+        message: `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`
+      });
+    }
+
+    if (![USER_ROLES.SALES, USER_ROLES.OWNER, USER_ROLES.SUPERADMIN].includes(role)) {
+      return res.status(400).json({ message: 'Rol interno no valido para creacion' });
+    }
+
+    const existingUsers = await User.find({
+      $or: [
+        { username },
+        ...(email ? [{ email }] : [])
+      ]
+    }).select('username email');
+
+    if (existingUsers.some(user => user.username === username)) {
+      return res.status(400).json({ message: 'El nombre de usuario ya existe' });
+    }
+
+    if (email && existingUsers.some(user => user.email === email)) {
+      return res.status(400).json({ message: 'El correo ya existe' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await User.create({
+      name,
+      username,
+      email,
+      password: passwordHash,
+      role
+    });
+
+    const serialized = serializeAccessUser(user);
+    await createAuditLog(req, {
+      action: 'create',
+      entity: 'InternalUser',
+      entityId: user._id,
+      before: null,
+      after: serialized
+    });
+
+    res.status(201).json(serialized);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'No se pudo crear el usuario interno' });
+  }
+});
+
 router.get('/access-control', async (req, res) => {
   const users = await User.find({
     role: { $in: INTERNAL_USER_ROLES }
   })
     .select('-password')
-    .sort({ role: -1, name: 1, email: 1 });
+    .sort({ role: -1, name: 1, username: 1 });
 
   res.json({
     catalog: PERMISSION_CATALOG,

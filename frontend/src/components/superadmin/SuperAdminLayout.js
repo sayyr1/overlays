@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const links = [
@@ -36,6 +36,15 @@ const SuperAdminLayout = () => {
           <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
             <p className="font-semibold text-slate-800">{user?.name || 'Super Admin'}</p>
             <p>{user?.email || 'Sin correo'}</p>
+          </div>
+
+          <div className="mt-4">
+            <Link
+              to="/admin-dashboard"
+              className="inline-flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-800 transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              Ir al panel admin
+            </Link>
           </div>
 
           <nav className="mt-6 flex flex-col gap-2">

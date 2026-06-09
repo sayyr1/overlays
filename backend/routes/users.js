@@ -77,6 +77,7 @@ const PASSWORD_MIN_LENGTH = 6;
 const sanitizeName = value => String(value || '').trim();
 const sanitizePassword = value => String(value || '');
 const sanitizeIdentifier = value => String(value || '').trim();
+const getRecoverySecret = () => String(process.env.RECOVERY_SECRET || process.env.JWT_SECRET || '').trim();
 
 const getResolvedUserRole = user =>
   user?.role || (user?.isAdmin ? USER_ROLES.ADMIN : USER_ROLES.CUSTOMER);
@@ -165,6 +166,75 @@ const serializeUser = user => ({
   membershipLevel: user.membershipLevel,
   permissions: buildSafePermissions(user),
   effectivePermissions: buildSafeEffectivePermissions(user)
+});
+
+const hasValidRecoverySecret = req => {
+  const configuredSecret = getRecoverySecret();
+  if (!configuredSecret) {
+    return false;
+  }
+
+  const providedSecret = String(
+    req.headers['x-recovery-secret'] ||
+    req.body?.recoverySecret ||
+    ''
+  ).trim();
+
+  return Boolean(providedSecret) && providedSecret === configuredSecret;
+};
+
+router.post('/recover-access', async (req, res) => {
+  if (!hasValidRecoverySecret(req)) {
+    return res.status(403).json({ message: 'Recuperacion no autorizada' });
+  }
+
+  try {
+    const username = normalizeUsername(req.body?.username || req.body?.identifier);
+    const password = sanitizePassword(req.body?.password);
+    const role = Object.values(USER_ROLES).includes(req.body?.role)
+      ? req.body.role
+      : USER_ROLES.SUPERADMIN;
+    const name = sanitizeName(req.body?.name) || username || 'Administrador';
+
+    if (!username) {
+      return res.status(400).json({ message: 'El nombre de usuario es obligatorio' });
+    }
+
+    if (password.length < PASSWORD_MIN_LENGTH) {
+      return res.status(400).json({
+        message: `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    let user = await User.findOne({ username });
+
+    if (!user) {
+      user = await User.create({
+        name,
+        username,
+        email: normalizeUserEmail(req.body?.email),
+        password: passwordHash,
+        role
+      });
+    } else {
+      user.name = name || user.name;
+      user.password = passwordHash;
+      user.role = role;
+      if (req.body?.email !== undefined) {
+        user.email = normalizeUserEmail(req.body?.email);
+      }
+      await user.save();
+    }
+
+    return res.json({
+      ok: true,
+      user: serializeUser(user)
+    });
+  } catch (error) {
+    console.error('Error recuperando acceso:', error);
+    return res.status(500).json({ message: 'No se pudo recuperar el acceso' });
+  }
 });
 
 router.post('/register', async (req, res) => {

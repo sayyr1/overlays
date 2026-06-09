@@ -218,9 +218,9 @@ const AdminDashboard = () => {
             <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               {kpiCards.map(card => (
                 <article key={card.label} className="surface-card flex flex-col gap-3 p-5">
-                  <span className="text-xs uppercase tracking-wide text-slate-400">{card.label}</span>
-                  <strong className="text-2xl text-slate-900">{card.value}</strong>
-                  <span className="text-xs text-slate-500">{card.helper}</span>
+                  <span className="text-xs uppercase tracking-wide text-slate-300">{card.label}</span>
+                  <strong className="text-2xl text-white">{card.value}</strong>
+                  <span className="text-xs text-slate-300">{card.helper}</span>
                 </article>
               ))}
             </section>
@@ -228,46 +228,60 @@ const AdminDashboard = () => {
             <section className="grid gap-4 lg:grid-cols-[2fr_1.2fr]">
               <div className="surface-card p-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-slate-900">Ventas ultimos 30 dias</h2>
-                  <span className="text-xs text-slate-500">Series por fecha de pedido</span>
+                  <h2 className="text-lg font-semibold text-white">Ventas ultimos 30 dias</h2>
+                  <span className="text-xs text-slate-300">Series por fecha de pedido</span>
                 </div>
                 <div className="mt-6 h-72">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={chartData}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="date" tick={{ fontSize: 12 }} stroke="#94a3b8" />
-                      <YAxis tickFormatter={value => `$${value}`} stroke="#94a3b8" />
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(226, 232, 240, 0.35)" />
+                      <XAxis
+                        dataKey="date"
+                        tick={{ fontSize: 12, fill: '#cbd5e1' }}
+                        stroke="#94a3b8"
+                      />
+                      <YAxis
+                        tickFormatter={value => `$${value}`}
+                        tick={{ fontSize: 12, fill: '#cbd5e1' }}
+                        stroke="#94a3b8"
+                      />
                       <Tooltip
                         formatter={value => formatCurrency(value)}
                         labelFormatter={label => `Fecha: ${label}`}
-                        contentStyle={{ borderRadius: '0.75rem', borderColor: '#cbd5f5' }}
+                        contentStyle={{
+                          borderRadius: '0.75rem',
+                          borderColor: 'rgba(148, 163, 184, 0.35)',
+                          backgroundColor: '#0f172a',
+                          color: '#e2e8f0'
+                        }}
+                        labelStyle={{ color: '#f8fafc' }}
                       />
-                      <Line type="monotone" dataKey="revenue" stroke="#0f766e" strokeWidth={2} dot={false} />
+                      <Line type="monotone" dataKey="revenue" stroke="#5eead4" strokeWidth={2.5} dot={false} />
                     </LineChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               <div className="surface-card p-6">
-                <h2 className="text-lg font-semibold text-slate-900">Top productos</h2>
+                <h2 className="text-lg font-semibold text-white">Top productos</h2>
                 <ul className="mt-4 space-y-3">
                   {analytics.topProducts?.length ? (
                     analytics.topProducts.map(product => (
                       <li
                         key={product.name}
-                        className="flex items-center justify-between rounded-xl border border-surface-200 px-3 py-3 text-sm text-slate-700"
+                        className="flex items-center justify-between rounded-xl border border-white/20 bg-white/[0.03] px-3 py-3 text-sm text-slate-200"
                       >
                         <div>
-                          <p className="font-semibold text-slate-900">{product.name}</p>
-                          <p className="text-xs text-slate-500">{product.units} unidades vendidas</p>
+                          <p className="font-semibold text-white">{product.name}</p>
+                          <p className="text-xs text-slate-300">{product.units} unidades vendidas</p>
                         </div>
-                        <span className="text-sm font-semibold text-slate-800">
+                        <span className="text-sm font-semibold text-teal-200">
                           {formatCurrency(product.revenue)}
                         </span>
                       </li>
                     ))
                   ) : (
-                    <li className="text-sm text-slate-500">No hay ventas registradas.</li>
+                    <li className="text-sm text-slate-300">No hay ventas registradas.</li>
                   )}
                 </ul>
               </div>
@@ -275,12 +289,12 @@ const AdminDashboard = () => {
 
             <section className="surface-card p-6">
               <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">Pedidos recientes</h2>
-                <span className="text-xs text-slate-500">Basado en registros confirmados.</span>
+                <h2 className="text-lg font-semibold text-white">Pedidos recientes</h2>
+                <span className="text-xs text-slate-300">Basado en registros confirmados.</span>
               </div>
               <div className="mt-4 overflow-x-auto">
-                <table className="min-w-full divide-y divide-surface-200">
-                  <thead className="bg-surface-100 text-left text-xs uppercase text-slate-500">
+                <table className="min-w-full divide-y divide-white/10">
+                  <thead className="bg-white/10 text-left text-xs uppercase text-slate-200">
                     <tr>
                       <th className="px-4 py-2">Producto</th>
                       <th className="px-4 py-2">Codigo</th>
@@ -290,7 +304,7 @@ const AdminDashboard = () => {
                       <th className="px-4 py-2">Fecha</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-surface-200 text-sm text-slate-700">
+                  <tbody className="divide-y divide-white/10 text-sm text-slate-200">
                     {recentOrders.length ? (
                       recentOrders.map(order => (
                         <tr key={`${order.code}-${order.size}`}>
@@ -306,7 +320,7 @@ const AdminDashboard = () => {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-500">
+                        <td colSpan={6} className="px-4 py-6 text-center text-sm text-slate-300">
                           Aun no se registran ventas.
                         </td>
                       </tr>

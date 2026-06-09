@@ -56,7 +56,11 @@ const parseAllowedOrigins = () =>
     .filter(Boolean);
 
 const allowVercelPreviewOrigins = () => {
-  const value = String(process.env.ALLOW_VERCEL_PREVIEW_ORIGINS ?? 'false').trim().toLowerCase();
+  if (process.env.ALLOW_VERCEL_PREVIEW_ORIGINS == null) {
+    return isVercelRuntime;
+  }
+
+  const value = String(process.env.ALLOW_VERCEL_PREVIEW_ORIGINS).trim().toLowerCase();
   return !['false', '0', 'no'].includes(value);
 };
 

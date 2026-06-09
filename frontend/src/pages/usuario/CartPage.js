@@ -143,7 +143,7 @@ const CartPage = () => {
       return;
     }
     if (!phone) {
-      setSubmitError('Necesitamos un telefono de contacto.');
+      setSubmitError('Necesitamos un celular de contacto.');
       return;
     }
 

@@ -109,6 +109,7 @@ const ProductDetailsPage = () => {
 
   const publicImages = Array.isArray(product?.images) ? product.images : [];
   const internalImages = Array.isArray(product?.internalImages) ? product.internalImages : [];
+  const coverImageId = publicImages[0]?.public_id || publicImages[0]?.url || '';
 
   if (error) {
     return (
@@ -201,20 +202,42 @@ const ProductDetailsPage = () => {
               </Link>
             </div>
 
-            <div className="mt-5 grid grid-cols-2 gap-4 lg:grid-cols-3">
+            <div className="mt-5 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+                Tienda
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                {publicImages.length} fotos visibles
+              </span>
+              <span className="text-xs text-slate-500">
+                Estas son las imagenes que ve el cliente en el catalogo y en el detalle del producto.
+              </span>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
               {publicImages.length ? (
-                publicImages.map(image => (
+                publicImages.map(image => {
+                  const imageKey = image.public_id || image.url;
+                  const isCover = imageKey === coverImageId;
+
+                  return (
                   <div
-                    key={image.public_id}
-                    className="overflow-hidden rounded-3xl border border-surface-200 bg-surface-50"
+                    key={imageKey}
+                    className="relative overflow-hidden rounded-3xl border border-surface-200 bg-surface-50"
                   >
+                    {isCover && (
+                      <span className="absolute left-3 top-3 z-10 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
+                        Portada tienda
+                      </span>
+                    )}
                     <ProductImage
                       src={image.url}
                       alt={product.name}
                       className="aspect-[4/5] w-full object-cover"
                     />
                   </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="col-span-full rounded-2xl border border-dashed border-surface-200 bg-surface-50 px-4 py-10 text-center text-sm text-slate-500">
                   Este producto no tiene fotos publicas cargadas.
@@ -226,6 +249,17 @@ const ProductDetailsPage = () => {
               <div className="mt-6">
                 <p className="text-xs uppercase tracking-[0.28em] text-slate-400">Referencia interna</p>
                 <h3 className="mt-2 text-base font-semibold text-slate-900">Fotos para el equipo</h3>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-semibold text-white">
+                    Interna
+                  </span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {internalImages.length} fotos operativas
+                  </span>
+                  <span className="text-xs text-slate-500">
+                    Sirven como referencia de bodega, detalles o soporte interno y no salen en tienda.
+                  </span>
+                </div>
                 <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
                   {internalImages.length ? (
                     internalImages.map(image => (

@@ -307,11 +307,11 @@ const ProductListPage = () => {
     const titleParts = [activeFilters.brand, activeFilters.type, activeFilters.gender].filter(Boolean);
     const title = titleParts.length > 0
       ? titleParts.join(' - ')
-      : activeFilters.collection || 'Coleccion destacada';
+      : activeFilters.collection || 'Catalogo Niway';
 
     const description = activeFilters.brand
       ? `${activeFilters.brand} concentra una seleccion mas curada para navegar rapido desde movil.`
-      : 'Explora productos, filtra rapido y descubre colecciones en un formato mas limpio.';
+      : 'Explora lanzamientos, filtra sin salir del listado y encuentra piezas clave en menos pasos.';
 
     const breadcrumb = [
       { label: 'Inicio', to: '/' },
@@ -337,7 +337,7 @@ const ProductListPage = () => {
                 type="search"
                 value={searchDraft}
                 onChange={event => setSearchDraft(event.target.value)}
-                placeholder="Search for brand, color, product"
+                placeholder="Busca por marca, color o producto"
                 className="w-full bg-transparent text-sm text-white placeholder:text-white/35 focus:outline-none"
               />
             </div>
@@ -346,7 +346,7 @@ const ProductListPage = () => {
                 type="submit"
                 className="inline-flex flex-1 items-center justify-center rounded-md bg-brand px-5 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-110"
               >
-                Search
+                Buscar
               </button>
               <button
                 type="button"
@@ -385,17 +385,55 @@ const ProductListPage = () => {
           )}
         </section>
 
-        <section className="sm:hidden space-y-4">
+        <section className="space-y-4 sm:hidden">
           <div className="rounded-[22px] border border-white/10 bg-[#272723] p-4">
             <h1 className="text-[1.65rem] font-semibold leading-tight text-white">{mobileHero.title}</h1>
             <p className="mt-3 text-sm leading-6 text-white/80">{mobileHero.description}</p>
-            <Link
-              to="/categorias"
-              className="mt-4 inline-flex rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"
-            >
-              Ver mas
-            </Link>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-white/75">
+                {visibleProducts.length} resultados
+              </span>
+              {activeFilterCount > 0 ? (
+                <span className="rounded-full bg-brand/15 px-3 py-1 text-xs font-semibold text-brand">
+                  {activeFilterCount} filtros activos
+                </span>
+              ) : null}
+            </div>
           </div>
+
+          <form
+            onSubmit={handleSearchSubmit}
+            className="rounded-[22px] border border-white/10 bg-[#1a1a1a] p-3"
+          >
+            <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#222] px-4 py-3">
+              <FiSearch className="text-white/40" />
+              <input
+                type="search"
+                value={searchDraft}
+                onChange={event => setSearchDraft(event.target.value)}
+                placeholder="Busca por marca, color o producto"
+                className="w-full bg-transparent text-sm text-white placeholder:text-white/35 focus:outline-none"
+              />
+            </div>
+
+            <div className="mt-3 flex gap-3">
+              <button
+                type="submit"
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-brand px-4 py-3 text-sm font-semibold text-slate-950 transition hover:brightness-110"
+              >
+                Buscar
+              </button>
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="inline-flex items-center justify-center rounded-full border border-white/10 px-4 py-3 text-sm font-semibold text-white"
+                >
+                  Limpiar
+                </button>
+              ) : null}
+            </div>
+          </form>
 
           <div className="flex flex-wrap items-center gap-2 text-sm text-white/70">
             {mobileHero.breadcrumb.map((item, index) => (
@@ -433,6 +471,36 @@ const ProductListPage = () => {
               <FiChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-white/70" />
             </div>
           </div>
+
+          {(activeFilterCount > 0 || Object.keys(extraFilters).length > 0) && (
+            <div className="flex flex-wrap gap-2">
+              {searchTerm ? (
+                <button
+                  type="button"
+                  onClick={clearSearch}
+                  className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white"
+                >
+                  Busqueda: {searchTerm} x
+                </button>
+              ) : null}
+              {Object.entries(activeFilters).map(([key, value]) => (
+                <span
+                  key={`${key}-${value}`}
+                  className="rounded-full bg-brand/10 px-3 py-1.5 text-xs font-semibold text-brand"
+                >
+                  {key}: {String(value)}
+                </span>
+              ))}
+              {Object.entries(extraFilters).map(([key, value]) => (
+                <span
+                  key={`${key}-${value}`}
+                  className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-white/80"
+                >
+                  {key}: {String(value)}
+                </span>
+              ))}
+            </div>
+          )}
         </section>
 
         {showFilters && isMobileViewport && (
@@ -520,7 +588,7 @@ const ProductListPage = () => {
                   {visibleProducts.length} productos {searchTerm ? 'relevantes para tu busqueda' : 'disponibles'}
                 </p>
                 <p className="text-sm text-white/45">
-                  Grid compacto estilo marketplace.
+                  Vista compacta para explorar rapido sin perder contexto.
                 </p>
               </div>
 
@@ -532,7 +600,7 @@ const ProductListPage = () => {
                     aria-live="polite"
                   >
                     <span className="mr-2 inline-flex h-2 w-2 animate-ping rounded-full bg-brand" />
-                    Actualizando catalogo...
+                    Actualizando seleccion...
                   </div>
                 )}
 
@@ -579,7 +647,7 @@ const ProductListPage = () => {
                 {visibleProducts.length} productos {searchTerm ? 'relevantes para tu busqueda' : 'disponibles'}
               </p>
               <p className="text-sm text-white/45">
-                Grid compacto estilo marketplace.
+                Vista compacta para explorar rapido sin perder contexto.
               </p>
             </div>
             {isRefreshing && (
@@ -589,7 +657,7 @@ const ProductListPage = () => {
                 aria-live="polite"
               >
                 <span className="mr-2 inline-flex h-2 w-2 animate-ping rounded-full bg-brand" />
-                Actualizando catalogo...
+                Actualizando seleccion...
               </div>
             )}
           </section>

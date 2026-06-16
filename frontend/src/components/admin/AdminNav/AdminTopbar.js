@@ -2,9 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   HiOutlineBell,
-  HiOutlineMagnifyingGlass,
-  HiOutlinePlusCircle,
-  HiOutlineCog6Tooth
+  HiOutlineMagnifyingGlass
 } from 'react-icons/hi2';
 import axios from '../../../api/axiosInstance';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
@@ -48,7 +46,7 @@ const getOrderTimestamp = order => {
   return raw ? new Date(raw).getTime() : 0;
 };
 
-const AdminTopbar = ({ handleLogout, user }) => {
+const AdminTopbar = () => {
   const { isModuleEnabled, loading } = usePublicConfig();
   const { hasPermission } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
@@ -214,13 +212,7 @@ const AdminTopbar = ({ handleLogout, user }) => {
   const inventoryEnabled = isModuleEnabled('inventory');
   const ordersEnabled = isModuleEnabled('orders') && hasPermission('orders.view');
   const hasAnyCatalogVisibility = hasPermission('products.view') || hasPermission('inventory.view');
-  const productsEnabled =
-    isModuleEnabled('products') &&
-    isModuleEnabled('categories') &&
-    hasPermission('products.create');
   const showCatalogSearch = isCatalogRoute && inventoryEnabled && hasAnyCatalogVisibility;
-  const showCreateProductAction = productsEnabled && !isCrmRoute;
-  const showCrmTaskShortcut = isCrmRoute && hasPermission('crm.tasksView');
 
   return (
     <>
@@ -262,76 +254,25 @@ const AdminTopbar = ({ handleLogout, user }) => {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            {showCreateProductAction && (
-              <button
-                type="button"
-                onClick={() => navigate('/crear-producto')}
-                className="inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white shadow-brand-sm transition hover:bg-brand-dark"
-              >
-                <HiOutlinePlusCircle className="text-lg" />
-                Crear producto
-              </button>
-            )}
-
-            {showCrmTaskShortcut && (
-              <button
-                type="button"
-                onClick={() => navigate('/crm/tareas')}
-                className="inline-flex items-center gap-2 rounded-xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-brand-sm transition hover:bg-slate-800"
-              >
-                <HiOutlinePlusCircle className="text-lg" />
-                Nueva tarea CRM
-              </button>
-            )}
-
-            {user?.role === 'superadmin' && (
-              <button
-                type="button"
-                onClick={() => navigate('/super-admin')}
-                className="inline-flex items-center gap-2 rounded-xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
-              >
-                <HiOutlineCog6Tooth className="text-lg" />
-                Super Admin
-              </button>
-            )}
-
-            {ordersEnabled && (
-            <div className="relative hidden sm:block">
-              <button
-                type="button"
-                onClick={handleNotificationsClick}
-                className="flex h-11 w-11 items-center justify-center rounded-xl border border-surface-200 text-slate-400 transition hover:border-brand/30 hover:text-brand"
-                aria-label={notificationLabel}
-              >
-                <HiOutlineBell className="text-xl" />
-              </button>
-              {pendingCount > 0 && (
-                <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white shadow-sm">
-                  {notificationBadge}
-                </span>
-              )}
-            </div>
-            )}
-
-            <div className="flex items-center gap-2 rounded-xl border border-surface-200 bg-white px-3 py-2">
-              <div className="h-9 w-9 rounded-full bg-brand/20 text-brand flex items-center justify-center font-semibold">
-                {user?.name ? user.name.slice(0, 1).toUpperCase() : 'A'}
-              </div>
-              <div className="hidden sm:block">
-                <p className="text-sm font-semibold text-slate-800">
-                  {user?.name ?? 'Administrador'}
-                </p>
+          {ordersEnabled && (
+            <div className="flex items-center justify-end">
+              <div className="relative hidden sm:block">
                 <button
                   type="button"
-                  onClick={handleLogout}
-                  className="text-xs font-medium text-brand hover:text-brand-dark"
+                  onClick={handleNotificationsClick}
+                  className="flex h-11 w-11 items-center justify-center rounded-xl border border-surface-200 text-slate-400 transition hover:border-brand/30 hover:text-brand"
+                  aria-label={notificationLabel}
                 >
-                  Cerrar sesion
+                  <HiOutlineBell className="text-xl" />
                 </button>
+                {pendingCount > 0 && (
+                  <span className="absolute -top-1 -right-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-500 px-1 text-[11px] font-semibold text-white shadow-sm">
+                    {notificationBadge}
+                  </span>
+                )}
               </div>
             </div>
-          </div>
+          )}
           </div>
         </div>
       </header>

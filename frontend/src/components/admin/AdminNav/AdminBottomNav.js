@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   HiOutlineChartPie,
@@ -25,6 +25,8 @@ const AdminBottomNav = ({ handleLogout, isSuperAdmin = false }) => {
   const isCrmRoute = location.pathname.startsWith('/crm');
   const { isModuleEnabled, loading } = usePublicConfig();
   const { hasPermission, hasAnyPermission } = useAuth();
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollYRef = useRef(0);
 
   const navItems = isSuperAdmin
     ? [
@@ -55,12 +57,54 @@ const AdminBottomNav = ({ handleLogout, isSuperAdmin = false }) => {
         return true;
       });
 
+  useEffect(() => {
+    setIsVisible(true);
+    lastScrollYRef.current = typeof window !== 'undefined' ? window.scrollY : 0;
+  }, [location.pathname]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      const lastScrollY = lastScrollYRef.current;
+      const delta = currentScrollY - lastScrollY;
+
+      if (currentScrollY <= 24) {
+        setIsVisible(true);
+        lastScrollYRef.current = currentScrollY;
+        return;
+      }
+
+      if (Math.abs(delta) < 8) {
+        return;
+      }
+
+      if (delta > 0 && currentScrollY > 96) {
+        setIsVisible(false);
+      } else if (delta < 0) {
+        setIsVisible(true);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   if (loading) {
     return null;
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-[1050] border-t border-surface-200 bg-white/95 backdrop-blur shadow-brand-sm">
+    <nav
+      className={`md:hidden fixed bottom-0 left-0 right-0 z-[1050] border-t border-surface-200 bg-white/95 backdrop-blur shadow-brand-sm transition-transform duration-300 ease-out ${
+        isVisible ? 'translate-y-0' : 'translate-y-full pointer-events-none'
+      }`}
+    >
       <div className="flex justify-around px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         {navItems.map(item => {
           const Icon = item.icon;

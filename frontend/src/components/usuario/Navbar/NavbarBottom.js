@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { AiOutlineHome } from 'react-icons/ai';
 import { FiTag, FiUser } from 'react-icons/fi';
 import { HiOutlineShoppingBag } from 'react-icons/hi';
@@ -22,7 +22,10 @@ const NavbarBottom = () => {
   const { isAuthenticated } = useAuth();
   const { isModuleEnabled, loading } = usePublicConfig();
   const navigate = useNavigate();
+  const location = useLocation();
   const navRef = useRef(null);
+  const lastScrollYRef = useRef(0);
+  const [isVisible, setIsVisible] = useState(true);
   const [guestOrderTracking, setGuestOrderTracking] = React.useState(() => getGuestOrderTracking());
 
   const getItemClasses = isActive =>
@@ -54,6 +57,51 @@ const NavbarBottom = () => {
   const navItems = [...storeItems, ...(guestTrackingItem ? [guestTrackingItem] : []), sessionItem];
 
   useEffect(() => subscribeGuestOrderTracking(setGuestOrderTracking), []);
+
+  useEffect(() => {
+    setIsVisible(true);
+    lastScrollYRef.current = typeof window !== 'undefined' ? window.scrollY : 0;
+  }, [isAuthenticated, guestOrderTracking?.lookupToken, location.pathname]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    const handleScroll = () => {
+      const isMobileViewport = window.innerWidth < 768;
+      if (!isMobileViewport) {
+        setIsVisible(true);
+        lastScrollYRef.current = window.scrollY;
+        return;
+      }
+
+      const currentScrollY = window.scrollY;
+      const lastScrollY = lastScrollYRef.current;
+      const delta = currentScrollY - lastScrollY;
+
+      if (currentScrollY <= 24) {
+        setIsVisible(true);
+        lastScrollYRef.current = currentScrollY;
+        return;
+      }
+
+      if (Math.abs(delta) < 8) {
+        return;
+      }
+
+      if (delta > 0 && currentScrollY > 96) {
+        setIsVisible(false);
+      } else if (delta < 0) {
+        setIsVisible(true);
+      }
+
+      lastScrollYRef.current = currentScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
@@ -96,7 +144,9 @@ const NavbarBottom = () => {
   return (
     <nav
       ref={navRef}
-      className="mobile-bottom-nav md:hidden pointer-events-none fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)]"
+      className={`mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-50 flex justify-center px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pointer-events-none transition-transform duration-300 ease-out ${
+        isVisible ? 'translate-y-0' : 'translate-y-full'
+      }`}
     >
       <div className="pointer-events-auto w-full max-w-xl rounded-[2.25rem] border border-white/15 bg-gradient-to-r from-slate-950/95 via-slate-900/95 to-slate-950/95 text-white shadow-[0_25px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
         <ul

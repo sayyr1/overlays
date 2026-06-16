@@ -2,6 +2,9 @@ import React, { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
+const inputClassName =
+  'mt-1 w-full rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm transition focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20';
+
 const RegisterPage = () => {
   const [name, setName] = useState('');
   const [username, setUsername] = useState('');
@@ -46,72 +49,127 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
-      <div className="w-full max-w-md rounded-lg bg-white p-8 shadow-lg">
-        <h2 className="mb-3 text-center text-3xl font-semibold text-gray-800">
-          Crear cuenta
-        </h2>
-        <p className="mb-6 text-center text-sm text-gray-500">
-          Registra tu acceso con nombre de usuario.
-        </p>
-        {error && (
-          <p className="mb-4 text-center text-sm text-red-500">
-            {error}
-          </p>
-        )}
-        <form onSubmit={handleRegister} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Nombre"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            required
-            autoComplete="name"
-            className="w-full rounded-md border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="text"
-            placeholder="Nombre de usuario"
-            value={username}
-            onChange={e => setUsername(e.target.value)}
-            required
-            autoComplete="username"
-            className="w-full rounded-md border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="email"
-            placeholder="Correo opcional"
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            autoComplete="email"
-            className="w-full rounded-md border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <input
-            type="password"
-            placeholder="Contrasena"
-            value={password}
-            onChange={e => setPassword(e.target.value)}
-            minLength={6}
-            required
-            autoComplete="new-password"
-            className="w-full rounded-md border border-gray-300 p-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            type="submit"
-            className="w-full rounded-md bg-blue-600 py-3 text-white transition duration-300 hover:bg-blue-700"
-          >
-            Registrarse
-          </button>
-        </form>
-        <div className="mt-6 border-t border-gray-100 pt-4 text-center">
-          <p className="text-sm text-gray-500">Ya tienes cuenta?</p>
-          <Link
-            to={loginLink}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:text-gray-900"
-          >
-            Ir al login
-          </Link>
-        </div>
+    <div className="min-h-screen bg-surface-50 px-4 py-10 sm:px-6 lg:px-8">
+      <div className="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-8 lg:grid-cols-[1fr_1fr]">
+        <section className="hidden rounded-[2.5rem] border border-surface-200 bg-white p-10 shadow-brand-sm lg:flex lg:min-h-[620px] lg:flex-col lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.35em] text-slate-400">
+              Equipo interno
+            </p>
+            <h1 className="mt-5 text-5xl font-semibold leading-[0.92] text-slate-900">
+              Crea accesos con una base clara y ordenada.
+            </h1>
+            <p className="mt-5 max-w-md text-base leading-7 text-slate-500">
+              Registra nuevos usuarios internos con una experiencia mas alineada al producto y no a un formulario generico.
+            </p>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-3xl border border-surface-200 bg-surface-50 p-5">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Paso 1</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">Define nombre y usuario</p>
+            </div>
+            <div className="rounded-3xl border border-surface-200 bg-surface-50 p-5">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Paso 2</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">Asigna correo opcional y clave</p>
+            </div>
+            <div className="rounded-3xl border border-surface-200 bg-surface-50 p-5">
+              <p className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Paso 3</p>
+              <p className="mt-2 text-lg font-semibold text-slate-900">Ingresa directo al backoffice</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="w-full rounded-[2rem] border border-surface-200 bg-white p-6 shadow-brand-sm sm:p-8 lg:p-10">
+          <div className="mb-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.32em] text-slate-400">
+              Nuevo acceso
+            </p>
+            <h2 className="mt-3 text-3xl font-semibold text-slate-900">
+              Crear cuenta
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-6 text-slate-500">
+              Registra un acceso interno con la informacion minima necesaria para empezar a operar.
+            </p>
+          </div>
+
+          {error && (
+            <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleRegister} className="space-y-5">
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Nombre</span>
+              <input
+                type="text"
+                placeholder="Nombre del usuario"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+                autoComplete="name"
+                className={inputClassName}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Nombre de usuario</span>
+              <input
+                type="text"
+                placeholder="Usuario interno"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                required
+                autoComplete="username"
+                className={inputClassName}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Correo opcional</span>
+              <input
+                type="email"
+                placeholder="correo@empresa.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                autoComplete="email"
+                className={inputClassName}
+              />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-medium text-slate-700">Contrasena</span>
+              <input
+                type="password"
+                placeholder="Minimo 6 caracteres"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                minLength={6}
+                required
+                autoComplete="new-password"
+                className={inputClassName}
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="w-full rounded-2xl bg-brand px-5 py-3.5 text-sm font-semibold text-white shadow-brand-sm transition hover:bg-brand-dark"
+            >
+              Registrar acceso
+            </button>
+          </form>
+
+          <div className="mt-8 border-t border-surface-200 pt-5">
+            <p className="text-sm text-slate-500">Ya tienes cuenta?</p>
+            <Link
+              to={loginLink}
+              className="mt-3 inline-flex w-full items-center justify-center rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
+            >
+              Ir al login
+            </Link>
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -10,6 +10,111 @@ import {
 } from '../../utils/inventory';
 
 const LOW_STOCK_THRESHOLD = 5;
+const INVENTORY_FILTER_STORAGE_KEY = 'niway-admin-inventory-filters-v1';
+
+const DEFAULT_ADVANCED_FILTERS = Object.freeze({
+  brand: '',
+  collection: '',
+  type: '',
+  gender: '',
+  promo: 'all',
+  missing: 'all',
+  attributeKey: '',
+  attributeValue: ''
+});
+
+const STOCK_FILTERS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'low', label: 'Stock bajo' },
+  { value: 'out', label: 'Sin stock' },
+  { value: 'healthy', label: 'Estables' }
+];
+
+const PROMO_FILTERS = [
+  { value: 'all', label: 'Todas' },
+  { value: 'on', label: 'En promocion' },
+  { value: 'off', label: 'Sin promocion' }
+];
+
+const MISSING_DATA_FILTERS = [
+  { value: 'all', label: 'Completo o mixto' },
+  { value: 'brand', label: 'Sin marca' },
+  { value: 'collection', label: 'Sin coleccion' }
+];
+
+const SORT_OPTIONS = [
+  { value: 'risk', label: 'Priorizar riesgo' },
+  { value: 'stock-asc', label: 'Menor stock' },
+  { value: 'stock-desc', label: 'Mayor stock' },
+  { value: 'name', label: 'Nombre A-Z' },
+  { value: 'price-desc', label: 'Precio mayor' }
+];
+
+const QUICK_VIEWS = [
+  { value: 'all', label: 'Todo' },
+  { value: 'risk', label: 'Riesgo' },
+  { value: 'out', label: 'Sin stock' },
+  { value: 'promo', label: 'Promos' },
+  { value: 'missing-brand', label: 'Sin marca' }
+];
+
+const normalizeText = value => String(value || '').trim().toLowerCase();
+
+const formatAttributeKey = key =>
+  String(key || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, char => char.toUpperCase());
+
+const readStoredInventoryState = () => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(INVENTORY_FILTER_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return {
+      stockFilter: parsed?.stockFilter || 'all',
+      sortBy: parsed?.sortBy || 'risk',
+      advancedFilters: {
+        ...DEFAULT_ADVANCED_FILTERS,
+        ...(parsed?.advancedFilters || {})
+      }
+    };
+  } catch (error) {
+    return null;
+  }
+};
+
+const getProductAttributes = product => {
+  const attributes = product?.attributes;
+  if (!attributes) {
+    return [];
+  }
+
+  if (attributes instanceof Map) {
+    return Array.from(attributes.entries());
+  }
+
+  if (typeof attributes === 'object') {
+    return Object.entries(attributes);
+  }
+
+  return [];
+};
+
+const getProductAttributeValue = (product, key) => {
+  if (!key) {
+    return '';
+  }
+
+  const entry = getProductAttributes(product).find(([entryKey]) => entryKey === key);
+  return entry ? String(entry[1] || '') : '';
+};
 
 const buildVariantMatrix = product => {
   const nested = buildNestedVariantsWithFallback(
@@ -133,29 +238,25 @@ const getVariantPillClassName = qty => {
   return 'border border-surface-200 bg-surface-50 text-slate-700';
 };
 
-const STOCK_FILTERS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'low', label: 'Stock bajo' },
-  { value: 'out', label: 'Sin stock' },
-  { value: 'healthy', label: 'Estables' }
-];
-
-const SORT_OPTIONS = [
-  { value: 'risk', label: 'Priorizar riesgo' },
-  { value: 'stock-asc', label: 'Menor stock' },
-  { value: 'stock-desc', label: 'Mayor stock' },
-  { value: 'name', label: 'Nombre A-Z' },
-  { value: 'price-desc', label: 'Precio mayor' }
-];
-
 const ProductPage = () => {
+  const storedState = readStoredInventoryState();
   const { isModuleEnabled, loading: modulesLoading } = usePublicConfig();
   const { hasPermission } = useAuth();
   const [products, setProducts] = useState([]);
   const [modalData, setModalData] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [stockFilter, setStockFilter] = useState('all');
-  const [sortBy, setSortBy] = useState('risk');
+  const [stockFilter, setStockFilter] = useState(storedState?.stockFilter || 'all');
+  const [draftStockFilter, setDraftStockFilter] = useState(storedState?.stockFilter || 'all');
+  const [sortBy, setSortBy] = useState(storedState?.sortBy || 'risk');
+  const [advancedFilters, setAdvancedFilters] = useState(
+    storedState?.advancedFilters || DEFAULT_ADVANCED_FILTERS
+  );
+  const [draftFilters, setDraftFilters] = useState(
+    storedState?.advancedFilters || DEFAULT_ADVANCED_FILTERS
+  );
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isMobileSummaryExpanded, setIsMobileSummaryExpanded] = useState(false);
+  const [expandedMobileActionId, setExpandedMobileActionId] = useState(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -232,6 +333,79 @@ const ProductPage = () => {
     }
   };
 
+  const resetAdvancedFilters = () => {
+    setAdvancedFilters(DEFAULT_ADVANCED_FILTERS);
+    setDraftFilters(DEFAULT_ADVANCED_FILTERS);
+  };
+
+  const clearAllFilters = () => {
+    setStockFilter('all');
+    resetAdvancedFilters();
+  };
+
+  const openFilterSheet = () => {
+    setDraftFilters(advancedFilters);
+    setDraftStockFilter(stockFilter);
+    setIsFilterSheetOpen(true);
+  };
+
+  const applyQuickView = view => {
+    if (view === 'all') {
+      clearAllFilters();
+      setSortBy('risk');
+      return;
+    }
+
+    if (view === 'risk') {
+      setStockFilter('low');
+      setSortBy('risk');
+      return;
+    }
+
+    if (view === 'out') {
+      setStockFilter('out');
+      setSortBy('risk');
+      return;
+    }
+
+    if (view === 'promo') {
+      setAdvancedFilters(prev => ({
+        ...prev,
+        promo: 'on'
+      }));
+      return;
+    }
+
+    if (view === 'missing-brand') {
+      setAdvancedFilters(prev => ({
+        ...prev,
+        missing: 'brand'
+      }));
+    }
+  };
+
+  const removeActiveFilter = key => {
+    if (key === 'stock') {
+      setStockFilter('all');
+      return;
+    }
+
+    setAdvancedFilters(prev => {
+      if (key === 'attribute') {
+        return {
+          ...prev,
+          attributeKey: '',
+          attributeValue: ''
+        };
+      }
+
+      return {
+        ...prev,
+        [key]: key === 'promo' || key === 'missing' ? 'all' : ''
+      };
+    });
+  };
+
   useEffect(() => {
     if (modulesLoading) return;
     fetchProducts();
@@ -242,6 +416,29 @@ const ProductPage = () => {
     setSearchTerm(params.get('query') ?? '');
   }, [location.search]);
 
+  useEffect(() => {
+    setDraftFilters(advancedFilters);
+  }, [advancedFilters]);
+
+  useEffect(() => {
+    setDraftStockFilter(stockFilter);
+  }, [stockFilter]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.localStorage.setItem(
+      INVENTORY_FILTER_STORAGE_KEY,
+      JSON.stringify({
+        stockFilter,
+        sortBy,
+        advancedFilters
+      })
+    );
+  }, [advancedFilters, sortBy, stockFilter]);
+
   const catalogItems = useMemo(
     () =>
       products.map(product => ({
@@ -250,6 +447,46 @@ const ProductPage = () => {
       })),
     [products]
   );
+
+  const filterOptions = useMemo(() => {
+    const brands = new Set();
+    const collections = new Set();
+    const types = new Set();
+    const genders = new Set();
+    const attributesMap = new Map();
+
+    catalogItems.forEach(({ product }) => {
+      if (product.brand) brands.add(String(product.brand).trim());
+      if (product.collection) collections.add(String(product.collection).trim());
+      if (product.type) types.add(String(product.type).trim());
+      if (product.gender) genders.add(String(product.gender).trim());
+
+      getProductAttributes(product).forEach(([key, rawValue]) => {
+        const value = String(rawValue || '').trim();
+        if (!key || !value) {
+          return;
+        }
+
+        if (!attributesMap.has(key)) {
+          attributesMap.set(key, new Set());
+        }
+
+        attributesMap.get(key).add(value);
+      });
+    });
+
+    return {
+      brands: Array.from(brands).sort((left, right) => left.localeCompare(right)),
+      collections: Array.from(collections).sort((left, right) => left.localeCompare(right)),
+      types: Array.from(types).sort((left, right) => left.localeCompare(right)),
+      genders: Array.from(genders).sort((left, right) => left.localeCompare(right)),
+      attributeKeys: Array.from(attributesMap.keys()).sort((left, right) => left.localeCompare(right)),
+      attributeValuesByKey: Array.from(attributesMap.entries()).reduce((acc, [key, values]) => {
+        acc[key] = Array.from(values).sort((left, right) => left.localeCompare(right));
+        return acc;
+      }, {})
+    };
+  }, [catalogItems]);
 
   const filteredProducts = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
@@ -262,7 +499,10 @@ const ProductPage = () => {
         product.code,
         product.sku,
         product.brand,
-        product.collection
+        product.collection,
+        product.type,
+        product.gender,
+        ...getProductAttributes(product).map(([, value]) => value)
       ];
       return searchable.some(value =>
         String(value || '').toLowerCase().includes(normalized)
@@ -285,8 +525,55 @@ const ProductPage = () => {
       return true;
     };
 
+    const matchesAdvancedFilters = item => {
+      const { product } = item;
+
+      const exactMatches = [
+        ['brand', advancedFilters.brand, product.brand],
+        ['collection', advancedFilters.collection, product.collection],
+        ['type', advancedFilters.type, product.type],
+        ['gender', advancedFilters.gender, product.gender]
+      ];
+
+      const hasExactMismatch = exactMatches.some(([, expected, actual]) =>
+        expected && normalizeText(actual) !== normalizeText(expected)
+      );
+      if (hasExactMismatch) {
+        return false;
+      }
+
+      if (advancedFilters.promo === 'on' && !product.onSale) {
+        return false;
+      }
+      if (advancedFilters.promo === 'off' && product.onSale) {
+        return false;
+      }
+
+      if (advancedFilters.missing === 'brand' && normalizeText(product.brand)) {
+        return false;
+      }
+      if (advancedFilters.missing === 'collection' && normalizeText(product.collection)) {
+        return false;
+      }
+
+      if (advancedFilters.attributeKey) {
+        const attributeValue = getProductAttributeValue(product, advancedFilters.attributeKey);
+        if (!attributeValue.trim()) {
+          return false;
+        }
+        if (
+          advancedFilters.attributeValue &&
+          normalizeText(attributeValue) !== normalizeText(advancedFilters.attributeValue)
+        ) {
+          return false;
+        }
+      }
+
+      return true;
+    };
+
     return catalogItems
-      .filter(item => matchesSearch(item) && matchesStockFilter(item))
+      .filter(item => matchesSearch(item) && matchesStockFilter(item) && matchesAdvancedFilters(item))
       .sort((left, right) => {
         if (sortBy === 'name') {
           return (left.product.name || '').localeCompare(right.product.name || '');
@@ -312,7 +599,7 @@ const ProductPage = () => {
 
         return rightRiskScore - leftRiskScore;
       });
-  }, [catalogItems, inventoryVisible, searchTerm, sortBy, stockFilter]);
+  }, [advancedFilters, catalogItems, inventoryVisible, searchTerm, sortBy, stockFilter]);
 
   const catalogStats = useMemo(() => {
     const totalCount = catalogItems.length;
@@ -327,15 +614,71 @@ const ProductPage = () => {
         )
     ).length;
     const outOfStockCount = catalogItems.filter(item => item.inventory.totalUnits === 0).length;
+    const promoCount = catalogItems.filter(item => item.product.onSale).length;
+    const missingBrandCount = catalogItems.filter(item => !normalizeText(item.product.brand)).length;
+    const missingCollectionCount = catalogItems.filter(item => !normalizeText(item.product.collection)).length;
 
     return {
       totalCount,
       visibleCount,
       totalUnits,
       lowStockCount,
-      outOfStockCount
+      outOfStockCount,
+      promoCount,
+      missingBrandCount,
+      missingCollectionCount
     };
   }, [catalogItems, filteredProducts]);
+
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+
+    if (inventoryVisible && stockFilter !== 'all') {
+      chips.push({
+        key: 'stock',
+        label: 'Stock',
+        value: STOCK_FILTERS.find(filter => filter.value === stockFilter)?.label || stockFilter
+      });
+    }
+
+    if (advancedFilters.brand) {
+      chips.push({ key: 'brand', label: 'Marca', value: advancedFilters.brand });
+    }
+    if (advancedFilters.collection) {
+      chips.push({ key: 'collection', label: 'Coleccion', value: advancedFilters.collection });
+    }
+    if (advancedFilters.type) {
+      chips.push({ key: 'type', label: 'Tipo', value: advancedFilters.type });
+    }
+    if (advancedFilters.gender) {
+      chips.push({ key: 'gender', label: 'Genero', value: advancedFilters.gender });
+    }
+    if (advancedFilters.promo !== 'all') {
+      chips.push({
+        key: 'promo',
+        label: 'Promo',
+        value: PROMO_FILTERS.find(filter => filter.value === advancedFilters.promo)?.label || advancedFilters.promo
+      });
+    }
+    if (advancedFilters.missing !== 'all') {
+      chips.push({
+        key: 'missing',
+        label: 'Dato faltante',
+        value: MISSING_DATA_FILTERS.find(filter => filter.value === advancedFilters.missing)?.label || advancedFilters.missing
+      });
+    }
+    if (advancedFilters.attributeKey) {
+      chips.push({
+        key: 'attribute',
+        label: formatAttributeKey(advancedFilters.attributeKey),
+        value: advancedFilters.attributeValue || 'Con dato'
+      });
+    }
+
+    return chips;
+  }, [advancedFilters, inventoryVisible, stockFilter]);
+
+  const hasActiveFilters = activeFilterChips.length > 0;
 
   const headingTitle = searchTerm
     ? `Resultados para "${searchTerm}"`
@@ -358,6 +701,79 @@ const ProductPage = () => {
     return Number(modalVariantMatrix[modalData.color]?.[modalData.size] || 0);
   }, [modalData, modalVariantMatrix]);
 
+  const selectedAttributeValues =
+    filterOptions.attributeValuesByKey[draftFilters.attributeKey] || [];
+
+  const mobilePrimaryStats = [
+    {
+      label: 'Stock bajo',
+      value: inventoryVisible ? catalogStats.lowStockCount : '--'
+    },
+    {
+      label: 'Sin stock',
+      value: inventoryVisible ? catalogStats.outOfStockCount : '--'
+    }
+  ];
+
+  const mobileSecondaryStats = [
+    {
+      label: 'Unidades',
+      value: inventoryVisible ? catalogStats.totalUnits : '--'
+    },
+    {
+      label: 'Promos',
+      value: catalogStats.promoCount
+    },
+    {
+      label: 'Sin marca',
+      value: catalogStats.missingBrandCount
+    },
+    {
+      label: 'Sin coleccion',
+      value: catalogStats.missingCollectionCount
+    }
+  ];
+
+  const isQuickViewActive = view => {
+    if (view === 'all') {
+      return !hasActiveFilters;
+    }
+    if (view === 'risk') {
+      return stockFilter === 'low' && sortBy === 'risk';
+    }
+    if (view === 'out') {
+      return stockFilter === 'out';
+    }
+    if (view === 'promo') {
+      return advancedFilters.promo === 'on';
+    }
+    if (view === 'missing-brand') {
+      return advancedFilters.missing === 'brand';
+    }
+    return false;
+  };
+
+  const renderSelect = (label, value, onChange, options, placeholder, disabled = false) => (
+    <label className="block">
+      <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+        {label}
+      </span>
+      <select
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-surface-50 disabled:text-slate-400"
+      >
+        <option value="">{placeholder}</option>
+        {options.map(option => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+
   return (
     <div className="min-h-screen bg-surface-50 px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -377,7 +793,7 @@ const ProductPage = () => {
               </div>
               <p className="max-w-3xl text-sm text-slate-500">
                 {inventoryVisible
-                  ? 'Revisa stock, detecta productos en riesgo y ejecuta movimientos sin salir del catalogo.'
+                  ? 'Filtra por marca, coleccion o riesgo operativo sin salir del inventario.'
                   : 'Vista de catalogo para revisar fichas, precios y estructura del producto.'}
               </p>
               {!inventoryVisible && (
@@ -387,7 +803,43 @@ const ProductPage = () => {
               )}
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:w-[420px]">
+            <div className="space-y-3 md:hidden">
+              <div className="grid grid-cols-2 gap-3">
+                {mobilePrimaryStats.map(item => (
+                  <div
+                    key={item.label}
+                    className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3"
+                  >
+                    <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
+                    <p className="mt-1 text-2xl font-semibold text-slate-900">{item.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {isMobileSummaryExpanded && (
+                <div className="grid grid-cols-2 gap-3">
+                  {mobileSecondaryStats.map(item => (
+                    <div
+                      key={item.label}
+                      className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3"
+                    >
+                      <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
+                      <p className="mt-1 text-xl font-semibold text-slate-900">{item.value}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setIsMobileSummaryExpanded(prev => !prev)}
+                className="w-full rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
+              >
+                {isMobileSummaryExpanded ? 'Ocultar resumen' : 'Ver mas resumen'}
+              </button>
+            </div>
+
+            <div className="hidden gap-3 sm:grid-cols-2 md:grid xl:w-[520px] xl:grid-cols-3">
               <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Stock bajo</p>
                 <p className="mt-1 text-2xl font-semibold text-slate-900">
@@ -407,63 +859,239 @@ const ProductPage = () => {
                 </p>
               </div>
               <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
-                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Modo</p>
-                <p className="mt-1 text-sm font-semibold text-slate-900">
-                  {inventoryVisible ? 'Inventario operativo' : 'Solo catalogo'}
-                </p>
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Promos</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{catalogStats.promoCount}</p>
+              </div>
+              <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Sin marca</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{catalogStats.missingBrandCount}</p>
+              </div>
+              <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
+                <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Sin coleccion</p>
+                <p className="mt-1 text-2xl font-semibold text-slate-900">{catalogStats.missingCollectionCount}</p>
               </div>
             </div>
           </div>
         </header>
 
         <section className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm lg:p-5">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {inventoryVisible && STOCK_FILTERS.map(filter => (
+          <div className="space-y-4">
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {QUICK_VIEWS.map(view => (
                 <button
-                  key={filter.value}
+                  key={view.value}
                   type="button"
-                  onClick={() => setStockFilter(filter.value)}
-                  className={`rounded-full px-4 py-2 text-xs font-semibold transition ${
-                    stockFilter === filter.value
+                  onClick={() => applyQuickView(view.value)}
+                  className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition ${
+                    isQuickViewActive(view.value)
                       ? 'bg-slate-950 text-white'
                       : 'border border-surface-200 bg-white text-slate-600 hover:border-brand/30 hover:text-brand'
                   }`}
                 >
-                  {filter.label}
+                  {view.label}
                 </button>
               ))}
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <select
-                value={sortBy}
-                onChange={event => setSortBy(event.target.value)}
-                className="rounded-xl border border-surface-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
-              >
-                {SORT_OPTIONS.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                onClick={fetchProducts}
-                className="rounded-xl border border-surface-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
-              >
-                Actualizar
-              </button>
-              {searchTerm && (
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+              <div className="md:hidden">
                 <button
                   type="button"
-                  onClick={() => navigate('/dashboard')}
-                  className="rounded-xl bg-brand/10 px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand/20"
+                  onClick={openFilterSheet}
+                  className="w-full rounded-2xl border border-surface-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
                 >
-                  Limpiar busqueda
+                  Filtros y marcas
+                  <span className="ml-2 text-slate-400">
+                    {hasActiveFilters ? `${activeFilterChips.length} activos` : 'Sin filtros'}
+                  </span>
                 </button>
-              )}
+              </div>
+
+              <div className="hidden flex-1 gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
+                {renderSelect(
+                  'Marca',
+                  advancedFilters.brand,
+                  event => setAdvancedFilters(prev => ({ ...prev, brand: event.target.value })),
+                  filterOptions.brands,
+                  'Todas las marcas'
+                )}
+                {renderSelect(
+                  'Coleccion',
+                  advancedFilters.collection,
+                  event => setAdvancedFilters(prev => ({ ...prev, collection: event.target.value })),
+                  filterOptions.collections,
+                  'Todas las colecciones'
+                )}
+                {renderSelect(
+                  'Tipo',
+                  advancedFilters.type,
+                  event => setAdvancedFilters(prev => ({ ...prev, type: event.target.value })),
+                  filterOptions.types,
+                  'Todos los tipos'
+                )}
+                {renderSelect(
+                  'Genero',
+                  advancedFilters.gender,
+                  event => setAdvancedFilters(prev => ({ ...prev, gender: event.target.value })),
+                  filterOptions.genders,
+                  'Todos los generos'
+                )}
+
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    Promocion
+                  </span>
+                  <select
+                    value={advancedFilters.promo}
+                    onChange={event => setAdvancedFilters(prev => ({ ...prev, promo: event.target.value }))}
+                    className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  >
+                    {PROMO_FILTERS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {inventoryVisible && (
+                  <label className="block">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      Estado stock
+                    </span>
+                    <select
+                      value={stockFilter}
+                      onChange={event => setStockFilter(event.target.value)}
+                      className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                    >
+                      {STOCK_FILTERS.map(option => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
+
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    Dato faltante
+                  </span>
+                  <select
+                    value={advancedFilters.missing}
+                    onChange={event => setAdvancedFilters(prev => ({ ...prev, missing: event.target.value }))}
+                    className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  >
+                    {MISSING_DATA_FILTERS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    Atributo extra
+                  </span>
+                  <select
+                    value={advancedFilters.attributeKey}
+                    onChange={event => {
+                      const nextKey = event.target.value;
+                      setAdvancedFilters(prev => ({
+                        ...prev,
+                        attributeKey: nextKey,
+                        attributeValue: ''
+                      }));
+                    }}
+                    className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  >
+                    <option value="">Sin atributo extra</option>
+                    {filterOptions.attributeKeys.map(key => (
+                      <option key={key} value={key}>
+                        {formatAttributeKey(key)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    Valor atributo
+                  </span>
+                  <select
+                    value={advancedFilters.attributeValue}
+                    onChange={event => setAdvancedFilters(prev => ({ ...prev, attributeValue: event.target.value }))}
+                    disabled={!advancedFilters.attributeKey}
+                    className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-surface-50 disabled:text-slate-400"
+                  >
+                    <option value="">
+                      {advancedFilters.attributeKey ? 'Cualquier valor' : 'Selecciona un atributo'}
+                    </option>
+                    {(filterOptions.attributeValuesByKey[advancedFilters.attributeKey] || []).map(value => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+                <select
+                  value={sortBy}
+                  onChange={event => setSortBy(event.target.value)}
+                  className="rounded-xl border border-surface-200 bg-white px-3 py-2 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                >
+                  {SORT_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={fetchProducts}
+                  className="rounded-xl border border-surface-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
+                >
+                  Actualizar
+                </button>
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="rounded-xl border border-surface-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
+                  >
+                    Limpiar filtros
+                  </button>
+                )}
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/dashboard')}
+                    className="rounded-xl bg-brand/10 px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand/20"
+                  >
+                    Limpiar busqueda
+                  </button>
+                )}
+              </div>
             </div>
+
+            {hasActiveFilters && (
+              <div className="flex flex-wrap gap-2">
+                {activeFilterChips.map(chip => (
+                  <button
+                    key={chip.key}
+                    type="button"
+                    onClick={() => removeActiveFilter(chip.key)}
+                    className="inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-3 py-1.5 text-xs font-semibold text-brand transition hover:bg-brand/10"
+                  >
+                    <span>{chip.label}: {chip.value}</span>
+                    <span className="text-brand/70">x</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </section>
 
@@ -472,6 +1100,7 @@ const ProductPage = () => {
             <div className="grid grid-cols-1 gap-4 md:hidden">
               {filteredProducts.map(({ product, inventory }) => {
                 const inventoryMeta = getInventoryHealthMeta(inventory);
+                const showExpandedActions = expandedMobileActionId === product._id;
 
                 return (
                   <article key={product._id} className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm">
@@ -491,9 +1120,17 @@ const ProductPage = () => {
                               {inventoryMeta.label}
                             </span>
                           )}
+                          {product.onSale && (
+                            <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
+                              Promo
+                            </span>
+                          )}
                         </div>
                         <p className="mt-1 text-sm text-slate-500">
-                          Cod. {product.code} {product.brand ? `· ${product.brand}` : ''}
+                          Cod. {product.code}{product.brand ? ` - ${product.brand}` : ''}
+                        </p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {product.collection || 'Sin coleccion'} / {product.gender || 'Sin genero'}
                         </p>
                         <p className="mt-2 text-sm font-semibold text-slate-900">
                           {formatCurrency(product.price?.retail)}
@@ -523,25 +1160,53 @@ const ProductPage = () => {
                       </div>
                     )}
 
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/product-private/${product._id}`)}
-                        className="rounded-xl border border-surface-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
-                      >
-                        Ver
-                      </button>
-                      {canEditProducts && (
+                    <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                      {inventoryVisible && canAdjustInventory ? (
                         <button
                           type="button"
-                          onClick={() => navigate(`/editar-producto/${product._id}`)}
-                          className="rounded-xl border border-surface-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                          onClick={() => openModal(product, 'sell')}
+                          className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white"
                         >
-                          Editar
+                          Venta
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/product-private/${product._id}`)}
+                          className="rounded-xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                        >
+                          Ver detalle
                         </button>
                       )}
-                      {inventoryVisible && canAdjustInventory && (
-                        <>
+
+                      <button
+                        type="button"
+                        onClick={() => setExpandedMobileActionId(prev => (prev === product._id ? null : product._id))}
+                        className="rounded-xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                      >
+                        {showExpandedActions ? 'Menos' : 'Mas'}
+                      </button>
+                    </div>
+
+                    {showExpandedActions && (
+                      <div className="mt-3 flex flex-wrap gap-2 rounded-2xl border border-surface-200 bg-surface-50 p-3">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/product-private/${product._id}`)}
+                          className="rounded-xl border border-surface-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                        >
+                          Ver
+                        </button>
+                        {canEditProducts && (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/editar-producto/${product._id}`)}
+                            className="rounded-xl border border-surface-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {inventoryVisible && canAdjustInventory && (
                           <button
                             type="button"
                             onClick={() => openModal(product, 'order')}
@@ -549,16 +1214,18 @@ const ProductPage = () => {
                           >
                             Pedido
                           </button>
+                        )}
+                        {canDeleteProducts && (
                           <button
                             type="button"
-                            onClick={() => openModal(product, 'sell')}
-                            className="rounded-xl bg-brand px-3 py-2 text-sm font-semibold text-white"
+                            onClick={() => handleDelete(product._id)}
+                            className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-600"
                           >
-                            Venta
+                            Eliminar
                           </button>
-                        </>
-                      )}
-                    </div>
+                        )}
+                      </div>
+                    )}
                   </article>
                 );
               })}
@@ -598,7 +1265,14 @@ const ProductPage = () => {
                                 />
                               </div>
                               <div className="min-w-0">
-                                <p className="font-semibold text-slate-900">{product.name}</p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-semibold text-slate-900">{product.name}</p>
+                                  {product.onSale && (
+                                    <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
+                                      Promo
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
                                   {product.gender || 'Sin genero'} / {product.type || 'Sin tipo'}
                                 </p>
@@ -730,19 +1404,203 @@ const ProductPage = () => {
               >
                 Volver al inventario
               </button>
-              {inventoryVisible && (
+              {hasActiveFilters && (
                 <button
                   type="button"
-                  onClick={() => setStockFilter('all')}
+                  onClick={clearAllFilters}
                   className="rounded-full border border-surface-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
                 >
-                  Quitar filtro
+                  Quitar filtros
                 </button>
               )}
             </div>
           </div>
         )}
       </div>
+
+      {isFilterSheetOpen && (
+        <div className="fixed inset-0 z-[1150] md:hidden">
+          <button
+            type="button"
+            aria-label="Cerrar filtros"
+            onClick={() => setIsFilterSheetOpen(false)}
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+          />
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-[28px] bg-white px-4 pb-6 pt-4 shadow-card-lg">
+            <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-200" />
+            <div className="mb-4 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">Filtros</p>
+                <h3 className="mt-2 text-xl font-semibold text-slate-900">Navegacion movil</h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Marca, stock y atributos del catalogo en una sola vista.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsFilterSheetOpen(false)}
+                className="rounded-xl border border-surface-200 px-3 py-2 text-sm font-semibold text-slate-600"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="grid gap-4">
+              {renderSelect(
+                'Marca',
+                draftFilters.brand,
+                event => setDraftFilters(prev => ({ ...prev, brand: event.target.value })),
+                filterOptions.brands,
+                'Todas las marcas'
+              )}
+              {renderSelect(
+                'Coleccion',
+                draftFilters.collection,
+                event => setDraftFilters(prev => ({ ...prev, collection: event.target.value })),
+                filterOptions.collections,
+                'Todas las colecciones'
+              )}
+              {renderSelect(
+                'Tipo',
+                draftFilters.type,
+                event => setDraftFilters(prev => ({ ...prev, type: event.target.value })),
+                filterOptions.types,
+                'Todos los tipos'
+              )}
+              {renderSelect(
+                'Genero',
+                draftFilters.gender,
+                event => setDraftFilters(prev => ({ ...prev, gender: event.target.value })),
+                filterOptions.genders,
+                'Todos los generos'
+              )}
+
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Promocion
+                </span>
+                <select
+                  value={draftFilters.promo}
+                  onChange={event => setDraftFilters(prev => ({ ...prev, promo: event.target.value }))}
+                  className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                >
+                  {PROMO_FILTERS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {inventoryVisible && (
+                <label className="block">
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    Estado stock
+                  </span>
+                  <select
+                    value={draftStockFilter}
+                    onChange={event => setDraftStockFilter(event.target.value)}
+                    className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  >
+                    {STOCK_FILTERS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Dato faltante
+                </span>
+                <select
+                  value={draftFilters.missing}
+                  onChange={event => setDraftFilters(prev => ({ ...prev, missing: event.target.value }))}
+                  className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                >
+                  {MISSING_DATA_FILTERS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Atributo extra
+                </span>
+                <select
+                  value={draftFilters.attributeKey}
+                  onChange={event => {
+                    const nextKey = event.target.value;
+                    setDraftFilters(prev => ({
+                      ...prev,
+                      attributeKey: nextKey,
+                      attributeValue: ''
+                    }));
+                  }}
+                  className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                >
+                  <option value="">Sin atributo extra</option>
+                  {filterOptions.attributeKeys.map(key => (
+                    <option key={key} value={key}>
+                      {formatAttributeKey(key)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  Valor atributo
+                </span>
+                <select
+                  value={draftFilters.attributeValue}
+                  onChange={event => setDraftFilters(prev => ({ ...prev, attributeValue: event.target.value }))}
+                  disabled={!draftFilters.attributeKey}
+                  className="mt-1 w-full rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:cursor-not-allowed disabled:bg-surface-50 disabled:text-slate-400"
+                >
+                  <option value="">
+                    {draftFilters.attributeKey ? 'Cualquier valor' : 'Selecciona un atributo'}
+                  </option>
+                  {selectedAttributeValues.map(value => (
+                    <option key={value} value={value}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  clearAllFilters();
+                  setIsFilterSheetOpen(false);
+                }}
+                className="rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+              >
+                Limpiar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setStockFilter(draftStockFilter);
+                  setAdvancedFilters(draftFilters);
+                  setIsFilterSheetOpen(false);
+                }}
+                className="rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
+              >
+                Aplicar filtros
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalData && modalVariantMatrix && (
         <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-900/40 px-4 backdrop-blur-sm">

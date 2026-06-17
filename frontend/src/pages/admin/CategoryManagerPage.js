@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  HiOutlineChevronDown,
+  HiOutlineChevronUp,
   HiOutlineFolderPlus,
   HiOutlineHashtag,
   HiOutlineMagnifyingGlass,
@@ -40,6 +42,9 @@ const CategoryManagerPage = () => {
   const [brandModelForm, setBrandModelForm] = useState({ brand: '', model: '' });
   const [newKey, setNewKey] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [brandModelSearchTerm, setBrandModelSearchTerm] = useState('');
+  const [brandModelView, setBrandModelView] = useState('all');
+  const [expandedBrand, setExpandedBrand] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -54,6 +59,11 @@ const CategoryManagerPage = () => {
     () => Object.values(brandModels).reduce((acc, items) => acc + (Array.isArray(items) ? items.length : 0), 0),
     [brandModels]
   );
+  const mappedBrandsCount = useMemo(
+    () => brandList.filter(brand => (brandModels[brand] || []).length > 0).length,
+    [brandList, brandModels]
+  );
+  const unmappedBrandsCount = Math.max(brandList.length - mappedBrandsCount, 0);
 
   const summary = useMemo(() => {
     const totalKeys = keys.length;
@@ -84,6 +94,55 @@ const CategoryManagerPage = () => {
       );
     });
   }, [categories, keys, searchTerm]);
+
+  const filteredBrandCards = useMemo(() => {
+    const needle = brandModelSearchTerm.trim().toLowerCase();
+
+    return brandList
+      .map(brand => {
+        const models = Array.isArray(brandModels[brand]) ? [...brandModels[brand]].sort((a, b) => a.localeCompare(b)) : [];
+        return {
+          brand,
+          models,
+          hasModels: models.length > 0
+        };
+      })
+      .filter(item => {
+        if (brandModelView === 'mapped' && !item.hasModels) {
+          return false;
+        }
+        if (brandModelView === 'pending' && item.hasModels) {
+          return false;
+        }
+        if (!needle) {
+          return true;
+        }
+
+        return (
+          item.brand.toLowerCase().includes(needle) ||
+          item.models.some(model => model.toLowerCase().includes(needle))
+        );
+      })
+      .sort((left, right) => {
+        if (left.hasModels !== right.hasModels) {
+          return left.hasModels ? -1 : 1;
+        }
+        return left.brand.localeCompare(right.brand);
+      });
+  }, [brandList, brandModelSearchTerm, brandModelView, brandModels]);
+
+  useEffect(() => {
+    if (!filteredBrandCards.length) {
+      setExpandedBrand('');
+      return;
+    }
+
+    setExpandedBrand(prev =>
+      prev && filteredBrandCards.some(item => item.brand === prev)
+        ? prev
+        : filteredBrandCards[0].brand
+    );
+  }, [filteredBrandCards]);
 
   useEffect(() => {
     const loadCategories = async () => {
@@ -387,7 +446,7 @@ const CategoryManagerPage = () => {
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+          <article className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
                 <HiOutlineTag className="text-2xl" />
@@ -400,13 +459,13 @@ const CategoryManagerPage = () => {
               </div>
             </div>
 
-            <div className="mt-5 grid gap-4 md:grid-cols-[0.9fr_1.2fr_auto]">
+            <div className="mt-5 grid gap-3 md:grid-cols-[0.9fr_1.2fr_auto] md:gap-4">
               <label className="text-sm text-slate-600">
                 Marca
                 <select
                   value={brandModelForm.brand}
                   onChange={event => setBrandModelForm(prev => ({ ...prev, brand: event.target.value }))}
-                  className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-2.5"
+                  className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-3 text-base sm:py-2.5 sm:text-sm"
                 >
                   <option value="">Selecciona una marca</option>
                   {brandList.map(brand => (
@@ -422,19 +481,30 @@ const CategoryManagerPage = () => {
                   value={brandModelForm.model}
                   onChange={event => setBrandModelForm(prev => ({ ...prev, model: event.target.value }))}
                   placeholder="Ej: Samba, Gazelle, Air Force 1"
-                  className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-2.5"
+                  className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-3 text-base sm:py-2.5 sm:text-sm"
                 />
               </label>
               <div className="flex items-end">
                 <button
                   onClick={handleAddBrandModel}
                   disabled={submitting || !brandModelForm.brand || !brandModelForm.model.trim()}
-                  className="w-full rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:py-3"
                 >
                   Agregar modelo
                 </button>
               </div>
             </div>
+
+            {brandModelForm.brand && (
+              <div className="mt-3 rounded-2xl border border-brand/15 bg-brand/5 px-4 py-3 text-sm text-slate-600">
+                <span className="font-semibold text-slate-800">{brandModelForm.brand}</span>
+                {' '}tiene{' '}
+                <span className="font-semibold text-slate-800">
+                  {(brandModels[brandModelForm.brand] || []).length}
+                </span>
+                {' '}modelo{(brandModels[brandModelForm.brand] || []).length === 1 ? '' : 's'} conectado{(brandModels[brandModelForm.brand] || []).length === 1 ? '' : 's'}.
+              </div>
+            )}
 
             {!brandList.length && (
               <div className="mt-4 rounded-2xl border border-dashed border-surface-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
@@ -443,7 +513,7 @@ const CategoryManagerPage = () => {
             )}
           </article>
 
-          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+          <article className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm sm:p-5">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
                 <HiOutlineSquares2X2 className="text-2xl" />
@@ -457,50 +527,136 @@ const CategoryManagerPage = () => {
             </div>
 
             <div className="mt-5 space-y-4">
+              <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0">
+                <div className="min-w-[132px] rounded-2xl border border-surface-200 bg-slate-50 px-4 py-3 sm:min-w-0">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Marcas</p>
+                  <p className="mt-1 text-2xl font-semibold text-slate-950">{brandList.length}</p>
+                </div>
+                <div className="min-w-[132px] rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 sm:min-w-0">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-emerald-600">Con modelos</p>
+                  <p className="mt-1 text-2xl font-semibold text-emerald-800">{mappedBrandsCount}</p>
+                </div>
+                <div className="min-w-[132px] rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 sm:min-w-0">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-amber-600">Pendientes</p>
+                  <p className="mt-1 text-2xl font-semibold text-amber-800">{unmappedBrandsCount}</p>
+                </div>
+              </div>
+
+              <div className="sticky top-3 z-10 -mx-1 rounded-[1.4rem] border border-surface-200 bg-white/95 px-3 py-3 shadow-sm backdrop-blur sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:shadow-none">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {[
+                    { value: 'all', label: 'Todas' },
+                    { value: 'mapped', label: 'Con modelos' },
+                    { value: 'pending', label: 'Pendientes' }
+                  ].map(option => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setBrandModelView(option.value)}
+                      className={`whitespace-nowrap rounded-full px-4 py-2 text-xs font-semibold transition ${
+                        brandModelView === option.value
+                          ? 'bg-slate-950 text-white'
+                          : 'border border-surface-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+
+                <label className="relative mt-3 block sm:mt-3">
+                  <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-400">
+                    <HiOutlineMagnifyingGlass className="text-lg" />
+                  </span>
+                  <input
+                    value={brandModelSearchTerm}
+                    onChange={event => setBrandModelSearchTerm(event.target.value)}
+                    placeholder="Buscar marca o modelo"
+                    className="w-full rounded-2xl border border-surface-200 px-10 py-3 text-base text-slate-700 sm:py-2.5 sm:text-sm"
+                  />
+                </label>
+              </div>
               {brandList.length ? (
-                brandList.map(brand => {
-                  const models = Array.isArray(brandModels[brand]) ? brandModels[brand] : [];
+                filteredBrandCards.length ? (
+                filteredBrandCards.map(({ brand, models, hasModels }) => {
+                  const isExpanded = expandedBrand === brand;
 
                   return (
-                    <article key={brand} className="rounded-3xl border border-surface-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-lg font-semibold text-slate-950">{brand}</h3>
-                          <p className="mt-1 text-sm text-slate-500">
+                    <article
+                      key={brand}
+                      className={`overflow-hidden rounded-3xl border transition ${
+                        isExpanded
+                          ? 'border-brand/20 bg-white shadow-sm'
+                          : 'border-surface-200 bg-slate-50'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setExpandedBrand(prev => (prev === brand ? '' : brand))}
+                        className="flex w-full flex-col items-start gap-3 px-3.5 py-3.5 text-left sm:flex-row sm:items-start sm:justify-between sm:px-4 sm:py-4"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-base font-semibold text-slate-950 sm:text-lg">{brand}</h3>
+                            <span
+                              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${
+                                hasModels
+                                  ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                                  : 'bg-amber-50 text-amber-700 ring-amber-200'
+                              }`}
+                            >
+                              {hasModels ? 'Lista' : 'Pendiente'}
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500 sm:text-sm">
                             {models.length} modelo{models.length === 1 ? '' : 's'} conectado{models.length === 1 ? '' : 's'}.
                           </p>
                         </div>
-                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-surface-200">
-                          Marca
-                        </span>
-                      </div>
+                        <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:justify-start">
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-inset ring-surface-200 sm:px-3 sm:text-xs">
+                            Marca
+                          </span>
+                          <span className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-surface-200 bg-white text-slate-500">
+                            {isExpanded ? <HiOutlineChevronUp className="text-base" /> : <HiOutlineChevronDown className="text-base" />}
+                          </span>
+                        </div>
+                      </button>
 
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {models.length ? (
-                          models.map(model => (
-                            <div
-                              key={`${brand}-${model}`}
-                              className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
-                            >
-                              <span>{model}</span>
-                              <button
-                                onClick={() => handleDeleteBrandModel(brand, model)}
-                                className="text-slate-400 transition hover:text-red-600"
-                                title="Eliminar modelo"
-                              >
-                                <HiOutlineTrash className="text-sm" />
-                              </button>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="rounded-2xl border border-dashed border-surface-200 bg-white px-4 py-5 text-sm text-slate-500">
-                            Esta marca aun no tiene modelos asociados.
+                      {isExpanded && (
+                        <div className="border-t border-surface-200 px-3.5 py-3.5 sm:px-4 sm:py-4">
+                          <div className="grid gap-2 sm:flex sm:flex-wrap">
+                            {models.length ? (
+                              models.map(model => (
+                                <div
+                                  key={`${brand}-${model}`}
+                                  className="inline-flex w-full items-center justify-between gap-3 rounded-2xl border border-surface-200 bg-white px-3 py-3 text-sm text-slate-700 shadow-sm sm:w-auto sm:justify-start sm:rounded-full sm:py-2"
+                                >
+                                  <span className="truncate">{model}</span>
+                                  <button
+                                    onClick={() => handleDeleteBrandModel(brand, model)}
+                                    className="rounded-full p-1 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                                    title="Eliminar modelo"
+                                  >
+                                    <HiOutlineTrash className="text-sm" />
+                                  </button>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="rounded-2xl border border-dashed border-surface-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                                Esta marca aun no tiene modelos asociados.
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </article>
                   );
                 })
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-surface-200 px-4 py-8 text-center text-sm text-slate-500">
+                    No encontramos coincidencias para esa marca o modelo.
+                  </div>
+                )
               ) : (
                 <div className="rounded-2xl border border-dashed border-surface-200 px-4 py-8 text-center text-sm text-slate-500">
                   No hay marcas disponibles para mapear modelos.

@@ -63,7 +63,7 @@ const EditProductPage = () => {
   const [colorToAdd, setColorToAdd] = useState('');
   const [existingImages, setExistingImages] = useState([]);
   const [pendingImages, setPendingImages] = useState([]);
-  const [uploadVisibility, setUploadVisibility] = useState('public');
+  const [uploadVisibility, setUploadVisibility] = useState('internal');
   const [coverImageKey, setCoverImageKey] = useState('');
   const [draggedExistingImageKey, setDraggedExistingImageKey] = useState('');
   const [draggedPendingImageKey, setDraggedPendingImageKey] = useState('');
@@ -697,18 +697,32 @@ const EditProductPage = () => {
                   )}
                 </div>
                 {imageVisibilityEnabled && (
-                  <select
-                    value={image.visibility}
-                    onChange={event =>
-                      kind === 'existing'
-                        ? handleExistingVisibilityChange(imageKey, event.target.value)
-                        : handlePendingVisibilityChange(imageKey, event.target.value)
-                    }
-                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-700"
-                  >
-                    <option value="public">Publica</option>
-                    <option value="internal">Interna</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-1">
+                    {[
+                      { value: 'public', label: 'Tienda' },
+                      { value: 'internal', label: 'Interna' }
+                    ].map(option => {
+                      const isActive = image.visibility === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            kind === 'existing'
+                              ? handleExistingVisibilityChange(imageKey, option.value)
+                              : handlePendingVisibilityChange(imageKey, option.value)
+                          }
+                          className={`rounded-md border px-2 py-1.5 text-[11px] font-semibold transition ${
+                            isActive
+                              ? 'border-brand/40 bg-brand/10 text-brand'
+                              : 'border-slate-200 bg-white text-slate-600'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {visibility === 'public' && !cover && (
                   <button
@@ -1217,6 +1231,12 @@ const EditProductPage = () => {
             summary: `${existingImages.length + pendingImages.length} totales`,
             children: (
           <>
+          {imageVisibilityEnabled && (
+            <div className="mb-4 rounded-xl border border-brand/15 bg-brand/5 px-4 py-3 text-sm text-slate-600">
+              Solo las fotos marcadas como <span className="font-semibold text-slate-900">Publicas</span> salen a tienda.
+              Si este producto se queda sin fotos publicas, dejara de mostrarse al cliente.
+            </div>
+          )}
           <div>
             <h4 className="mb-2 text-sm font-semibold text-gray-700">Imagenes actuales</h4>
             <div className="space-y-4">

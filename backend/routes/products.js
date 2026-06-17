@@ -282,6 +282,9 @@ const formatProduct = (product, options = {}) => {
     colors,
     images: publicImages,
     internalImages: includeInternalImages ? internalImages : [],
+    publicImageCount: publicImages.length,
+    internalImageCount: internalImages.length,
+    storeReady: publicImages.length > 0,
     imageVisibilityEnabled: Boolean(imageVisibilityEnabled),
     stockBySize: stockBySizePlain,
     stockByColorSize: stockByColorSizePlain,
@@ -304,6 +307,17 @@ const getImageVisibilityContext = async req => {
     includeInternalImages: isInternalUser(req.user)
   };
 };
+
+const getStorefrontVisibilityFilter = includeInternalImages =>
+  includeInternalImages
+    ? {}
+    : {
+        images: {
+          $elemMatch: {
+            visibility: { $ne: 'internal' }
+          }
+        }
+      };
 
 router.post(
   '/upload-image',
@@ -333,7 +347,10 @@ router.post(
 router.get('/promocion', optionalProtect, async (req, res) => {
   try {
     const imageContext = await getImageVisibilityContext(req);
-    const productosEnPromo = await Product.find({ onSale: true }).limit(6);
+    const productosEnPromo = await Product.find({
+      onSale: true,
+      ...getStorefrontVisibilityFilter(imageContext.includeInternalImages)
+    }).limit(6);
     res.json(productosEnPromo.map(product => formatProduct(product, imageContext)));
   } catch (error) {
     console.error('Error al obtener productos en promocion:', error);
@@ -343,12 +360,14 @@ router.get('/promocion', optionalProtect, async (req, res) => {
 
 router.get('/filters-options', async (req, res) => {
   try {
-    const brands = await Product.distinct('brand');
-    const types = await Product.distinct('type');
-    const genders = await Product.distinct('gender');
-    const collections = await Product.distinct('collection');
-    const min = await Product.find().sort({ 'price.retail': 1 }).limit(1);
-    const max = await Product.find().sort({ 'price.retail': -1 }).limit(1);
+    const imageContext = await getImageVisibilityContext(req);
+    const storefrontFilter = getStorefrontVisibilityFilter(imageContext.includeInternalImages);
+    const brands = await Product.distinct('brand', storefrontFilter);
+    const types = await Product.distinct('type', storefrontFilter);
+    const genders = await Product.distinct('gender', storefrontFilter);
+    const collections = await Product.distinct('collection', storefrontFilter);
+    const min = await Product.find(storefrontFilter).sort({ 'price.retail': 1 }).limit(1);
+    const max = await Product.find(storefrontFilter).sort({ 'price.retail': -1 }).limit(1);
     res.json({
       brands: uniqueStrings(brands),
       types: uniqueStrings(types),
@@ -408,7 +427,10 @@ router.get('/filtrar', optionalProtect, async (req, res) => {
       }
     });
 
-    const productos = await Product.find(filter);
+    const productos = await Product.find({
+      ...filter,
+      ...getStorefrontVisibilityFilter(imageContext.includeInternalImages)
+    });
     res.json(productos.map(product => formatProduct(product, imageContext)));
   } catch (error) {
     console.error('Error al filtrar productos:', error);
@@ -461,7 +483,10 @@ router.get('/filter', optionalProtect, async (req, res) => {
       }
     });
 
-    const productos = await Product.find(filter);
+    const productos = await Product.find({
+      ...filter,
+      ...getStorefrontVisibilityFilter(imageContext.includeInternalImages)
+    });
     res.json(productos.map(product => formatProduct(product, imageContext)));
   } catch (error) {
     console.error('Error al filtrar productos:', error);
@@ -472,7 +497,9 @@ router.get('/filter', optionalProtect, async (req, res) => {
 router.get('/', optionalProtect, async (req, res) => {
   try {
     const imageContext = await getImageVisibilityContext(req);
-    const products = await Product.find();
+    const products = await Product.find(
+      getStorefrontVisibilityFilter(imageContext.includeInternalImages)
+    );
     res.json(products.map(product => formatProduct(product, imageContext)));
   } catch {
     res.status(500).json({ message: 'Error al obtener productos' });
@@ -484,7 +511,11 @@ router.get('/:id', optionalProtect, async (req, res) => {
     const imageContext = await getImageVisibilityContext(req);
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-    res.json(formatProduct(product, imageContext));
+    const formatted = formatProduct(product, imageContext);
+    if (!imageContext.includeInternalImages && !formatted.images.length) {
+      return res.status(404).json({ message: 'Producto no disponible en tienda' });
+    }
+    res.json(formatted);
   } catch {
     res.status(500).json({ message: 'Error al obtener producto' });
   }
@@ -971,4 +1002,3 @@ router.get('/analytics/overview', protect, adminOnly, requireModuleEnabled('repo
 });
 
 export default router;
-

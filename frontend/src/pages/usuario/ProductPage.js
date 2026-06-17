@@ -1133,6 +1133,15 @@ const ProductPage = () => {
                               {inventoryMeta.label}
                             </span>
                           )}
+                          <span
+                            className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                              product.storeReady
+                                ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                                : 'border border-amber-200 bg-amber-50 text-amber-700'
+                            }`}
+                          >
+                            {product.storeReady ? 'Tienda' : 'Solo interna'}
+                          </span>
                           {product.onSale && (
                             <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
                               Promo
@@ -1280,6 +1289,15 @@ const ProductPage = () => {
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <p className="font-semibold text-slate-900">{product.name}</p>
+                                  <span
+                                    className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                      product.storeReady
+                                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                                        : 'border border-amber-200 bg-amber-50 text-amber-700'
+                                    }`}
+                                  >
+                                    {product.storeReady ? 'Tienda' : 'Solo interna'}
+                                  </span>
                                   {product.onSale && (
                                     <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-2.5 py-1 text-[11px] font-semibold text-fuchsia-700">
                                       Promo

@@ -140,6 +140,15 @@ const ProductDetailsPage = () => {
                     {inventoryMeta.label}
                   </span>
                 )}
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    product.storeReady
+                      ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border border-amber-200 bg-amber-50 text-amber-700'
+                  }`}
+                >
+                  {product.storeReady ? 'Visible en tienda' : 'Oculto en tienda'}
+                </span>
                 {product.onSale && (
                   <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-semibold text-fuchsia-700">
                     En promocion
@@ -207,7 +216,7 @@ const ProductDetailsPage = () => {
                 Tienda
               </span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                {publicImages.length} fotos visibles
+                {product.publicImageCount ?? publicImages.length} fotos visibles
               </span>
               <span className="text-xs text-slate-500">
                 Estas son las imagenes que ve el cliente en el catalogo y en el detalle del producto.
@@ -254,7 +263,7 @@ const ProductDetailsPage = () => {
                     Interna
                   </span>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                    {internalImages.length} fotos operativas
+                    {product.internalImageCount ?? internalImages.length} fotos operativas
                   </span>
                   <span className="text-xs text-slate-500">
                     Sirven como referencia de bodega, detalles o soporte interno y no salen en tienda.

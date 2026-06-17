@@ -102,7 +102,7 @@ const CreateProductPage = () => {
   const [brandModels, setBrandModels] = useState({});
   const [variantState, setVariantState] = useState({});
   const [pendingImages, setPendingImages] = useState([]);
-  const [uploadVisibility, setUploadVisibility] = useState('public');
+  const [uploadVisibility, setUploadVisibility] = useState('internal');
   const [draggedImageKey, setDraggedImageKey] = useState('');
   const [colorToAdd, setColorToAdd] = useState('');
   const [activeColor, setActiveColor] = useState('');
@@ -600,16 +600,6 @@ const CreateProductPage = () => {
     try {
       const sortedPendingImages = sortImagesForPayload(pendingImages, imageVisibilityEnabled);
 
-      if (
-        imageVisibilityEnabled &&
-        sortedPendingImages.length > 0 &&
-        !sortedPendingImages.some(image => image.visibility !== 'internal')
-      ) {
-        window.alert('Agrega al menos una foto publica para la tienda o elimina las fotos internas.');
-        setSubmitting(false);
-        return;
-      }
-
       const images = canUploadImages && sortedPendingImages.length
         ? await uploadImages(sortedPendingImages)
         : [];
@@ -724,14 +714,28 @@ const CreateProductPage = () => {
                   </div>
                 </div>
                 {imageVisibilityEnabled && (
-                  <select
-                    value={item.visibility}
-                    onChange={event => handleImageVisibilityChange(imageKey, event.target.value)}
-                    className="w-full rounded-md border border-slate-200 px-2 py-1 text-[11px] text-slate-700"
-                  >
-                    <option value="public">Tienda publica</option>
-                    <option value="internal">Uso interno</option>
-                  </select>
+                  <div className="grid grid-cols-2 gap-1">
+                    {[
+                      { value: 'public', label: 'Tienda' },
+                      { value: 'internal', label: 'Interna' }
+                    ].map(option => {
+                      const isActive = item.visibility === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => handleImageVisibilityChange(imageKey, option.value)}
+                          className={`rounded-md border px-2 py-1.5 text-[11px] font-semibold transition ${
+                            isActive
+                              ? 'border-brand/40 bg-brand/10 text-brand'
+                              : 'border-slate-200 bg-white text-slate-600'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 )}
                 {visibility === 'public' && !cover && (
                   <button
@@ -1263,6 +1267,12 @@ const CreateProductPage = () => {
             summary: `${pendingImages.length} nuevas`,
             children: (
           <div>
+            {imageVisibilityEnabled && (
+              <div className="mb-4 rounded-xl border border-brand/15 bg-brand/5 px-4 py-3 text-sm text-slate-600">
+                Solo las fotos marcadas como <span className="font-semibold text-slate-900">Tienda</span> saldran al cliente.
+                Si el producto no tiene al menos una foto publica, no aparecera en la tienda.
+              </div>
+            )}
             <label className="text-sm font-medium text-gray-700">
               Subir imagenes
               {imageVisibilityEnabled && (

@@ -35,7 +35,9 @@ const normalizeKeyName = value =>
 
 const CategoryManagerPage = () => {
   const [categories, setCategories] = useState({});
+  const [brandModels, setBrandModels] = useState({});
   const [catForm, setCatForm] = useState({ key: '', value: '' });
+  const [brandModelForm, setBrandModelForm] = useState({ brand: '', model: '' });
   const [newKey, setNewKey] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -44,6 +46,14 @@ const CategoryManagerPage = () => {
   const [message, setMessage] = useState('');
 
   const keys = useMemo(() => Object.keys(categories).sort((a, b) => a.localeCompare(b)), [categories]);
+  const brandList = useMemo(
+    () => [...(categories.brand || [])].sort((a, b) => a.localeCompare(b)),
+    [categories.brand]
+  );
+  const totalBrandModels = useMemo(
+    () => Object.values(brandModels).reduce((acc, items) => acc + (Array.isArray(items) ? items.length : 0), 0),
+    [brandModels]
+  );
 
   const summary = useMemo(() => {
     const totalKeys = keys.length;
@@ -55,9 +65,10 @@ const CategoryManagerPage = () => {
       totalKeys,
       protectedCount,
       totalValues,
-      customKeys
+      customKeys,
+      totalBrandModels
     };
-  }, [categories, keys]);
+  }, [categories, keys, totalBrandModels]);
 
   const filteredKeys = useMemo(() => {
     const needle = searchTerm.trim().toLowerCase();
@@ -78,9 +89,13 @@ const CategoryManagerPage = () => {
     const loadCategories = async () => {
       setLoading(true);
       try {
-        const { data } = await axios.get('/api/categories');
+        const [{ data }, { data: brandModelMap }] = await Promise.all([
+          axios.get('/api/categories'),
+          axios.get('/api/categories/brand-models')
+        ]);
         const normalized = normalizeCategories(data);
         setCategories(normalized);
+        setBrandModels(brandModelMap || {});
         setCatForm(prev => {
           const currentKey =
             prev.key && Object.prototype.hasOwnProperty.call(normalized, prev.key)
@@ -88,6 +103,13 @@ const CategoryManagerPage = () => {
               : Object.keys(normalized)[0] || '';
           return { ...prev, key: currentKey };
         });
+        setBrandModelForm(prev => ({
+          ...prev,
+          brand:
+            prev.brand && (normalized.brand || []).includes(prev.brand)
+              ? prev.brand
+              : normalized.brand?.[0] || ''
+        }));
         setError('');
       } catch {
         setError('No se pudieron cargar las categorias.');
@@ -109,6 +131,17 @@ const CategoryManagerPage = () => {
           : Object.keys(normalized)[0] || '';
       return { ...prev, key: nextKey };
     });
+    setBrandModelForm(prev => ({
+      ...prev,
+      brand:
+        prev.brand && (normalized.brand || []).includes(prev.brand)
+          ? prev.brand
+          : normalized.brand?.[0] || ''
+    }));
+  };
+
+  const syncBrandModels = nextBrandModels => {
+    setBrandModels(nextBrandModels && typeof nextBrandModels === 'object' ? nextBrandModels : {});
   };
 
   const handleAddCategory = async () => {
@@ -141,6 +174,13 @@ const CategoryManagerPage = () => {
     try {
       const { data } = await axios.delete('/api/categories', { data: { key, value } });
       syncCategories(data);
+      if (key === 'brand') {
+        setBrandModels(prev => {
+          const next = { ...prev };
+          delete next[value];
+          return next;
+        });
+      }
       setMessage(`Valor "${value}" eliminado de ${key}.`);
     } catch (err) {
       setError(err?.response?.data?.message || 'Error al eliminar el valor.');
@@ -184,6 +224,48 @@ const CategoryManagerPage = () => {
     }
   };
 
+  const handleAddBrandModel = async () => {
+    const brand = String(brandModelForm.brand || '').trim();
+    const model = String(brandModelForm.model || '').trim();
+    if (!brand || !model) return;
+
+    setSubmitting(true);
+    setError('');
+    setMessage('');
+
+    try {
+      const { data } = await axios.post('/api/categories/brand-models', { brand, model });
+      syncBrandModels(data);
+      setCategories(prev => ({
+        ...prev,
+        type: Array.from(new Set([...(prev.type || []), model]))
+      }));
+      setBrandModelForm(prev => ({ ...prev, model: '' }));
+      setMessage(`Modelo "${model}" agregado a ${brand}.`);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Error al agregar el modelo.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeleteBrandModel = async (brand, model) => {
+    if (!window.confirm(`Eliminar "${model}" de ${brand}?`)) return;
+
+    setError('');
+    setMessage('');
+
+    try {
+      const { data } = await axios.delete('/api/categories/brand-models', {
+        data: { brand, model }
+      });
+      syncBrandModels(data);
+      setMessage(`Modelo "${model}" eliminado de ${brand}.`);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Error al eliminar el modelo.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-surface-50 px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -212,6 +294,10 @@ const CategoryManagerPage = () => {
               <div>
                 <p className="text-xs uppercase tracking-wide text-slate-400">Personalizadas</p>
                 <p className="mt-2 text-3xl font-semibold text-slate-950">{summary.customKeys}</p>
+              </div>
+              <div>
+                <p className="text-xs uppercase tracking-wide text-slate-400">Modelos ligados</p>
+                <p className="mt-2 text-3xl font-semibold text-slate-950">{summary.totalBrandModels}</p>
               </div>
             </div>
           </div>
@@ -297,6 +383,130 @@ const CategoryManagerPage = () => {
             <p className="mt-3 text-xs text-slate-400">
               La clave se normaliza a minúsculas y reemplaza espacios por `_`.
             </p>
+          </article>
+        </section>
+
+        <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
+                <HiOutlineTag className="text-2xl" />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Conectar modelos a marcas</h2>
+                <p className="text-sm text-slate-500">
+                  Define qué modelos aparecen para cada marca en el formulario de productos.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 md:grid-cols-[0.9fr_1.2fr_auto]">
+              <label className="text-sm text-slate-600">
+                Marca
+                <select
+                  value={brandModelForm.brand}
+                  onChange={event => setBrandModelForm(prev => ({ ...prev, brand: event.target.value }))}
+                  className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-2.5"
+                >
+                  <option value="">Selecciona una marca</option>
+                  {brandList.map(brand => (
+                    <option key={brand} value={brand}>
+                      {brand}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm text-slate-600">
+                Modelo
+                <input
+                  value={brandModelForm.model}
+                  onChange={event => setBrandModelForm(prev => ({ ...prev, model: event.target.value }))}
+                  placeholder="Ej: Samba, Gazelle, Air Force 1"
+                  className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-2.5"
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  onClick={handleAddBrandModel}
+                  disabled={submitting || !brandModelForm.brand || !brandModelForm.model.trim()}
+                  className="w-full rounded-2xl bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Agregar modelo
+                </button>
+              </div>
+            </div>
+
+            {!brandList.length && (
+              <div className="mt-4 rounded-2xl border border-dashed border-surface-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                Primero agrega marcas en la clave `brand` para poder mapear modelos.
+              </div>
+            )}
+          </article>
+
+          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
+                <HiOutlineSquares2X2 className="text-2xl" />
+              </span>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Mapa marca -> modelos</h2>
+                <p className="text-sm text-slate-500">
+                  Aqui se ve exactamente qué modelos quedarán disponibles por cada marca.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              {brandList.length ? (
+                brandList.map(brand => {
+                  const models = Array.isArray(brandModels[brand]) ? brandModels[brand] : [];
+
+                  return (
+                    <article key={brand} className="rounded-3xl border border-surface-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-950">{brand}</h3>
+                          <p className="mt-1 text-sm text-slate-500">
+                            {models.length} modelo{models.length === 1 ? '' : 's'} conectado{models.length === 1 ? '' : 's'}.
+                          </p>
+                        </div>
+                        <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-surface-200">
+                          Marca
+                        </span>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {models.length ? (
+                          models.map(model => (
+                            <div
+                              key={`${brand}-${model}`}
+                              className="inline-flex items-center gap-2 rounded-full border border-surface-200 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm"
+                            >
+                              <span>{model}</span>
+                              <button
+                                onClick={() => handleDeleteBrandModel(brand, model)}
+                                className="text-slate-400 transition hover:text-red-600"
+                                title="Eliminar modelo"
+                              >
+                                <HiOutlineTrash className="text-sm" />
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-surface-200 bg-white px-4 py-5 text-sm text-slate-500">
+                            Esta marca aun no tiene modelos asociados.
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  );
+                })
+              ) : (
+                <div className="rounded-2xl border border-dashed border-surface-200 px-4 py-8 text-center text-sm text-slate-500">
+                  No hay marcas disponibles para mapear modelos.
+                </div>
+              )}
+            </div>
           </article>
         </section>
 

@@ -37,10 +37,14 @@ const EditProductPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const inventoryEnabled = isModuleEnabled('inventory');
+  const membershipsEnabled = isModuleEnabled('memberships');
   const canUploadImages = hasPermission('products.upload');
   const canSeeInventory = hasPermission('inventory.view') || hasPermission('inventory.adjust');
   const canEditImages = hasPermission('products.edit');
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
+  const priceLevels = membershipsEnabled
+    ? ['retail', 'gold', 'premium', 'platinum']
+    : ['retail'];
 
   const [form, setForm] = useState({
     name: '',
@@ -65,6 +69,7 @@ const EditProductPage = () => {
   const [draggedPendingImageKey, setDraggedPendingImageKey] = useState('');
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(true);
+  const [openSection, setOpenSection] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [originalInventory, setOriginalInventory] = useState({
     stockByColorSize: {},
@@ -584,6 +589,10 @@ const EditProductPage = () => {
   const internalExistingImages = existingImages.filter(image => image.visibility === 'internal');
   const publicPendingImages = pendingImages.filter(image => image.visibility !== 'internal');
   const internalPendingImages = pendingImages.filter(image => image.visibility === 'internal');
+  const selectedSizeCount = Object.values(variantState).reduce(
+    (acc, entry) => acc + Object.keys(entry?.sizes || {}).length,
+    0
+  );
 
   const handleExistingVisibilityChange = (imageKey, nextVisibility) => {
     setExistingImages(prev => updateImageVisibility(prev, imageKey, nextVisibility, imageVisibilityEnabled));
@@ -731,11 +740,57 @@ const EditProductPage = () => {
     </div>
   );
 
+  const renderAccordionSection = ({ id, title, description, summary, children }) => {
+    const isOpen = openSection === id;
+
+    return (
+      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+        <button
+          type="button"
+          onClick={() => setOpenSection(prev => (prev === id ? '' : id))}
+          className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
+        >
+          <div className="min-w-0">
+            <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+            {description ? (
+              <p className="mt-1 text-xs leading-5 text-gray-500">{description}</p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            {summary ? (
+              <span className="hidden max-w-[180px] truncate rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600 sm:inline-flex">
+                {summary}
+              </span>
+            ) : null}
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-gray-200 text-sm font-semibold text-slate-500">
+              {isOpen ? '-' : '+'}
+            </span>
+          </div>
+        </button>
+
+        {isOpen ? <div className="border-t border-gray-100 px-4 py-4">{children}</div> : null}
+      </section>
+    );
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="mx-auto max-w-5xl rounded-xl bg-white p-8 shadow">
+    <div className="min-h-screen bg-gray-50 p-4 pb-28 md:p-6 md:pb-6">
+      <div className="mx-auto max-w-5xl rounded-xl bg-white p-5 shadow md:p-8">
         <h2 className="mb-6 text-2xl font-semibold text-gray-800">Editar producto</h2>
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="font-semibold text-slate-800">{form.name || 'Producto sin nombre'}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                {code || 'Sin codigo'} · {selectedColors.length} colores · {totalUnits} unidades
+              </p>
+            </div>
+            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200">
+              {existingImages.length + pendingImages.length} imagenes
+            </span>
+          </div>
+        </div>
+        <form id="edit-product-form" onSubmit={handleSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-sm font-medium text-gray-700">
               Nombre
@@ -762,7 +817,7 @@ const EditProductPage = () => {
           <fieldset className="rounded-lg border border-gray-200 p-4">
             <legend className="px-2 text-sm font-semibold text-gray-700">Precios</legend>
             <div className="grid gap-4 md:grid-cols-2">
-              {['retail', 'gold', 'premium', 'platinum'].map(level => (
+              {priceLevels.map(level => (
                 <label key={level} className="text-sm font-medium text-gray-700">
                   {level === 'retail'
                     ? 'Precio Retail'
@@ -780,9 +835,15 @@ const EditProductPage = () => {
                 </label>
               ))}
             </div>
-            <p className="mt-2 text-xs text-gray-500">
-              Si dejas vacio Gold/Premium/Platinum se usara el precio retail.
-            </p>
+            {membershipsEnabled ? (
+              <p className="mt-2 text-xs text-gray-500">
+                Si dejas vacio Gold/Premium/Platinum se usara el precio retail.
+              </p>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                Membresias desactivadas. Solo se usa el precio retail en este producto.
+              </p>
+            )}
           </fieldset>
 
           <div className="grid gap-4 md:grid-cols-3">
@@ -883,6 +944,12 @@ const EditProductPage = () => {
             </div>
           )}
 
+          {renderAccordionSection({
+            id: 'inventory',
+            title: 'Inventario',
+            description: 'Color, tallas activas y cantidades. Esta seccion queda plegada por defecto para acortar la vista.',
+            summary: `${selectedColors.length} colores · ${selectedSizeCount} tallas · ${totalUnits} uds`,
+            children: (
           <section className="rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-semibold text-gray-700">Inventario por color y talla</h3>
             <p className="mt-1 text-xs text-gray-500">
@@ -977,55 +1044,112 @@ const EditProductPage = () => {
                       {`Tallas para ${colorLabelMap[activeColor] || activeColor}`}
                     </h4>
                     {sizeOptions.length ? (
-                      <div className="mt-3 space-y-3">
-                        {sizeOptions.map(option => {
-                          const isSelected =
-                            Boolean(
-                              variantState[activeColor]?.sizes &&
-                                Object.prototype.hasOwnProperty.call(
-                                  variantState[activeColor].sizes,
-                                  option.value
-                                )
-                            );
-                          const currentValue =
-                            variantState[activeColor]?.sizes?.[option.value] ?? '';
-                          return (
-                            <div
-                              key={option.value}
-                              className="flex flex-col gap-3 rounded-md border border-gray-200 p-3 md:flex-row md:items-center md:justify-between"
-                            >
-                              <label className="flex items-center gap-2 text-sm text-gray-700">
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() =>
-                                    setSizeSelection(activeColor, option.value, !isSelected)
-                                  }
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                {option.label}
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                inputMode="numeric"
-                                pattern="[0-9]*"
-                                value={currentValue}
-                                onChange={event =>
-                                  handleVariantQuantityChange(
-                                    activeColor,
-                                    option.value,
-                                    event.target.value
+                      <>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {sizeOptions.map(option => {
+                            const isSelected =
+                              Boolean(
+                                variantState[activeColor]?.sizes &&
+                                  Object.prototype.hasOwnProperty.call(
+                                    variantState[activeColor].sizes,
+                                    option.value
                                   )
+                              );
+                            const currentValue =
+                              variantState[activeColor]?.sizes?.[option.value] ?? '';
+
+                            return (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() =>
+                                  setSizeSelection(activeColor, option.value, !isSelected)
                                 }
-                                disabled={!isSelected}
-                                className="w-full rounded-md border border-gray-300 p-2 text-sm focus:border-blue-500 focus:outline-none md:w-32"
-                                placeholder="Cantidad"
-                              />
+                                className={`inline-flex items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium transition ${
+                                  isSelected
+                                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                                    : 'border-gray-200 bg-white text-gray-700'
+                                }`}
+                              >
+                                <span>{option.label}</span>
+                                {isSelected && currentValue !== '' && (
+                                  <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                    {currentValue}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {sizeOptions.some(option =>
+                          Boolean(
+                            variantState[activeColor]?.sizes &&
+                              Object.prototype.hasOwnProperty.call(
+                                variantState[activeColor].sizes,
+                                option.value
+                              )
+                          )
+                        ) && (
+                          <div className="mt-4 space-y-2">
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-400">
+                              Tallas activas
+                            </p>
+                            <div className="space-y-2">
+                              {sizeOptions
+                                .filter(option =>
+                                  Boolean(
+                                    variantState[activeColor]?.sizes &&
+                                      Object.prototype.hasOwnProperty.call(
+                                        variantState[activeColor].sizes,
+                                        option.value
+                                      )
+                                  )
+                                )
+                                .map(option => {
+                                  const currentValue =
+                                    variantState[activeColor]?.sizes?.[option.value] ?? '';
+
+                                  return (
+                                    <div
+                                      key={`active-${option.value}`}
+                                      className="grid grid-cols-[72px_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border border-blue-100 bg-blue-50/50 p-3"
+                                    >
+                                      <span className="text-sm font-semibold text-gray-700">
+                                        {option.label}
+                                      </span>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        value={currentValue}
+                                        onChange={event =>
+                                          handleVariantQuantityChange(
+                                            activeColor,
+                                            option.value,
+                                            event.target.value
+                                          )
+                                        }
+                                        className="w-full rounded-xl border border-gray-300 bg-white p-2 text-sm focus:border-blue-500 focus:outline-none"
+                                        placeholder="Cantidad"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSizeSelection(activeColor, option.value, false)
+                                        }
+                                        className="rounded-xl border border-transparent px-2 py-2 text-xs font-semibold text-red-500 transition hover:border-red-100 hover:bg-red-50"
+                                      >
+                                        Quitar
+                                      </button>
+                                    </div>
+                                  );
+                                })}
                             </div>
-                          );
-                        })}
-                      </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       <p className="mt-2 text-sm text-gray-500">
                         No hay tallas configuradas. Agrega tallas en Administrador de Categorias.
@@ -1061,6 +1185,8 @@ const EditProductPage = () => {
             </>
             )}
           </section>
+            )
+          })}
 
           <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
             <input
@@ -1084,6 +1210,13 @@ const EditProductPage = () => {
             />
           </label>
 
+          {renderAccordionSection({
+            id: 'images',
+            title: 'Imagenes',
+            description: 'Gestiona fotos actuales, nuevas cargas, portada y visibilidad interna.',
+            summary: `${existingImages.length + pendingImages.length} totales`,
+            children: (
+          <>
           <div>
             <h4 className="mb-2 text-sm font-semibold text-gray-700">Imagenes actuales</h4>
             <div className="space-y-4">
@@ -1184,17 +1317,42 @@ const EditProductPage = () => {
               </div>
             )}
           </div>
+          </>
+            )
+          })}
 
           <button
             type="submit"
             disabled={submitting}
-            className={`w-full rounded-md py-3 text-white font-semibold transition ${
+            className={`hidden w-full rounded-md py-3 text-white font-semibold transition md:block ${
               submitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             {submitting ? 'Guardando...' : 'Guardar cambios'}
           </button>
         </form>
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur md:hidden">
+        <div className="mx-auto flex max-w-5xl items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold text-slate-800">
+              {form.name || 'Producto sin nombre'}
+            </p>
+            <p className="text-xs text-slate-500">
+              {selectedColors.length} colores · {totalUnits} unidades · {existingImages.length + pendingImages.length} imagenes
+            </p>
+          </div>
+          <button
+            type="submit"
+            form="edit-product-form"
+            disabled={submitting}
+            className={`rounded-xl px-4 py-3 text-sm font-semibold text-white transition ${
+              submitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
+          >
+            {submitting ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
       </div>
     </div>
   );

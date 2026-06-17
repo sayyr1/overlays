@@ -6,6 +6,11 @@ const CategorySchema = new mongoose.Schema({
     type: Map,
     of: [String],
     default: {}
+  },
+  brandModels: {
+    type: Map,
+    of: [String],
+    default: {}
   }
 });
 

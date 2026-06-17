@@ -263,6 +263,10 @@ const ProductPage = () => {
   const inventoryEnabled = isModuleEnabled('inventory');
   const canEditProducts = hasPermission('products.edit');
   const canDeleteProducts = hasPermission('products.delete');
+  const canCreateProducts =
+    isModuleEnabled('products') &&
+    isModuleEnabled('categories') &&
+    hasPermission('products.create');
   const canAdjustInventory = hasPermission('inventory.adjust');
   const canViewInventory = hasPermission('inventory.view') || canAdjustInventory;
   const inventoryVisible = inventoryEnabled && canViewInventory;
@@ -894,7 +898,7 @@ const ProductPage = () => {
             </div>
 
             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-              <div className="md:hidden">
+              <div className={`md:hidden ${canCreateProducts ? 'grid grid-cols-2 gap-3' : ''}`}>
                 <button
                   type="button"
                   onClick={openFilterSheet}
@@ -905,6 +909,15 @@ const ProductPage = () => {
                     {hasActiveFilters ? `${activeFilterChips.length} activos` : 'Sin filtros'}
                   </span>
                 </button>
+                {canCreateProducts && (
+                  <button
+                    type="button"
+                    onClick={() => navigate('/crear-producto')}
+                    className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                  >
+                    Crear producto
+                  </button>
+                )}
               </div>
 
               <div className="hidden flex-1 gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
@@ -1426,26 +1439,30 @@ const ProductPage = () => {
             onClick={() => setIsFilterSheetOpen(false)}
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
           />
-          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] overflow-y-auto rounded-t-[28px] bg-white px-4 pb-6 pt-4 shadow-card-lg">
-            <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-200" />
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">Filtros</p>
-                <h3 className="mt-2 text-xl font-semibold text-slate-900">Navegacion movil</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  Marca, stock y atributos del catalogo en una sola vista.
-                </p>
+          <div className="absolute inset-x-0 bottom-0 max-h-[85vh] rounded-t-[28px] bg-white shadow-card-lg">
+            <div className="flex max-h-[85vh] flex-col">
+              <div className="px-4 pt-4">
+                <div className="mx-auto mb-4 h-1.5 w-14 rounded-full bg-slate-200" />
+                <div className="mb-4 flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.28em] text-slate-400">Filtros</p>
+                    <h3 className="mt-2 text-xl font-semibold text-slate-900">Navegacion movil</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Marca, stock y atributos del catalogo en una sola vista.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsFilterSheetOpen(false)}
+                    className="rounded-xl border border-surface-200 px-3 py-2 text-sm font-semibold text-slate-600"
+                  >
+                    Cerrar
+                  </button>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setIsFilterSheetOpen(false)}
-                className="rounded-xl border border-surface-200 px-3 py-2 text-sm font-semibold text-slate-600"
-              >
-                Cerrar
-              </button>
-            </div>
 
-            <div className="grid gap-4">
+              <div className="flex-1 overflow-y-auto px-4 pb-4">
+                <div className="grid gap-4">
               {renderSelect(
                 'Marca',
                 draftFilters.brand,
@@ -1573,30 +1590,34 @@ const ProductPage = () => {
                   ))}
                 </select>
               </label>
-            </div>
+                </div>
+              </div>
 
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  clearAllFilters();
-                  setIsFilterSheetOpen(false);
-                }}
-                className="rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
-              >
-                Limpiar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setStockFilter(draftStockFilter);
-                  setAdvancedFilters(draftFilters);
-                  setIsFilterSheetOpen(false);
-                }}
-                className="rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
-              >
-                Aplicar filtros
-              </button>
+              <div className="border-t border-surface-200 bg-white px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      clearAllFilters();
+                      setIsFilterSheetOpen(false);
+                    }}
+                    className="rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700"
+                  >
+                    Limpiar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStockFilter(draftStockFilter);
+                      setAdvancedFilters(draftFilters);
+                      setIsFilterSheetOpen(false);
+                    }}
+                    className="rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white"
+                  >
+                    Aplicar filtros
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

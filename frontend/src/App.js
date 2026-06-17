@@ -85,6 +85,7 @@ const AppContent = () => {
   );
   const isSuperAdminRoute = location.pathname.startsWith('/super-admin');
   const isBackofficeRoute = isOperationalAdminRoute || isSuperAdminRoute;
+  const isCreateProductRoute = location.pathname.startsWith('/crear-producto');
 
   const showNavbar = !hideNavbarRoutes.includes(location.pathname);
   const showStoreFooter = showNavbar && !isBackofficeRoute;
@@ -98,7 +99,9 @@ const AppContent = () => {
         tabIndex="-1"
         className={
           isOperationalAdminRoute
-            ? 'ml-0 md:ml-72 min-h-screen bg-surface-50 pb-24 md:pb-16 pt-28 md:pt-32 transition-all duration-200'
+            ? `ml-0 md:ml-72 min-h-screen bg-surface-50 pb-24 md:pb-16 ${
+                isCreateProductRoute ? 'pt-4 md:pt-8' : 'pt-28 md:pt-32'
+              } transition-all duration-200`
             : isSuperAdminRoute
               ? 'min-h-screen bg-surface-50'
               : 'min-h-screen content-surface'

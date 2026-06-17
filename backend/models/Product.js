@@ -30,7 +30,7 @@ const priceSchema = new mongoose.Schema({
 
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  code: { type: Number, unique: true, required: true },
+  code: { type: String, unique: true, required: true, trim: true },
   price: { type: priceSchema, required: true },
   description: String,
   brand: String,
@@ -102,4 +102,3 @@ const productSchema = new mongoose.Schema({
 });
 
 export default mongoose.model('Product', productSchema);
-

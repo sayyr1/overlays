@@ -8,6 +8,8 @@ const router = express.Router();
 router.use(requireModuleEnabled('categories'));
 
 const DEFAULT_KEYS = ['brand', 'type', 'size', 'collection', 'gender', 'color'];
+const normalizeEntry = value => String(value ?? '').trim();
+const uniqueStrings = values => Array.from(new Set(values.map(normalizeEntry).filter(Boolean)));
 
 const ensureCategoryDocument = async () => {
   let doc = await Category.findOne();
@@ -16,7 +18,7 @@ const ensureCategoryDocument = async () => {
     DEFAULT_KEYS.forEach(key => {
       valuesByKey[key] = [];
     });
-    doc = await Category.create({ valuesByKey });
+    doc = await Category.create({ valuesByKey, brandModels: {} });
     return doc;
   }
 
@@ -24,6 +26,19 @@ const ensureCategoryDocument = async () => {
   DEFAULT_KEYS.forEach(key => {
     if (!doc.valuesByKey.has(key)) {
       doc.valuesByKey.set(key, []);
+      updated = true;
+    }
+  });
+
+  if (!doc.brandModels) {
+    doc.brandModels = new Map();
+    updated = true;
+  }
+
+  const brands = doc.valuesByKey.get('brand') || [];
+  brands.forEach(brand => {
+    if (!doc.brandModels.has(brand)) {
+      doc.brandModels.set(brand, []);
       updated = true;
     }
   });
@@ -48,6 +63,26 @@ const mapDocToResponse = doc => {
   return response;
 };
 
+const mapBrandModelsToResponse = doc => {
+  const response = {};
+  const brandModels = doc?.brandModels instanceof Map
+    ? doc.brandModels
+    : new Map(Object.entries(doc?.brandModels || {}));
+
+  for (const [brand, models] of brandModels.entries()) {
+    response[brand] = uniqueStrings(Array.isArray(models) ? models : []);
+  }
+
+  const brands = doc?.valuesByKey?.get?.('brand') || [];
+  brands.forEach(brand => {
+    if (!Object.prototype.hasOwnProperty.call(response, brand)) {
+      response[brand] = [];
+    }
+  });
+
+  return response;
+};
+
 router.get('/', async (req, res) => {
   try {
     const doc = await ensureCategoryDocument();
@@ -58,10 +93,20 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/brand-models', async (req, res) => {
+  try {
+    const doc = await ensureCategoryDocument();
+    res.json(mapBrandModelsToResponse(doc));
+  } catch (error) {
+    console.error('Error al obtener modelos por marca:', error);
+    res.status(500).json({ message: 'Error al obtener modelos por marca' });
+  }
+});
+
 router.post('/', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key, value } = req.body || {};
-  const trimmedKey = (key ?? '').toString().trim();
-  const trimmedValue = (value ?? '').toString().trim();
+  const trimmedKey = normalizeEntry(key);
+  const trimmedValue = normalizeEntry(value);
 
   if (!trimmedKey || !trimmedValue) {
     return res.status(400).json({ message: 'Falta clave o valor' });
@@ -69,12 +114,15 @@ router.post('/', protect, adminOnly, requirePermission('categories', 'manage'), 
 
   try {
     const doc = await ensureCategoryDocument();
-    const current = doc.valuesByKey.get(trimmedKey) || [];
+    const current = uniqueStrings(doc.valuesByKey.get(trimmedKey) || []);
     if (!current.includes(trimmedValue)) {
       current.push(trimmedValue);
       doc.valuesByKey.set(trimmedKey, current);
-      await doc.save();
     }
+    if (trimmedKey === 'brand' && !doc.brandModels.has(trimmedValue)) {
+      doc.brandModels.set(trimmedValue, []);
+    }
+    await doc.save();
     res.json(mapDocToResponse(doc));
   } catch (error) {
     console.error('Error al agregar categoria:', error);
@@ -84,8 +132,8 @@ router.post('/', protect, adminOnly, requirePermission('categories', 'manage'), 
 
 router.delete('/', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key, value } = req.body || {};
-  const trimmedKey = (key ?? '').toString().trim();
-  const trimmedValue = (value ?? '').toString().trim();
+  const trimmedKey = normalizeEntry(key);
+  const trimmedValue = normalizeEntry(value);
 
   if (!trimmedKey || !trimmedValue) {
     return res.status(400).json({ message: 'Falta clave o valor' });
@@ -100,7 +148,10 @@ router.delete('/', protect, adminOnly, requirePermission('categories', 'manage')
       return res.status(404).json({ message: 'Valor no encontrado en la categoria' });
     }
 
-    doc.valuesByKey.set(trimmedKey, filtered);
+    doc.valuesByKey.set(trimmedKey, uniqueStrings(filtered));
+    if (trimmedKey === 'brand') {
+      doc.brandModels.delete(trimmedValue);
+    }
     await doc.save();
     res.json(mapDocToResponse(doc));
   } catch (error) {
@@ -111,7 +162,7 @@ router.delete('/', protect, adminOnly, requirePermission('categories', 'manage')
 
 router.post('/key', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key } = req.body || {};
-  const trimmedKey = (key ?? '').toString().trim();
+  const trimmedKey = normalizeEntry(key);
   if (!trimmedKey) {
     return res.status(400).json({ message: 'Falta el nombre de la clave' });
   }
@@ -130,7 +181,7 @@ router.post('/key', protect, adminOnly, requirePermission('categories', 'manage'
 
 router.delete('/key', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
   const { key } = req.body || {};
-  const trimmedKey = (key ?? '').toString().trim();
+  const trimmedKey = normalizeEntry(key);
   if (!trimmedKey) {
     return res.status(400).json({ message: 'Falta el nombre de la clave' });
   }
@@ -148,6 +199,68 @@ router.delete('/key', protect, adminOnly, requirePermission('categories', 'manag
   } catch (error) {
     console.error('Error al eliminar clave de categoria:', error);
     res.status(500).json({ message: 'Error al eliminar clave de categoria' });
+  }
+});
+
+router.post('/brand-models', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
+  const brand = normalizeEntry(req.body?.brand);
+  const model = normalizeEntry(req.body?.model);
+
+  if (!brand || !model) {
+    return res.status(400).json({ message: 'Marca y modelo son obligatorios' });
+  }
+
+  try {
+    const doc = await ensureCategoryDocument();
+    const brands = uniqueStrings(doc.valuesByKey.get('brand') || []);
+    if (!brands.includes(brand)) {
+      brands.push(brand);
+      doc.valuesByKey.set('brand', brands);
+    }
+
+    const types = uniqueStrings(doc.valuesByKey.get('type') || []);
+    if (!types.includes(model)) {
+      types.push(model);
+      doc.valuesByKey.set('type', types);
+    }
+
+    const currentModels = uniqueStrings(doc.brandModels.get(brand) || []);
+    if (!currentModels.includes(model)) {
+      currentModels.push(model);
+      doc.brandModels.set(brand, currentModels);
+    }
+
+    await doc.save();
+    res.json(mapBrandModelsToResponse(doc));
+  } catch (error) {
+    console.error('Error al agregar modelo por marca:', error);
+    res.status(500).json({ message: 'Error al agregar modelo por marca' });
+  }
+});
+
+router.delete('/brand-models', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
+  const brand = normalizeEntry(req.body?.brand);
+  const model = normalizeEntry(req.body?.model);
+
+  if (!brand || !model) {
+    return res.status(400).json({ message: 'Marca y modelo son obligatorios' });
+  }
+
+  try {
+    const doc = await ensureCategoryDocument();
+    const currentModels = uniqueStrings(doc.brandModels.get(brand) || []);
+    const filtered = currentModels.filter(item => item !== model);
+
+    if (filtered.length === currentModels.length) {
+      return res.status(404).json({ message: 'Modelo no encontrado para esta marca' });
+    }
+
+    doc.brandModels.set(brand, filtered);
+    await doc.save();
+    res.json(mapBrandModelsToResponse(doc));
+  } catch (error) {
+    console.error('Error al eliminar modelo por marca:', error);
+    res.status(500).json({ message: 'Error al eliminar modelo por marca' });
   }
 });
 

@@ -44,14 +44,24 @@ const getVariantPillClassName = qty => {
   return 'border border-surface-200 bg-white text-slate-700';
 };
 
+const getAdminGalleryPreviewImages = product => {
+  const publicImages = Array.isArray(product?.images) ? product.images : [];
+  if (publicImages.length) {
+    return publicImages;
+  }
+  return Array.isArray(product?.internalImages) ? product.internalImages : [];
+};
+
 const ProductDetailsPage = () => {
   const { isModuleEnabled, settings } = usePublicConfig();
   const { hasPermission } = useAuth();
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [error, setError] = useState('');
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false);
   const inventoryEnabled = isModuleEnabled('inventory') && hasPermission('inventory.view');
   const canViewProductInterest = isModuleEnabled('crm') && hasPermission('crm.productInterestView');
+  const canEditProducts = hasPermission('products.edit');
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
 
   useEffect(() => {
@@ -109,7 +119,30 @@ const ProductDetailsPage = () => {
 
   const publicImages = Array.isArray(product?.images) ? product.images : [];
   const internalImages = Array.isArray(product?.internalImages) ? product.internalImages : [];
+  const galleryPreviewImages = getAdminGalleryPreviewImages(product);
   const coverImageId = publicImages[0]?.public_id || publicImages[0]?.url || '';
+  const isStorePublic = product?.storeVisibility === 'public';
+
+  const handleStoreVisibilityChange = async nextVisibility => {
+    if (!canEditProducts || !product || nextVisibility === product.storeVisibility) {
+      return;
+    }
+
+    setIsUpdatingVisibility(true);
+    try {
+      const { data } = await axios.put(
+        `/api/products/${product._id}`,
+        { storeVisibility: nextVisibility },
+        { withCredentials: true }
+      );
+      setProduct(data);
+    } catch (requestError) {
+      console.error('No se pudo actualizar la visibilidad del producto', requestError);
+      window.alert('No se pudo actualizar la visibilidad del producto.');
+    } finally {
+      setIsUpdatingVisibility(false);
+    }
+  };
 
   if (error) {
     return (
@@ -142,12 +175,21 @@ const ProductDetailsPage = () => {
                 )}
                 <span
                   className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                    isStorePublic
+                      ? 'border border-sky-200 bg-sky-50 text-sky-700'
+                      : 'border border-slate-200 bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  {isStorePublic ? 'Producto publico' : 'Producto interno'}
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-semibold ${
                     product.storeReady
                       ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
                       : 'border border-amber-200 bg-amber-50 text-amber-700'
                   }`}
                 >
-                  {product.storeReady ? 'Visible en tienda' : 'Oculto en tienda'}
+                  {product.storeReady ? 'Listo para tienda' : 'No visible en tienda'}
                 </span>
                 {product.onSale && (
                   <span className="rounded-full border border-fuchsia-200 bg-fuchsia-50 px-3 py-1 text-xs font-semibold text-fuchsia-700">
@@ -168,6 +210,47 @@ const ProductDetailsPage = () => {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2 xl:w-[420px]">
+              <div className="rounded-2xl border border-surface-200 bg-white px-4 py-4 shadow-sm sm:col-span-2">
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Visibilidad de tienda</p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      El producto nace como interno. Solo saldra en tienda cuando lo marques publico.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { value: 'internal', label: 'Interno', helper: 'Solo inventario' },
+                      { value: 'public', label: 'Publico', helper: 'Puede salir en tienda' }
+                    ].map(option => {
+                      const isActive = product.storeVisibility === option.value;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          disabled={!canEditProducts || isUpdatingVisibility}
+                          onClick={() => handleStoreVisibilityChange(option.value)}
+                          className={`rounded-2xl border px-4 py-3 text-left transition ${
+                            isActive
+                              ? 'border-brand bg-brand/5 text-brand'
+                              : 'border-surface-200 bg-surface-50 text-slate-600'
+                          } disabled:cursor-not-allowed disabled:opacity-60`}
+                        >
+                          <p className="text-sm font-semibold">{option.label}</p>
+                          <p className="mt-1 text-xs text-slate-500">{option.helper}</p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    {product.storeReady
+                      ? 'Este producto ya puede mostrarse en la tienda publica.'
+                      : isStorePublic
+                        ? 'Aun falta al menos una foto de tipo tienda para que se publique.'
+                        : 'Mientras siga interno, no aparecera en la tienda publica.'}
+                  </p>
+                </div>
+              </div>
               <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
                 <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Retail</p>
                 <p className="mt-1 text-xl font-semibold text-slate-900">
@@ -224,8 +307,8 @@ const ProductDetailsPage = () => {
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-3">
-              {publicImages.length ? (
-                publicImages.map(image => {
+              {galleryPreviewImages.length ? (
+                galleryPreviewImages.map(image => {
                   const imageKey = image.public_id || image.url;
                   const isCover = imageKey === coverImageId;
 
@@ -234,9 +317,14 @@ const ProductDetailsPage = () => {
                     key={imageKey}
                     className="relative overflow-hidden rounded-3xl border border-surface-200 bg-surface-50"
                   >
-                    {isCover && (
+                    {isCover && publicImages.length > 0 && (
                       <span className="absolute left-3 top-3 z-10 rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
                         Portada tienda
+                      </span>
+                    )}
+                    {!publicImages.length && (
+                      <span className="absolute left-3 top-3 z-10 rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white shadow-sm">
+                        Interna
                       </span>
                     )}
                     <ProductImage
@@ -249,7 +337,7 @@ const ProductDetailsPage = () => {
                 })
               ) : (
                 <div className="col-span-full rounded-2xl border border-dashed border-surface-200 bg-surface-50 px-4 py-10 text-center text-sm text-slate-500">
-                  Este producto no tiene fotos publicas cargadas.
+                  Este producto no tiene imagenes cargadas.
                 </div>
               )}
             </div>

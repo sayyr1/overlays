@@ -526,15 +526,6 @@ const EditProductPage = () => {
       const uploadedImages = canUploadImages ? await uploadNewImages(orderedPendingImages) : [];
       let images = sortImagesForPayload([...existingImages, ...uploadedImages], imageVisibilityEnabled);
 
-      if (
-        imageVisibilityEnabled &&
-        images.length > 0 &&
-        !images.some(image => image.visibility !== 'internal')
-      ) {
-        window.alert('Mantén al menos una foto publica para la tienda o elimina las fotos internas.');
-        setSubmitting(false);
-        return;
-      }
 
       if (coverImageKey) {
         images = makeImageCover(images, coverImageKey, imageVisibilityEnabled);

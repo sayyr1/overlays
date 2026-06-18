@@ -28,6 +28,43 @@ const priceSchema = new mongoose.Schema({
   }
 }, { _id: false });
 
+const saleHistorySchema = new mongoose.Schema({
+  soldAt: {
+    type: Date,
+    default: Date.now
+  },
+  color: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  size: {
+    type: String,
+    trim: true,
+    required: true
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1
+  },
+  unitPrice: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  total: {
+    type: Number,
+    required: true,
+    min: 0
+  },
+  priceSource: {
+    type: String,
+    enum: ['retail', 'manual'],
+    default: 'retail'
+  }
+}, { _id: false });
+
 const productSchema = new mongoose.Schema({
   name: { type: String, required: true },
   code: { type: String, unique: true, required: true, trim: true },
@@ -85,6 +122,10 @@ const productSchema = new mongoose.Schema({
     of: Number,
     default: () => new Map()
   },
+  saleHistory: {
+    type: [saleHistorySchema],
+    default: () => []
+  },
   lastSoldAt: { type: Date },
   images: [{
     url: { type: String, required: true },
@@ -95,6 +136,11 @@ const productSchema = new mongoose.Schema({
       default: 'public'
     }
   }],
+  storeVisibility: {
+    type: String,
+    enum: ['public', 'internal'],
+    default: 'internal'
+  },
   onSale: { type: Boolean, default: false }
 }, {
   timestamps: true,

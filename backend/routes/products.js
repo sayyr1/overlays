@@ -198,6 +198,9 @@ const isInternalUser = user => Boolean(
 const normalizeImageVisibility = visibility =>
   visibility === 'internal' ? 'internal' : 'public';
 
+const normalizeStoreVisibility = visibility =>
+  visibility === 'public' ? 'public' : 'internal';
+
 const parseImagesPayload = images =>
   (Array.isArray(images) ? images : [])
     .filter(image => image?.url && image?.public_id)
@@ -221,6 +224,94 @@ const splitProductImages = (images, imageVisibilityEnabled) => {
     publicImages: normalizedImages.filter(image => image.visibility !== 'internal'),
     internalImages: normalizedImages.filter(image => image.visibility === 'internal')
   };
+};
+
+const isStorefrontReadyProduct = (product, imageVisibilityEnabled = false) => {
+  const storeVisibility = normalizeStoreVisibility(product?.storeVisibility);
+  if (storeVisibility !== 'public') {
+    return false;
+  }
+
+  const { publicImages } = splitProductImages(product?.images, imageVisibilityEnabled);
+  return publicImages.length > 0;
+};
+
+const pushSaleHistoryEntry = (product, sale) => {
+  if (!Array.isArray(product.saleHistory)) {
+    product.saleHistory = [];
+  }
+
+  const quantity = Number(sale?.quantity || 0);
+  const unitPrice = Number(sale?.unitPrice || 0);
+  if (!Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(unitPrice) || unitPrice < 0) {
+    return;
+  }
+
+  product.saleHistory.push({
+    soldAt: sale?.soldAt || new Date(),
+    color: normalizeVariantColor(sale?.color),
+    size: normalizeVariantSize(sale?.size),
+    quantity,
+    unitPrice,
+    total: Number((quantity * unitPrice).toFixed(2)),
+    priceSource: sale?.priceSource === 'manual' ? 'manual' : 'retail'
+  });
+};
+
+const buildProductSalesRecords = product => {
+  const records = [];
+  const trackedBySize = new Map();
+  const history = Array.isArray(product?.saleHistory) ? product.saleHistory : [];
+
+  history.forEach(entry => {
+    const quantity = Number(entry?.quantity || 0);
+    const unitPrice = Number(entry?.unitPrice || 0);
+    const size = normalizeVariantSize(entry?.size);
+    if (!quantity || !size || !Number.isFinite(unitPrice) || unitPrice < 0) {
+      return;
+    }
+
+    trackedBySize.set(size, Number(trackedBySize.get(size) || 0) + quantity);
+    records.push({
+      name: product.name,
+      code: product.code,
+      color: normalizeVariantColor(entry?.color),
+      size,
+      quantity,
+      price: Number(unitPrice.toFixed(2)),
+      total: Number((Number(entry?.total) || quantity * unitPrice).toFixed(2)),
+      lastSoldAt: entry?.soldAt || product.lastSoldAt,
+      priceSource: entry?.priceSource === 'manual' ? 'manual' : 'retail',
+      isLegacy: false
+    });
+  });
+
+  const priceRetail = Number(product?.price?.retail ?? 0);
+  const soldBySize = ensureMap(product?.soldBySize);
+  soldBySize.forEach((rawQuantity, rawSize) => {
+    const size = normalizeVariantSize(rawSize);
+    const soldQuantity = Number(rawQuantity || 0);
+    const trackedQuantity = Number(trackedBySize.get(size) || 0);
+    const remaining = soldQuantity - trackedQuantity;
+    if (!size || remaining <= 0) {
+      return;
+    }
+
+    records.push({
+      name: product.name,
+      code: product.code,
+      color: DEFAULT_COLOR_LABEL,
+      size,
+      quantity: remaining,
+      price: Number(priceRetail.toFixed(2)),
+      total: Number((remaining * priceRetail).toFixed(2)),
+      lastSoldAt: product.lastSoldAt,
+      priceSource: 'retail',
+      isLegacy: true
+    });
+  });
+
+  return records;
 };
 
 const formatProduct = (product, options = {}) => {
@@ -270,6 +361,8 @@ const formatProduct = (product, options = {}) => {
     plain.images,
     imageVisibilityEnabled
   );
+  const storeVisibility = normalizeStoreVisibility(plain.storeVisibility);
+  const storeReady = storeVisibility === 'public' && publicImages.length > 0;
 
   return {
     ...plain,
@@ -284,7 +377,8 @@ const formatProduct = (product, options = {}) => {
     internalImages: includeInternalImages ? internalImages : [],
     publicImageCount: publicImages.length,
     internalImageCount: internalImages.length,
-    storeReady: publicImages.length > 0,
+    storeVisibility,
+    storeReady,
     imageVisibilityEnabled: Boolean(imageVisibilityEnabled),
     stockBySize: stockBySizePlain,
     stockByColorSize: stockByColorSizePlain,
@@ -312,6 +406,7 @@ const getStorefrontVisibilityFilter = includeInternalImages =>
   includeInternalImages
     ? {}
     : {
+        storeVisibility: 'public',
         images: {
           $elemMatch: {
             visibility: { $ne: 'internal' }
@@ -512,7 +607,7 @@ router.get('/:id', optionalProtect, async (req, res) => {
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
     const formatted = formatProduct(product, imageContext);
-    if (!imageContext.includeInternalImages && !formatted.images.length) {
+    if (!imageContext.includeInternalImages && !isStorefrontReadyProduct(product, imageContext.imageVisibilityEnabled)) {
       return res.status(404).json({ message: 'Producto no disponible en tienda' });
     }
     res.json(formatted);
@@ -553,6 +648,7 @@ router.get('/:id', optionalProtect, async (req, res) => {
         ...image,
         visibility: imageVisibilityEnabled ? image.visibility : 'public'
       }));
+      payload.storeVisibility = normalizeStoreVisibility(req.body.storeVisibility);
       payload.stockByColorSize = stockByColorSizeMap;
       payload.stockBySize = aggregatedBySize;
 
@@ -621,7 +717,7 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
       product.colors = incomingColors;
     }
 
-    const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'type', 'collection', 'gender', 'onSale', 'images', 'attributes'];
+    const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'type', 'collection', 'gender', 'onSale', 'images', 'attributes', 'storeVisibility'];
     fieldsToUpdate.forEach(field => {
       if (req.body[field] !== undefined) {
         product[field] = field === 'images'
@@ -629,6 +725,8 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
               ...image,
               visibility: imageVisibilityEnabled ? image.visibility : 'public'
             }))
+          : field === 'storeVisibility'
+            ? normalizeStoreVisibility(req.body.storeVisibility)
           : req.body[field];
       }
     });
@@ -755,10 +853,11 @@ router.post('/order/:id', protect, adminOnly, requireModuleEnabled('inventory'),
 
 router.post('/sell/:id', protect, adminOnly, requireModuleEnabled('inventory'), requirePermission('inventory', 'adjust'), async (req, res) => {
   try {
-    const { color, size, quantity } = req.body || {};
+    const { color, size, quantity, salePriceMode, manualSalePrice } = req.body || {};
     const normalizedSize = normalizeVariantSize(size);
     const normalizedColor = normalizeVariantColor(color);
     const qty = Number(quantity);
+    const priceMode = salePriceMode === 'manual' ? 'manual' : 'retail';
 
     if (!normalizedSize || !Number.isFinite(qty) || qty <= 0) {
       return res.status(400).json({ message: 'Datos invalidos' });
@@ -767,6 +866,14 @@ router.post('/sell/:id', protect, adminOnly, requireModuleEnabled('inventory'), 
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    const resolvedRetailPrice = Number(product.price?.retail ?? 0);
+    const resolvedManualSalePrice = Number(manualSalePrice);
+    const unitSalePrice = priceMode === 'manual' ? resolvedManualSalePrice : resolvedRetailPrice;
+
+    if (!Number.isFinite(unitSalePrice) || unitSalePrice < 0) {
+      return res.status(400).json({ message: 'Precio de venta invalido' });
     }
 
     const stockByColorSize = ensureMap(product.stockByColorSize);
@@ -804,11 +911,23 @@ router.post('/sell/:id', protect, adminOnly, requireModuleEnabled('inventory'), 
     adjustMapValue(soldByColorSize, chosenKey, qty);
     adjustMapValue(soldBySize, normalizedSize, qty);
 
-    product.lastSoldAt = new Date();
+    const soldAt = new Date();
+    const { color: chosenColor } = splitVariantKey(chosenKey);
+    pushSaleHistoryEntry(product, {
+      soldAt,
+      color: chosenColor,
+      size: normalizedSize,
+      quantity: qty,
+      unitPrice: unitSalePrice,
+      priceSource: priceMode
+    });
+
+    product.lastSoldAt = soldAt;
     product.markModified('stockByColorSize');
     product.markModified('stockBySize');
     product.markModified('soldByColorSize');
     product.markModified('soldBySize');
+    product.markModified('saleHistory');
 
     await product.save();
     res.json({ message: 'Venta registrada con exito' });
@@ -867,11 +986,23 @@ router.post('/confirm/:id', protect, adminOnly, requireModuleEnabled(['inventory
     adjustMapValue(soldByColorSize, chosenKey, qty);
     adjustMapValue(soldBySize, normalizedSize, qty);
 
-    product.lastSoldAt = new Date();
+    const soldAt = new Date();
+    const { color: chosenColor } = splitVariantKey(chosenKey);
+    pushSaleHistoryEntry(product, {
+      soldAt,
+      color: chosenColor,
+      size: normalizedSize,
+      quantity: qty,
+      unitPrice: Number(product.price?.retail ?? 0),
+      priceSource: 'retail'
+    });
+
+    product.lastSoldAt = soldAt;
     product.markModified('reservedByColorSize');
     product.markModified('reservedBySize');
     product.markModified('soldByColorSize');
     product.markModified('soldBySize');
+    product.markModified('saleHistory');
 
     await product.save();
     res.json({ message: 'Pedido confirmado y registrado como venta' });
@@ -883,21 +1014,7 @@ router.post('/confirm/:id', protect, adminOnly, requireModuleEnabled(['inventory
 router.get('/summary/sales', protect, adminOnly, requireModuleEnabled('reports'), requirePermission('reports', 'view'), async (req, res) => {
   try {
     const products = await Product.find();
-    const resumen = [];
-    products.forEach(prod => {
-      for (const [size, quantity] of prod.soldBySize.entries()) {
-        const priceRetail = parseFloat(prod.price?.retail ?? 0);
-        resumen.push({
-          name: prod.name,
-          code: prod.code,
-          size,
-          quantity,
-          price: priceRetail.toFixed(2),
-          total: (priceRetail * quantity).toFixed(2),
-          lastSoldAt: prod.lastSoldAt
-        });
-      }
-    });
+    const resumen = products.flatMap(prod => buildProductSalesRecords(prod));
     res.json(resumen);
   } catch {
     res.status(500).json({ message: 'Error al generar resumen' });
@@ -909,6 +1026,8 @@ router.post('/reset-sales', protect, adminOnly, requireModuleEnabled('reports'),
     const products = await Product.find();
     for (const prod of products) {
       prod.soldBySize = new Map();
+      prod.soldByColorSize = new Map();
+      prod.saleHistory = [];
       prod.lastSoldAt = null;
       await prod.save();
     }
@@ -934,39 +1053,42 @@ router.get('/analytics/overview', protect, adminOnly, requireModuleEnabled('repo
     const topProductsAccumulator = [];
 
     products.forEach(product => {
-      const priceRetail = Number(product.price?.retail ?? 0);
-      let unitsSold = 0;
-      for (const quantity of product.soldBySize.values()) {
-        unitsSold += quantity;
-      }
-      if (unitsSold === 0) return;
+      const salesRecords = buildProductSalesRecords(product);
+      if (!salesRecords.length) return;
 
-      const revenue = unitsSold * priceRetail;
+      const unitsSold = salesRecords.reduce((acc, item) => acc + Number(item.quantity || 0), 0);
+      const revenue = salesRecords.reduce((acc, item) => acc + Number(item.total || 0), 0);
+      const latestSaleAt = salesRecords.reduce((latest, item) => {
+        const timestamp = item.lastSoldAt ? new Date(item.lastSoldAt).getTime() : 0;
+        return timestamp > latest ? timestamp : latest;
+      }, 0);
+
       totalRevenue += revenue;
       totalUnits += unitsSold;
       topProductsAccumulator.push({
         name: product.name,
         units: unitsSold,
         revenue,
-        lastSoldAt: product.lastSoldAt
+        lastSoldAt: latestSaleAt ? new Date(latestSaleAt) : product.lastSoldAt
       });
 
-      if (product.lastSoldAt) {
-        const soldDate = new Date(product.lastSoldAt);
+      salesRecords.forEach(item => {
+        if (!item.lastSoldAt) return;
+        const soldDate = new Date(item.lastSoldAt);
         const dateKey = soldDate.toISOString().slice(0, 10);
         if (!dateBucket[dateKey]) {
           dateBucket[dateKey] = { units: 0, revenue: 0 };
         }
-        dateBucket[dateKey].units += unitsSold;
-        dateBucket[dateKey].revenue += revenue;
+        dateBucket[dateKey].units += Number(item.quantity || 0);
+        dateBucket[dateKey].revenue += Number(item.total || 0);
 
         if (soldDate.toDateString() === today.toDateString()) {
-          revenueToday += revenue;
+          revenueToday += Number(item.total || 0);
         }
         if (soldDate >= sevenDaysAgo) {
-          revenue7Days += revenue;
+          revenue7Days += Number(item.total || 0);
         }
-      }
+      });
     });
 
     const dailySeries = [];

@@ -24,6 +24,21 @@ const ensureMap = value => {
 
 const clampQuantity = quantity => Math.min(Math.max(quantity, 1), 99);
 
+const normalizeImageVisibility = visibility =>
+  visibility === 'internal' ? 'internal' : 'public';
+
+const normalizeStoreVisibility = visibility =>
+  visibility === 'public' ? 'public' : 'internal';
+
+const isStorefrontReadyProduct = product => {
+  if (normalizeStoreVisibility(product?.storeVisibility) !== 'public') {
+    return false;
+  }
+
+  const images = Array.isArray(product?.images) ? product.images : [];
+  return images.some(image => normalizeImageVisibility(image?.visibility) !== 'internal');
+};
+
 const resolvePriceForMembership = (product, membershipLevel = 'STANDARD') => {
   const normalized = membershipLevel.toUpperCase();
   const price = product.price || {};
@@ -93,7 +108,7 @@ export const addItemToCart = async (req, res) => {
   }
 
   const product = await Product.findById(productId).lean();
-  if (!product) {
+  if (!product || !isStorefrontReadyProduct(product)) {
     return res.status(404).json({ message: 'Product not found' });
   }
 
@@ -253,7 +268,7 @@ export const mergeCart = async (req, res) => {
     if (!guestItem?.productId) continue;
 
     const product = await Product.findById(guestItem.productId).lean();
-    if (!product) continue;
+    if (!product || !isStorefrontReadyProduct(product)) continue;
 
     const normalizedSize = normalizeVariantSize(guestItem.size || '');
     const normalizedColor = normalizeVariantColor(guestItem.color);

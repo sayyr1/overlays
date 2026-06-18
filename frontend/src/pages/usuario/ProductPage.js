@@ -58,6 +58,14 @@ const QUICK_VIEWS = [
   { value: 'missing-brand', label: 'Sin marca' }
 ];
 
+const MOBILE_INVENTORY_VIEWS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'store', label: 'Tienda' },
+  { value: 'internal', label: 'Internas' },
+  { value: 'low', label: 'Stock bajo' },
+  { value: 'promo', label: 'Promos' }
+];
+
 const normalizeText = value => String(value || '').trim().toLowerCase();
 
 const formatAttributeKey = key =>
@@ -158,6 +166,11 @@ const formatCurrency = amount =>
     maximumFractionDigits: 2
   }).format(Number(amount || 0));
 
+const getAdminPreviewImage = product =>
+  product?.images?.[0]?.url ||
+  product?.internalImages?.[0]?.url ||
+  '';
+
 const buildInventorySummary = product => {
   const matrix = buildVariantMatrix(product);
   const colorLabelMap = getColorLabelMap(product);
@@ -257,6 +270,7 @@ const ProductPage = () => {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isMobileSummaryExpanded, setIsMobileSummaryExpanded] = useState(false);
   const [expandedMobileActionId, setExpandedMobileActionId] = useState(null);
+  const [mobileInventoryView, setMobileInventoryView] = useState('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -303,13 +317,25 @@ const ProductPage = () => {
       mode,
       color: defaults.color,
       size: defaults.size,
-      quantity: 1
+      quantity: '1',
+      salePriceMode: 'retail',
+      manualSalePrice: ''
     });
   };
 
   const handleModalSubmit = async () => {
-    const { product, mode, color, size, quantity } = modalData || {};
-    if (!product || !color || !size || Number.isNaN(quantity) || quantity <= 0) {
+    const {
+      product,
+      mode,
+      color,
+      size,
+      quantity,
+      salePriceMode,
+      manualSalePrice
+    } = modalData || {};
+    const numericQuantity = Number(quantity);
+
+    if (!product || !color || !size || Number.isNaN(numericQuantity) || numericQuantity <= 0) {
       alert('Datos invalidos');
       return;
     }
@@ -320,14 +346,32 @@ const ProductPage = () => {
       alert('No hay stock disponible para la combinacion seleccionada.');
       return;
     }
-    if (quantity > available) {
+    if (numericQuantity > available) {
       alert(`Solo hay ${available} unidades disponibles.`);
       return;
     }
 
     const url = `/api/products/${mode}/${product._id}`;
+    const payload = { color, size, quantity: numericQuantity };
+
+    if (mode === 'sell') {
+      const numericManualSalePrice = Number(manualSalePrice);
+      if (
+        salePriceMode === 'manual' &&
+        (Number.isNaN(numericManualSalePrice) || numericManualSalePrice < 0)
+      ) {
+        alert('Ingresa un precio manual valido.');
+        return;
+      }
+
+      payload.salePriceMode = salePriceMode === 'manual' ? 'manual' : 'retail';
+      if (payload.salePriceMode === 'manual') {
+        payload.manualSalePrice = Number(numericManualSalePrice.toFixed(2));
+      }
+    }
+
     try {
-      await axios.post(url, { color, size, quantity }, { withCredentials: true });
+      await axios.post(url, payload, { withCredentials: true });
       alert(mode === 'order' ? 'Pedido registrado' : 'Venta registrada');
       fetchProducts();
       setModalData(null);
@@ -576,8 +620,41 @@ const ProductPage = () => {
       return true;
     };
 
+    const matchesMobileInventoryView = item => {
+      if (mobileInventoryView === 'all') {
+        return true;
+      }
+
+      if (mobileInventoryView === 'store') {
+        return Boolean(item.product.storeReady);
+      }
+
+      if (mobileInventoryView === 'internal') {
+        return !item.product.storeReady;
+      }
+
+      if (mobileInventoryView === 'low') {
+        return item.inventory.totalUnits > 0 && (
+          item.inventory.totalUnits <= LOW_STOCK_THRESHOLD ||
+          item.inventory.lowStockVariants.length > 0
+        );
+      }
+
+      if (mobileInventoryView === 'promo') {
+        return Boolean(item.product.onSale);
+      }
+
+      return true;
+    };
+
     return catalogItems
-      .filter(item => matchesSearch(item) && matchesStockFilter(item) && matchesAdvancedFilters(item))
+      .filter(
+        item =>
+          matchesSearch(item) &&
+          matchesStockFilter(item) &&
+          matchesAdvancedFilters(item) &&
+          matchesMobileInventoryView(item)
+      )
       .sort((left, right) => {
         if (sortBy === 'name') {
           return (left.product.name || '').localeCompare(right.product.name || '');
@@ -603,7 +680,7 @@ const ProductPage = () => {
 
         return rightRiskScore - leftRiskScore;
       });
-  }, [advancedFilters, catalogItems, inventoryVisible, searchTerm, sortBy, stockFilter]);
+  }, [advancedFilters, catalogItems, inventoryVisible, mobileInventoryView, searchTerm, sortBy, stockFilter]);
 
   const catalogStats = useMemo(() => {
     const totalCount = catalogItems.length;
@@ -757,6 +834,32 @@ const ProductPage = () => {
     return false;
   };
 
+  const getMobileInventoryViewCount = view => {
+    if (view === 'all') {
+      return catalogItems.length;
+    }
+    if (view === 'store') {
+      return catalogItems.filter(item => item.product.storeReady).length;
+    }
+    if (view === 'internal') {
+      return catalogItems.filter(item => !item.product.storeReady).length;
+    }
+    if (view === 'low') {
+      return catalogItems.filter(
+        item =>
+          item.inventory.totalUnits > 0 &&
+          (
+            item.inventory.totalUnits <= LOW_STOCK_THRESHOLD ||
+            item.inventory.lowStockVariants.length > 0
+          )
+      ).length;
+    }
+    if (view === 'promo') {
+      return catalogItems.filter(item => item.product.onSale).length;
+    }
+    return 0;
+  };
+
   const renderSelect = (label, value, onChange, options, placeholder, disabled = false) => (
     <label className="block">
       <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -815,20 +918,20 @@ const ProductPage = () => {
                     className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3"
                   >
                     <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
-                    <p className="mt-1 text-2xl font-semibold text-slate-900">{item.value}</p>
+                    <p className="mt-1 text-xl font-semibold text-slate-900">{item.value}</p>
                   </div>
                 ))}
               </div>
 
               {isMobileSummaryExpanded && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="flex gap-2 overflow-x-auto pb-1">
                   {mobileSecondaryStats.map(item => (
                     <div
                       key={item.label}
-                      className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3"
+                      className="min-w-[122px] rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3"
                     >
                       <p className="text-[10px] uppercase tracking-[0.22em] text-slate-400">{item.label}</p>
-                      <p className="mt-1 text-xl font-semibold text-slate-900">{item.value}</p>
+                      <p className="mt-1 text-lg font-semibold text-slate-900">{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -837,9 +940,9 @@ const ProductPage = () => {
               <button
                 type="button"
                 onClick={() => setIsMobileSummaryExpanded(prev => !prev)}
-                className="w-full rounded-2xl border border-surface-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
+                className="inline-flex items-center justify-center rounded-full border border-surface-200 bg-white px-4 py-2 text-xs font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand"
               >
-                {isMobileSummaryExpanded ? 'Ocultar resumen' : 'Ver mas resumen'}
+                {isMobileSummaryExpanded ? 'Ver menos' : 'Ver resumen completo'}
               </button>
             </div>
 
@@ -880,7 +983,7 @@ const ProductPage = () => {
 
         <section className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm lg:p-5">
           <div className="space-y-4">
-            <div className="flex gap-2 overflow-x-auto pb-1">
+            <div className="hidden gap-2 overflow-x-auto pb-1 md:flex">
               {QUICK_VIEWS.map(view => (
                 <button
                   key={view.value}
@@ -898,29 +1001,100 @@ const ProductPage = () => {
             </div>
 
             <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-              <div className={`md:hidden ${canCreateProducts ? 'grid grid-cols-2 gap-3' : ''}`}>
-                <button
-                  type="button"
-                  onClick={openFilterSheet}
-                  className="w-full rounded-2xl border border-surface-200 bg-white px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
-                >
-                  Filtros y marcas
-                  <span className="ml-2 text-slate-400">
-                    {hasActiveFilters ? `${activeFilterChips.length} activos` : 'Sin filtros'}
-                  </span>
-                </button>
-                {canCreateProducts && (
+              <div className="space-y-3 md:hidden">
+                <div className="flex gap-2 overflow-x-auto pb-1">
+                  {MOBILE_INVENTORY_VIEWS.map(view => (
+                    <button
+                      key={view.value}
+                      type="button"
+                      onClick={() => setMobileInventoryView(view.value)}
+                      className={`inline-flex items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-xs font-semibold transition ${
+                        mobileInventoryView === view.value
+                          ? 'bg-slate-950 text-white'
+                          : 'border border-surface-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      <span>{view.label}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${
+                        mobileInventoryView === view.value ? 'bg-white/15 text-white' : 'bg-surface-100 text-slate-500'
+                      }`}>
+                        {getMobileInventoryViewCount(view.value)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className={`${canCreateProducts ? 'grid grid-cols-[minmax(0,1fr)_auto] gap-3' : ''}`}>
                   <button
                     type="button"
-                    onClick={() => navigate('/crear-producto')}
-                    className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                    onClick={openFilterSheet}
+                    className="w-full rounded-2xl border border-surface-200 bg-white px-4 py-2.5 text-left text-sm font-semibold text-slate-700 transition hover:border-brand/30 hover:text-brand"
                   >
-                    Crear producto
+                    <span>Filtros</span>
+                    <span className="ml-2 text-xs text-slate-400">
+                      {hasActiveFilters ? `${activeFilterChips.length} activos` : 'Sin filtros'}
+                    </span>
                   </button>
+                  {canCreateProducts && (
+                    <button
+                      type="button"
+                      onClick={() => navigate('/crear-producto')}
+                      className="whitespace-nowrap rounded-2xl bg-brand px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-dark"
+                    >
+                      Nuevo
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
+                  <select
+                    value={sortBy}
+                    onChange={event => setSortBy(event.target.value)}
+                    className="rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                  >
+                    {SORT_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={fetchProducts}
+                    className="rounded-2xl border border-surface-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand"
+                  >
+                    Actualizar
+                  </button>
+                </div>
+
+                {(hasActiveFilters || searchTerm) && (
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <span className="rounded-full bg-surface-100 px-3 py-1.5 font-semibold text-slate-500">
+                      {filteredProducts.length} visibles
+                    </span>
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={clearAllFilters}
+                        className="rounded-full border border-surface-200 bg-white px-3 py-1.5 font-semibold text-slate-600 transition hover:border-brand/30 hover:text-brand"
+                      >
+                        Limpiar filtros
+                      </button>
+                    )}
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => navigate('/dashboard')}
+                        className="rounded-full bg-brand/10 px-3 py-1.5 font-semibold text-brand transition hover:bg-brand/20"
+                      >
+                        Limpiar busqueda
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
-              <div className="hidden flex-1 gap-3 md:grid md:grid-cols-2 xl:grid-cols-4">
+              <div className="hidden md:grid md:flex-1 md:grid-cols-2 md:gap-3 xl:grid-cols-4">
                 {renderSelect(
                   'Marca',
                   advancedFilters.brand,
@@ -1050,7 +1224,7 @@ const ProductPage = () => {
                 </label>
               </div>
 
-              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center xl:justify-end">
+              <div className="hidden md:flex md:flex-col md:gap-3 lg:flex-row lg:flex-wrap lg:items-center xl:justify-end">
                 <select
                   value={sortBy}
                   onChange={event => setSortBy(event.target.value)}
@@ -1105,29 +1279,32 @@ const ProductPage = () => {
                 ))}
               </div>
             )}
+
           </div>
         </section>
 
         {filteredProducts.length ? (
           <>
-            <div className="grid grid-cols-1 gap-4 md:hidden">
+            <div className="grid grid-cols-1 gap-3 md:hidden">
               {filteredProducts.map(({ product, inventory }) => {
                 const inventoryMeta = getInventoryHealthMeta(inventory);
                 const showExpandedActions = expandedMobileActionId === product._id;
+                const mobilePreviewVariants = inventory.previewVariants.slice(0, 2);
+                const remainingVariantCount = Math.max(inventory.previewVariants.length - mobilePreviewVariants.length, 0);
 
                 return (
-                  <article key={product._id} className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm">
-                    <div className="flex items-start gap-4">
-                      <div className="h-20 w-20 flex-none overflow-hidden rounded-2xl bg-surface-100">
+                  <article key={product._id} className="rounded-[1.75rem] border border-surface-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <div className="h-16 w-16 flex-none overflow-hidden rounded-2xl bg-surface-100">
                         <ProductImage
-                          src={product.images?.[0]?.url || ''}
+                          src={getAdminPreviewImage(product)}
                           alt={product.name}
                           className="h-full w-full object-cover"
                         />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="truncate text-base font-semibold text-slate-900">{product.name}</h3>
+                          <h3 className="truncate text-[15px] font-semibold text-slate-900">{product.name}</h3>
                           {inventoryVisible && (
                             <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${inventoryMeta.className}`}>
                               {inventoryMeta.label}
@@ -1148,27 +1325,29 @@ const ProductPage = () => {
                             </span>
                           )}
                         </div>
-                        <p className="mt-1 text-sm text-slate-500">
+                        <p className="mt-1 text-xs text-slate-500">
                           Cod. {product.code}{product.brand ? ` - ${product.brand}` : ''}
                         </p>
                         <p className="mt-1 text-xs text-slate-400">
                           {product.collection || 'Sin coleccion'} / {product.gender || 'Sin genero'}
                         </p>
-                        <p className="mt-2 text-sm font-semibold text-slate-900">
-                          {formatCurrency(product.price?.retail)}
-                        </p>
-                        {inventoryVisible && (
-                          <div className="mt-2 flex flex-wrap gap-2">
-                            <span className="metric-chip">Stock {inventory.totalUnits}</span>
-                            <span className="metric-chip">{inventory.activeVariants.length} variantes</span>
-                          </div>
-                        )}
+                        <div className="mt-2 flex items-center justify-between gap-3">
+                          <p className="text-base font-semibold text-slate-900">
+                            {formatCurrency(product.price?.retail)}
+                          </p>
+                          {inventoryVisible && (
+                            <div className="flex flex-wrap justify-end gap-2 text-[11px]">
+                              <span className="metric-chip">Stock {inventory.totalUnits}</span>
+                              <span className="metric-chip">{inventory.activeVariants.length} variantes</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
                     {inventoryVisible && inventory.previewVariants.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {inventory.previewVariants.slice(0, 4).map(variant => (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {mobilePreviewVariants.map(variant => (
                           <span
                             key={variant.key}
                             className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-medium ${getVariantPillClassName(variant.qty)}`}
@@ -1179,15 +1358,20 @@ const ProductPage = () => {
                             </span>
                           </span>
                         ))}
+                        {remainingVariantCount > 0 && (
+                          <span className="inline-flex items-center rounded-full border border-surface-200 bg-surface-50 px-3 py-1.5 text-xs font-semibold text-slate-500">
+                            +{remainingVariantCount} mas
+                          </span>
+                        )}
                       </div>
                     )}
 
-                    <div className="mt-4 grid grid-cols-[1fr_auto] gap-2">
+                    <div className="mt-3 grid grid-cols-[1fr_auto] gap-2">
                       {inventoryVisible && canAdjustInventory ? (
                         <button
                           type="button"
                           onClick={() => openModal(product, 'sell')}
-                          className="rounded-xl bg-brand px-4 py-2.5 text-sm font-semibold text-white"
+                          className="rounded-2xl bg-brand px-4 py-2.5 text-sm font-semibold text-white"
                         >
                           Venta
                         </button>
@@ -1195,23 +1379,23 @@ const ProductPage = () => {
                         <button
                           type="button"
                           onClick={() => navigate(`/product-private/${product._id}`)}
-                          className="rounded-xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                          className="rounded-2xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
                         >
-                          Ver detalle
+                          Ver
                         </button>
                       )}
 
                       <button
                         type="button"
                         onClick={() => setExpandedMobileActionId(prev => (prev === product._id ? null : product._id))}
-                        className="rounded-xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
+                        className="rounded-2xl border border-surface-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700"
                       >
                         {showExpandedActions ? 'Menos' : 'Mas'}
                       </button>
                     </div>
 
                     {showExpandedActions && (
-                      <div className="mt-3 flex flex-wrap gap-2 rounded-2xl border border-surface-200 bg-surface-50 p-3">
+                      <div className="mt-3 grid grid-cols-2 gap-2 rounded-2xl border border-surface-200 bg-surface-50 p-3">
                         <button
                           type="button"
                           onClick={() => navigate(`/product-private/${product._id}`)}
@@ -1281,7 +1465,7 @@ const ProductPage = () => {
                             <div className="flex items-start gap-3">
                               <div className="h-16 w-16 flex-none overflow-hidden rounded-2xl bg-surface-100">
                                 <ProductImage
-                                  src={product.images?.[0]?.url || ''}
+                                  src={getAdminPreviewImage(product)}
                                   alt={product.name}
                                   className="h-full w-full object-cover"
                                 />
@@ -1666,7 +1850,7 @@ const ProductPage = () => {
                   ...prev,
                   color: nextColor,
                   size: sizeKeys[0] || '',
-                  quantity: 1
+                  quantity: '1'
                 }));
               }}
               className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
@@ -1697,14 +1881,98 @@ const ProductPage = () => {
               type="number"
               min="1"
               max={modalAvailable || undefined}
+              inputMode="numeric"
               value={modalData.quantity}
               onChange={event => {
-                const next = parseInt(event.target.value, 10) || 1;
-                const clamped = modalAvailable ? Math.min(next, modalAvailable) : next;
-                setModalData({ ...modalData, quantity: clamped });
+                const nextValue = event.target.value;
+                if (nextValue === '') {
+                  setModalData({ ...modalData, quantity: '' });
+                  return;
+                }
+
+                setModalData({ ...modalData, quantity: nextValue });
               }}
+              onBlur={() => {
+                const next = parseInt(modalData.quantity, 10);
+                if (Number.isNaN(next) || next <= 0) {
+                  setModalData(prev => ({ ...prev, quantity: '1' }));
+                  return;
+                }
+
+                const clamped = modalAvailable ? Math.min(next, modalAvailable) : next;
+                setModalData(prev => ({ ...prev, quantity: String(clamped) }));
+              }}
+              placeholder="Ingresa cantidad"
               className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
             />
+
+            {modalData.mode === 'sell' && (
+              <div className="mt-4 space-y-3">
+                <label className="block text-sm font-medium text-slate-600">Precio de venta</label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setModalData(prev => ({
+                        ...prev,
+                        salePriceMode: 'retail'
+                      }))
+                    }
+                    className={`rounded-2xl border px-4 py-3 text-left transition ${
+                      modalData.salePriceMode === 'retail'
+                        ? 'border-brand bg-brand/5 text-brand'
+                        : 'border-surface-200 bg-white text-slate-600'
+                    }`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.22em]">Precio detallado</p>
+                    <p className="mt-2 text-base font-semibold">
+                      {formatCurrency(modalData.product?.price?.retail)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Usar el precio base del producto.</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setModalData(prev => ({
+                        ...prev,
+                        salePriceMode: 'manual'
+                      }))
+                    }
+                    className={`rounded-2xl border px-4 py-3 text-left transition ${
+                      modalData.salePriceMode === 'manual'
+                        ? 'border-brand bg-brand/5 text-brand'
+                        : 'border-surface-200 bg-white text-slate-600'
+                    }`}
+                  >
+                    <p className="text-xs uppercase tracking-[0.22em]">Precio manual</p>
+                    <p className="mt-2 text-base font-semibold">Ingresar valor</p>
+                    <p className="mt-1 text-xs text-slate-500">Para descuentos o ventas especiales.</p>
+                  </button>
+                </div>
+
+                {modalData.salePriceMode === 'manual' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-600">Valor cobrado</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      value={modalData.manualSalePrice}
+                      onChange={event =>
+                        setModalData(prev => ({
+                          ...prev,
+                          manualSalePrice: event.target.value
+                        }))
+                      }
+                      placeholder="Ej. 49.99"
+                      className="mt-1 w-full rounded-xl border border-surface-200 px-3 py-2 text-sm text-slate-700 focus:border-brand/40 focus:outline-none focus:ring-2 focus:ring-brand/20"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="mt-3 rounded-2xl border border-surface-200 bg-surface-50 px-3 py-3 text-sm">
               {modalAvailable ? (

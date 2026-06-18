@@ -14,6 +14,8 @@ const formatDateTime = value => {
   return new Date(value).toLocaleString();
 };
 
+const getPriceSourceLabel = value => (value === 'manual' ? 'Manual' : 'Detallado');
+
 const ResumenVentasPage = () => {
   const [ventas, setVentas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -191,6 +193,7 @@ const ResumenVentasPage = () => {
                       <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
                         <span className="metric-chip">Cant. {item.quantity}</span>
                         <span className="metric-chip">Unit. {formatCurrency(item.price)}</span>
+                        <span className="metric-chip">{getPriceSourceLabel(item.priceSource)}</span>
                       </div>
                       <p className="mt-3 text-xs text-slate-400">
                         {formatDateTime(item.lastSoldAt)}
@@ -208,6 +211,7 @@ const ResumenVentasPage = () => {
                       <th className="px-4 py-3 font-semibold">Codigo</th>
                       <th className="px-4 py-3 font-semibold">Talla</th>
                       <th className="px-4 py-3 font-semibold">Cantidad</th>
+                      <th className="px-4 py-3 font-semibold">Tipo</th>
                       <th className="px-4 py-3 font-semibold">Unitario</th>
                       <th className="px-4 py-3 font-semibold">Total</th>
                       <th className="px-4 py-3 font-semibold">Fecha</th>
@@ -220,6 +224,7 @@ const ResumenVentasPage = () => {
                         <td className="px-4 py-3">{item.code || 'S/C'}</td>
                         <td className="px-4 py-3">{item.size || 'N/A'}</td>
                         <td className="px-4 py-3">{item.quantity}</td>
+                        <td className="px-4 py-3">{getPriceSourceLabel(item.priceSource)}</td>
                         <td className="px-4 py-3">{formatCurrency(item.price)}</td>
                         <td className="px-4 py-3 font-semibold text-slate-900">
                           {formatCurrency(item.total)}

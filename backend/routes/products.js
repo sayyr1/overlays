@@ -319,7 +319,7 @@ const formatProduct = (product, options = {}) => {
     includeInternalImages = false,
     imageVisibilityEnabled = false
   } = options;
-  const plain = product.toObject();
+  const plain = product.toObject({ flattenMaps: true });
   const price = plain.price || {};
   let variantMap = ensureMap(product.stockByColorSize);
   variantMap = new Map(variantMap);

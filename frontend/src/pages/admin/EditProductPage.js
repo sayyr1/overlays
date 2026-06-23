@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import axios from '../../api/axiosInstance';
 import imageCompression from 'browser-image-compression';
+import BrandModelInput from '../../components/admin/BrandModelInput';
 import ProductImage from '../../components/usuario/ProductImage';
 import { usePublicConfig } from '../../context/PublicConfigContext';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +31,16 @@ const createEmptyPrice = () => ({
 });
 
 const DEFAULT_GENDERS = ['Unisex', 'Hombre', 'Mujer', 'Nino', 'Nina'];
+const normalizeCategoryPayload = payload => {
+  const normalized = {};
+  if (payload && typeof payload === 'object') {
+    Object.entries(payload).forEach(([key, values]) => {
+      normalized[key] = Array.isArray(values) ? values : [];
+    });
+  }
+  return normalized;
+};
+const normalizeEntry = value => String(value || '').trim();
 
 const EditProductPage = () => {
   const { isModuleEnabled, settings } = usePublicConfig();
@@ -41,6 +52,9 @@ const EditProductPage = () => {
   const canUploadImages = hasPermission('products.upload');
   const canSeeInventory = hasPermission('inventory.view') || hasPermission('inventory.adjust');
   const canEditImages = hasPermission('products.edit');
+  const canManageCategories = hasPermission('categories.manage');
+  const canEditProducts = hasPermission('products.edit');
+  const canCreateModelInline = canManageCategories || canEditProducts;
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
   const priceLevels = membershipsEnabled
     ? ['retail', 'gold', 'premium', 'platinum']
@@ -58,6 +72,7 @@ const EditProductPage = () => {
     onSale: false
   });
   const [categories, setCategories] = useState({});
+  const [brandModels, setBrandModels] = useState({});
   const [variantState, setVariantState] = useState({});
   const [activeColor, setActiveColor] = useState('');
   const [colorToAdd, setColorToAdd] = useState('');
@@ -71,11 +86,18 @@ const EditProductPage = () => {
   const [loading, setLoading] = useState(true);
   const [openSection, setOpenSection] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [creatingModel, setCreatingModel] = useState(false);
   const [originalInventory, setOriginalInventory] = useState({
     stockByColorSize: {},
     stockBySize: {},
     colors: []
   });
+  const availableModels = useMemo(() => {
+    if (!form.brand) {
+      return [];
+    }
+    return Array.isArray(brandModels[form.brand]) ? brandModels[form.brand] : [];
+  }, [brandModels, form.brand]);
 
   const categoryGenderOptions = useMemo(
     () =>
@@ -107,12 +129,14 @@ const EditProductPage = () => {
     if (!id) return;
     const loadData = async () => {
       try {
-        const [{ data: catPayload }, { data: product }] = await Promise.all([
+        const [{ data: catPayload }, { data: brandModelMap }, { data: product }] = await Promise.all([
           axios.get('/api/categories'),
+          axios.get('/api/categories/brand-models'),
           axios.get(`/api/products/${id}`)
         ]);
 
-        setCategories(catPayload || {});
+        setCategories(normalizeCategoryPayload(catPayload));
+        setBrandModels(brandModelMap || {});
 
         setCode(product.code);
         // Normaliza claves de atributos del producto para que coincidan con las claves de categorías (insensible a mayúsculas/minúsculas)
@@ -325,6 +349,32 @@ const EditProductPage = () => {
         [name]: value
       }
     }));
+  };
+
+  const handleCreateModel = async modelName => {
+    const brand = normalizeEntry(form.brand);
+    const model = normalizeEntry(modelName);
+
+    if (!brand || !model) {
+      return '';
+    }
+
+    setCreatingModel(true);
+    try {
+      const { data } = await axios.post('/api/categories/brand-models', { brand, model });
+      setBrandModels(data || {});
+      setCategories(prev => ({
+        ...prev,
+        type: Array.from(new Set([...(prev.type || []), model])).sort((left, right) => left.localeCompare(right))
+      }));
+      setForm(prev => ({ ...prev, type: model }));
+      return model;
+    } catch (error) {
+      window.alert(error.response?.data?.message || 'No se pudo crear el modelo.');
+      return '';
+    } finally {
+      setCreatingModel(false);
+    }
   };
 
   const handleAddColor = () => {
@@ -868,22 +918,21 @@ const EditProductPage = () => {
                 ))}
               </select>
             </label>
-            <label className="text-sm font-medium text-gray-700">
-              Tipo
-              <select
-                name="type"
-                value={form.type}
-                onChange={handleFieldChange}
-                className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">Selecciona un tipo</option>
-                {(categories.type || []).map(type => (
-                  <option key={type} value={type}>
-                    {type}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <BrandModelInput
+              brand={form.brand}
+              value={form.type}
+              options={availableModels}
+              onChange={nextValue =>
+                setForm(prev => ({
+                  ...prev,
+                  type: nextValue
+                }))
+              }
+              onCreate={handleCreateModel}
+              canCreate={canCreateModelInline}
+              creating={creatingModel}
+              label="Modelo"
+            />
             <label className="text-sm font-medium text-gray-700">
               Coleccion
               <select

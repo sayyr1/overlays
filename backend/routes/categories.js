@@ -2,6 +2,7 @@ import express from 'express';
 import Category from '../models/Category.js';
 import { protect, adminOnly, requirePermission } from '../middleware/authMiddleware.js';
 import { requireModuleEnabled } from '../middleware/moduleMiddleware.js';
+import { hasPermission } from '../constants/permissions.js';
 
 const router = express.Router();
 
@@ -10,6 +11,10 @@ router.use(requireModuleEnabled('categories'));
 const DEFAULT_KEYS = ['brand', 'type', 'size', 'collection', 'gender', 'color'];
 const normalizeEntry = value => String(value ?? '').trim();
 const uniqueStrings = values => Array.from(new Set(values.map(normalizeEntry).filter(Boolean)));
+const canManageBrandModels = user =>
+  hasPermission(user, 'categories', 'manage') ||
+  hasPermission(user, 'products', 'create') ||
+  hasPermission(user, 'products', 'edit');
 
 const ensureCategoryDocument = async () => {
   let doc = await Category.findOne();
@@ -202,12 +207,19 @@ router.delete('/key', protect, adminOnly, requirePermission('categories', 'manag
   }
 });
 
-router.post('/brand-models', protect, adminOnly, requirePermission('categories', 'manage'), async (req, res) => {
+router.post('/brand-models', protect, adminOnly, async (req, res) => {
   const brand = normalizeEntry(req.body?.brand);
   const model = normalizeEntry(req.body?.model);
 
   if (!brand || !model) {
     return res.status(400).json({ message: 'Marca y modelo son obligatorios' });
+  }
+
+  if (!canManageBrandModels(req.user)) {
+    return res.status(403).json({
+      message: 'Acceso denegado: permiso insuficiente',
+      permission: 'categories.manage | products.create | products.edit'
+    });
   }
 
   try {

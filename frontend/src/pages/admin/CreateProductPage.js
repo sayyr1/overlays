@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import axios from '../../api/axiosInstance';
 import imageCompression from 'browser-image-compression';
 import { usePublicConfig } from '../../context/PublicConfigContext';
 import { useAuth } from '../../context/AuthContext';
+import BrandModelInput from '../../components/admin/BrandModelInput';
 import {
   DEFAULT_COLOR_LABEL,
   flattenNestedVariants,
@@ -93,6 +94,8 @@ const normalizeCategoryPayload = payload => {
   return normalized;
 };
 
+const normalizeEntry = value => String(value || '').trim();
+
 const CreateProductPage = () => {
   const { isModuleEnabled, settings } = usePublicConfig();
   const { hasPermission } = useAuth();
@@ -108,10 +111,16 @@ const CreateProductPage = () => {
   const [activeColor, setActiveColor] = useState('');
   const [openSection, setOpenSection] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [creatingModel, setCreatingModel] = useState(false);
+  const [hasCustomName, setHasCustomName] = useState(false);
+  const previousGeneratedNameRef = useRef('');
   const inventoryEnabled = isModuleEnabled('inventory');
   const membershipsEnabled = isModuleEnabled('memberships');
   const canUploadImages = hasPermission('products.upload');
+  const canCreateProducts = hasPermission('products.create');
   const canSeeInventory = hasPermission('inventory.view') || hasPermission('inventory.adjust');
+  const canManageCategories = hasPermission('categories.manage');
+  const canCreateModelInline = canManageCategories || canCreateProducts;
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
   const priceLevels = membershipsEnabled
     ? ['retail', 'gold', 'premium', 'platinum']
@@ -191,8 +200,19 @@ const CreateProductPage = () => {
   }, [categoryGenderOptions]);
 
   useEffect(() => {
-    setForm(prev => (prev.name === generatedName ? prev : { ...prev, name: generatedName }));
-  }, [generatedName]);
+    setForm(prev => {
+      const previousGeneratedName = previousGeneratedNameRef.current;
+      const shouldSyncName =
+        !hasCustomName || !prev.name || prev.name === previousGeneratedName;
+
+      if (!shouldSyncName || prev.name === generatedName) {
+        return prev;
+      }
+
+      return { ...prev, name: generatedName };
+    });
+    previousGeneratedNameRef.current = generatedName;
+  }, [generatedName, hasCustomName]);
 
   useEffect(() => {
     if (!form.brand) {
@@ -352,6 +372,9 @@ const CreateProductPage = () => {
 
   const handleFieldChange = event => {
     const { name, value, type, checked } = event.target;
+    if (name === 'name') {
+      setHasCustomName(Boolean(value.trim()) && value !== generatedName);
+    }
     setForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -377,6 +400,32 @@ const CreateProductPage = () => {
         [name]: value
       }
     }));
+  };
+
+  const handleCreateModel = async modelName => {
+    const brand = normalizeEntry(form.brand);
+    const model = normalizeEntry(modelName);
+
+    if (!brand || !model) {
+      return '';
+    }
+
+    setCreatingModel(true);
+    try {
+      const { data } = await axios.post('/api/categories/brand-models', { brand, model });
+      setBrandModels(data || {});
+      setCategories(prev => ({
+        ...prev,
+        type: Array.from(new Set([...(prev.type || []), model])).sort((left, right) => left.localeCompare(right))
+      }));
+      setForm(prev => ({ ...prev, type: model }));
+      return model;
+    } catch (error) {
+      window.alert(error.response?.data?.message || 'No se pudo crear el modelo.');
+      return '';
+    } finally {
+      setCreatingModel(false);
+    }
   };
 
   const handleAddColor = () => {
@@ -637,6 +686,8 @@ const CreateProductPage = () => {
       window.alert('Producto creado con exito');
       setForm(createInitialFormState());
       setVariantState({});
+      setHasCustomName(false);
+      previousGeneratedNameRef.current = '';
       setPendingImages(prev => {
         prev.forEach(item => URL.revokeObjectURL(item.previewUrl));
         return [];
@@ -802,7 +853,9 @@ const CreateProductPage = () => {
         <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="font-semibold text-slate-800">{generatedName || 'Producto en preparacion'}</p>
+              <p className="font-semibold text-slate-800">
+                {form.name || generatedName || 'Producto en preparacion'}
+              </p>
               <p className="mt-1 text-xs text-slate-500">
                 {code || 'Codigo pendiente'} · {selectedColors.length} colores · {totalUnits} unidades
               </p>
@@ -860,29 +913,20 @@ const CreateProductPage = () => {
                 </select>
               </label>
 
-              <label className="text-sm font-medium text-gray-700">
-                Modelo
-                <select
-                  name="type"
-                  value={form.type}
-                  onChange={handleFieldChange}
-                  disabled={!form.brand || !availableModels.length}
-                  className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-                >
-                  <option value="">
-                    {!form.brand
-                      ? 'Primero selecciona una marca'
-                      : availableModels.length
-                        ? 'Selecciona un modelo'
-                        : 'No hay modelos para esta marca'}
-                  </option>
-                  {availableModels.map(type => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <BrandModelInput
+                brand={form.brand}
+                value={form.type}
+                options={availableModels}
+                onChange={nextValue =>
+                  setForm(prev => ({
+                    ...prev,
+                    type: nextValue
+                  }))
+                }
+                onCreate={handleCreateModel}
+                canCreate={canCreateModelInline}
+                creating={creatingModel}
+              />
 
               <label className="text-sm font-medium text-gray-700">
                 Genero
@@ -906,9 +950,26 @@ const CreateProductPage = () => {
                   type="text"
                   name="name"
                   value={form.name}
-                  readOnly
-                  className="mt-1 w-full rounded-md border border-gray-200 bg-gray-100 p-3 text-gray-600"
+                  onChange={handleFieldChange}
+                  className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
                 />
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                  <span className="text-gray-500">
+                    Sugerido: {generatedName || 'Completa marca, modelo y genero'}
+                  </span>
+                  {generatedName && form.name !== generatedName && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForm(prev => ({ ...prev, name: generatedName }));
+                        setHasCustomName(false);
+                      }}
+                      className="font-semibold text-blue-600 hover:text-blue-700"
+                    >
+                      Usar sugerido
+                    </button>
+                  )}
+                </div>
               </label>
 
               <label className="text-sm font-medium text-gray-700">

@@ -17,6 +17,7 @@ const DEFAULT_ADVANCED_FILTERS = Object.freeze({
   collection: '',
   type: '',
   gender: '',
+  location: '',
   promo: 'all',
   missing: 'all',
   attributeKey: '',
@@ -67,6 +68,14 @@ const MOBILE_INVENTORY_VIEWS = [
 ];
 
 const normalizeText = value => String(value || '').trim().toLowerCase();
+const LOCATION_ATTRIBUTE_CANDIDATES = ['ubicacion', 'ubicación', 'location', 'lugar', 'place'];
+
+const normalizeComparableKey = value =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
 const formatAttributeKey = key =>
   String(key || '')
@@ -523,12 +532,23 @@ const ProductPage = () => {
       });
     });
 
+    const locationKey =
+      Array.from(attributesMap.keys()).find(key =>
+        LOCATION_ATTRIBUTE_CANDIDATES.includes(normalizeComparableKey(key))
+      ) || '';
+
     return {
       brands: Array.from(brands).sort((left, right) => left.localeCompare(right)),
       collections: Array.from(collections).sort((left, right) => left.localeCompare(right)),
       types: Array.from(types).sort((left, right) => left.localeCompare(right)),
       genders: Array.from(genders).sort((left, right) => left.localeCompare(right)),
-      attributeKeys: Array.from(attributesMap.keys()).sort((left, right) => left.localeCompare(right)),
+      locationKey,
+      locationValues: locationKey
+        ? Array.from(attributesMap.get(locationKey) || []).sort((left, right) => left.localeCompare(right))
+        : [],
+      attributeKeys: Array.from(attributesMap.keys())
+        .filter(key => key !== locationKey)
+        .sort((left, right) => left.localeCompare(right)),
       attributeValuesByKey: Array.from(attributesMap.entries()).reduce((acc, [key, values]) => {
         acc[key] = Array.from(values).sort((left, right) => left.localeCompare(right));
         return acc;
@@ -588,6 +608,13 @@ const ProductPage = () => {
       );
       if (hasExactMismatch) {
         return false;
+      }
+
+      if (advancedFilters.location) {
+        const locationValue = getProductAttributeValue(product, filterOptions.locationKey);
+        if (normalizeText(locationValue) !== normalizeText(advancedFilters.location)) {
+          return false;
+        }
       }
 
       if (advancedFilters.promo === 'on' && !product.onSale) {
@@ -680,7 +707,7 @@ const ProductPage = () => {
 
         return rightRiskScore - leftRiskScore;
       });
-  }, [advancedFilters, catalogItems, inventoryVisible, mobileInventoryView, searchTerm, sortBy, stockFilter]);
+  }, [advancedFilters, catalogItems, filterOptions.locationKey, inventoryVisible, mobileInventoryView, searchTerm, sortBy, stockFilter]);
 
   const catalogStats = useMemo(() => {
     const totalCount = catalogItems.length;
@@ -733,6 +760,9 @@ const ProductPage = () => {
     }
     if (advancedFilters.gender) {
       chips.push({ key: 'gender', label: 'Genero', value: advancedFilters.gender });
+    }
+    if (advancedFilters.location) {
+      chips.push({ key: 'location', label: 'Lugar', value: advancedFilters.location });
     }
     if (advancedFilters.promo !== 'all') {
       chips.push({
@@ -1122,6 +1152,14 @@ const ProductPage = () => {
                   event => setAdvancedFilters(prev => ({ ...prev, gender: event.target.value })),
                   filterOptions.genders,
                   'Todos los generos'
+                )}
+                {renderSelect(
+                  'Lugar',
+                  advancedFilters.location,
+                  event => setAdvancedFilters(prev => ({ ...prev, location: event.target.value })),
+                  filterOptions.locationValues,
+                  'Todos los lugares',
+                  !filterOptions.locationKey
                 )}
 
                 <label className="block">
@@ -1692,6 +1730,14 @@ const ProductPage = () => {
                 event => setDraftFilters(prev => ({ ...prev, gender: event.target.value })),
                 filterOptions.genders,
                 'Todos los generos'
+              )}
+              {renderSelect(
+                'Lugar',
+                draftFilters.location,
+                event => setDraftFilters(prev => ({ ...prev, location: event.target.value })),
+                filterOptions.locationValues,
+                'Todos los lugares',
+                !filterOptions.locationKey
               )}
 
               <label className="block">

@@ -19,7 +19,7 @@ const resolveAttributeValue = (product, keyName) => {
 };
 
 const resolveProductValue = (product, queryKey, resolvedKey) => {
-  if (['brand', 'type', 'collection', 'gender'].includes(queryKey)) {
+  if (['brand', 'type', 'model', 'collection', 'gender'].includes(queryKey)) {
     return normalizeValue(product?.[queryKey]);
   }
 
@@ -150,7 +150,7 @@ export default function SectionValueGridPage({
           image: relatedProducts[0]?.images?.[0]?.url || '',
           meta: relatedProducts.length > 0 ? `${relatedProducts.length} productos` : 'Explorar'
         };
-      }),
+      }).filter(item => item.label && item.meta !== 'Explorar'),
     [detailBasePath, products, queryKey, rawValues, resolvedKey]
   );
 

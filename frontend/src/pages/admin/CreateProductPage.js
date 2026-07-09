@@ -19,6 +19,10 @@ import {
   sortImagesForPayload,
   updateImageVisibility
 } from '../../utils/productImages';
+import {
+  buildConfigFieldMap,
+  isAdminConfigEnabled
+} from '../../utils/adminFormConfig';
 
 const createEmptyPrice = () => ({
   retail: '',
@@ -32,7 +36,7 @@ const createInitialFormState = () => ({
   price: createEmptyPrice(),
   description: '',
   brand: '',
-  type: '',
+  model: '',
   collection: '',
   gender: 'Unisex',
   attributes: {},
@@ -109,11 +113,20 @@ const CreateProductPage = () => {
   const [draggedImageKey, setDraggedImageKey] = useState('');
   const [colorToAdd, setColorToAdd] = useState('');
   const [activeColor, setActiveColor] = useState('');
-  const [openSection, setOpenSection] = useState('');
+  const [openSections, setOpenSections] = useState({
+    pricing: false,
+    collection: false,
+    dynamic_attributes: false,
+    inventory: false,
+    content: false,
+    images: false
+  });
   const [submitting, setSubmitting] = useState(false);
   const [creatingModel, setCreatingModel] = useState(false);
   const [hasCustomName, setHasCustomName] = useState(false);
+  const [adminFormConfig, setAdminFormConfig] = useState(null);
   const previousGeneratedNameRef = useRef('');
+  const sectionRefs = useRef({});
   const inventoryEnabled = isModuleEnabled('inventory');
   const membershipsEnabled = isModuleEnabled('memberships');
   const canUploadImages = hasPermission('products.upload');
@@ -122,6 +135,7 @@ const CreateProductPage = () => {
   const canManageCategories = hasPermission('categories.manage');
   const canCreateModelInline = canManageCategories || canCreateProducts;
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
+  const modelFieldLabel = settings?.catalogProfile === 'apparel' ? 'Referencia / modelo' : 'Modelo';
   const priceLevels = membershipsEnabled
     ? ['retail', 'gold', 'premium', 'platinum']
     : ['retail'];
@@ -145,10 +159,10 @@ const CreateProductPage = () => {
   }, [brandModels, form.brand]);
   const generatedName = useMemo(
     () =>
-      form.brand && form.type && form.gender
-        ? buildCompositeName(form.brand, form.type, form.gender)
+      form.brand && form.model && form.gender
+        ? buildCompositeName(form.brand, form.model, form.gender)
         : '',
-    [form.brand, form.gender, form.type]
+    [form.brand, form.gender, form.model]
   );
 
   const categoryGenderOptions = useMemo(
@@ -216,7 +230,7 @@ const CreateProductPage = () => {
 
   useEffect(() => {
     if (!form.brand) {
-      setForm(prev => (prev.type ? { ...prev, type: '' } : prev));
+      setForm(prev => (prev.model ? { ...prev, model: '' } : prev));
       return;
     }
 
@@ -225,9 +239,9 @@ const CreateProductPage = () => {
     }
 
     setForm(prev => (
-      prev.type && availableModels.includes(prev.type)
+      prev.model && availableModels.includes(prev.model)
         ? prev
-        : { ...prev, type: '' }
+        : { ...prev, model: '' }
     ));
   }, [availableModels, form.brand]);
 
@@ -266,6 +280,32 @@ const CreateProductPage = () => {
       cancelled = true;
     };
   }, [form.brand]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAdminConfig = async () => {
+      try {
+        const { data } = await axios.get('/api/admin-config/forms/admin_product_create', {
+          withCredentials: true
+        });
+
+        if (!cancelled) {
+          setAdminFormConfig(data || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminFormConfig(null);
+        }
+      }
+    };
+
+    loadAdminConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -414,11 +454,7 @@ const CreateProductPage = () => {
     try {
       const { data } = await axios.post('/api/categories/brand-models', { brand, model });
       setBrandModels(data || {});
-      setCategories(prev => ({
-        ...prev,
-        type: Array.from(new Set([...(prev.type || []), model])).sort((left, right) => left.localeCompare(right))
-      }));
-      setForm(prev => ({ ...prev, type: model }));
+      setForm(prev => ({ ...prev, model }));
       return model;
     } catch (error) {
       window.alert(error.response?.data?.message || 'No se pudo crear el modelo.');
@@ -671,7 +707,8 @@ const CreateProductPage = () => {
         price: normalizedPrice,
         description: form.description,
         brand: form.brand,
-        type: form.type,
+        model: form.model,
+        type: '',
         collection: form.collection,
         gender: form.gender,
         attributes,
@@ -813,14 +850,39 @@ const CreateProductPage = () => {
     </div>
   );
 
-  const renderAccordionSection = ({ id, title, description, summary, children }) => {
-    const isOpen = openSection === id;
+  const registerSectionRef = id => node => {
+    if (node) {
+      sectionRefs.current[id] = node;
+    }
+  };
+
+  const openAndScrollToSection = id => {
+    setOpenSections(prev => ({
+      ...prev,
+      [id]: true
+    }));
+
+    window.setTimeout(() => {
+      sectionRefs.current[id]?.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      });
+    }, 80);
+  };
+
+  const renderAccordionSection = ({ id, title, description, summary, children, style, sectionRef }) => {
+    const isOpen = Boolean(openSections[id]);
 
     return (
-      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <section ref={sectionRef} className="rounded-2xl border border-gray-200 bg-white shadow-sm" style={style}>
         <button
           type="button"
-          onClick={() => setOpenSection(prev => (prev === id ? '' : id))}
+          onClick={() =>
+            setOpenSections(prev => ({
+              ...prev,
+              [id]: !prev[id]
+            }))
+          }
           className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
         >
           <div className="min-w-0">
@@ -846,6 +908,71 @@ const CreateProductPage = () => {
     );
   };
 
+  const renderResponsiveSection = ({ id, title, description, summary, style, children }) => (
+    <div ref={registerSectionRef(id)} style={style}>
+      <div className="md:hidden">
+        {renderAccordionSection({
+          id,
+          title,
+          description,
+          summary,
+          children
+        })}
+      </div>
+      <section className="hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm md:block">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800">{title}</h3>
+          {description ? (
+            <p className="mt-1 text-xs leading-5 text-gray-500">{description}</p>
+          ) : null}
+        </div>
+        <div className="mt-4">{children}</div>
+      </section>
+    </div>
+  );
+
+  const adminFieldMap = useMemo(
+    () => buildConfigFieldMap(adminFormConfig?.fields),
+    [adminFormConfig?.fields]
+  );
+  const submitActionStyle = useMemo(() => {
+    const maxOrder = (adminFormConfig?.fields || []).reduce(
+      (acc, field) => Math.max(acc, Number(field?.order ?? 0)),
+      0
+    );
+    return { order: maxOrder + 100 };
+  }, [adminFormConfig?.fields]);
+
+  const blockStyle = key => ({
+    order: adminFieldMap[key]?.order ?? 0
+  });
+  const combinedBlockStyle = keys => ({
+    order: keys.reduce(
+      (acc, key) => Math.min(acc, adminFieldMap[key]?.order ?? Number.MAX_SAFE_INTEGER),
+      Number.MAX_SAFE_INTEGER
+    )
+  });
+
+  const createIdentityKeys = ['location', 'brand', 'model', 'gender', 'name', 'code'];
+  const showCreateIdentity = createIdentityKeys.some(key => isAdminConfigEnabled(adminFieldMap, key));
+  const fieldStyle = key => ({
+    order: adminFieldMap[key]?.order ?? 0
+  });
+  const showCollectionSection = isAdminConfigEnabled(adminFieldMap, 'collection');
+  const showDynamicAttributesSection =
+    isAdminConfigEnabled(adminFieldMap, 'dynamic_attributes') && dynamicAttributeKeys.length > 0;
+  const showContentSection =
+    isAdminConfigEnabled(adminFieldMap, 'on_sale') || isAdminConfigEnabled(adminFieldMap, 'description');
+  const mobileQuickNavItems = [
+    showCreateIdentity ? { id: 'identity', label: 'Identidad' } : null,
+    isAdminConfigEnabled(adminFieldMap, 'pricing') ? { id: 'pricing', label: 'Precios' } : null,
+    showCollectionSection ? { id: 'collection', label: 'Coleccion' } : null,
+    showDynamicAttributesSection ? { id: 'dynamic_attributes', label: 'Atributos' } : null,
+    isAdminConfigEnabled(adminFieldMap, 'inventory') ? { id: 'inventory', label: 'Inventario' } : null,
+    showContentSection ? { id: 'content', label: 'Contenido' } : null,
+    isAdminConfigEnabled(adminFieldMap, 'images') ? { id: 'images', label: 'Imagenes' } : null
+  ].filter(Boolean);
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 pb-28 md:p-6 md:pb-6">
       <div className="mx-auto max-w-4xl rounded-xl bg-white p-5 shadow md:p-8">
@@ -865,12 +992,30 @@ const CreateProductPage = () => {
             </span>
           </div>
         </div>
-        <form id="create-product-form" onSubmit={handleSubmit} className="space-y-4">
-          <section className="rounded-lg border border-gray-200 p-4">
+        {mobileQuickNavItems.length > 0 && (
+          <div className="sticky top-0 z-20 -mx-5 mb-5 border-y border-slate-200 bg-white/95 px-5 py-3 backdrop-blur md:hidden">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto">
+              {mobileQuickNavItems.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => openAndScrollToSection(item.id)}
+                  className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        <form id="create-product-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {showCreateIdentity && (
+          <section ref={registerSectionRef('identity')} className="rounded-lg border border-gray-200 p-4" style={blockStyle('identity')}>
           
 
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <label className="text-sm font-medium text-gray-700">
+              {isAdminConfigEnabled(adminFieldMap, 'location') && (
+              <label className="text-sm font-medium text-gray-700" style={fieldStyle('location')}>
                 Ubicacion
                 {locationOptions.length ? (
                   <select
@@ -895,8 +1040,10 @@ const CreateProductPage = () => {
                   />
                 )}
               </label>
+              )}
 
-              <label className="text-sm font-medium text-gray-700">
+              {isAdminConfigEnabled(adminFieldMap, 'brand') && (
+              <label className="text-sm font-medium text-gray-700" style={fieldStyle('brand')}>
                 Marca
                 <select
                   name="brand"
@@ -912,23 +1059,29 @@ const CreateProductPage = () => {
                   ))}
                 </select>
               </label>
+              )}
 
+              {isAdminConfigEnabled(adminFieldMap, 'model') && (
               <BrandModelInput
+                style={fieldStyle('model')}
                 brand={form.brand}
-                value={form.type}
+                value={form.model}
                 options={availableModels}
                 onChange={nextValue =>
                   setForm(prev => ({
                     ...prev,
-                    type: nextValue
+                    model: nextValue
                   }))
                 }
                 onCreate={handleCreateModel}
                 canCreate={canCreateModelInline}
                 creating={creatingModel}
+                label={modelFieldLabel}
               />
+              )}
 
-              <label className="text-sm font-medium text-gray-700">
+              {isAdminConfigEnabled(adminFieldMap, 'gender') && (
+              <label className="text-sm font-medium text-gray-700" style={fieldStyle('gender')}>
                 Genero
                 <select
                   name="gender"
@@ -943,8 +1096,10 @@ const CreateProductPage = () => {
                   ))}
                 </select>
               </label>
+              )}
 
-              <label className="text-sm font-medium text-gray-700 xl:col-span-2">
+              {isAdminConfigEnabled(adminFieldMap, 'name') && (
+              <label className="text-sm font-medium text-gray-700 xl:col-span-2" style={fieldStyle('name')}>
                 Nombre
                 <input
                   type="text"
@@ -971,8 +1126,10 @@ const CreateProductPage = () => {
                   )}
                 </div>
               </label>
+              )}
 
-              <label className="text-sm font-medium text-gray-700">
+              {isAdminConfigEnabled(adminFieldMap, 'code') && (
+              <label className="text-sm font-medium text-gray-700" style={fieldStyle('code')}>
                 Codigo
                 <input
                   type="text"
@@ -981,41 +1138,59 @@ const CreateProductPage = () => {
                   className="mt-1 w-full rounded-md border border-gray-200 bg-gray-100 p-3 text-gray-500"
                 />
               </label>
+              )}
             </div>
           </section>
+          )}
 
-          <fieldset className="rounded-lg border border-gray-200 p-4">
-            <legend className="px-2 text-sm font-semibold text-gray-700">Precios</legend>
-            <div className="grid gap-4 md:grid-cols-2">
-              {priceLevels.map(level => (
-                <label key={level} className="text-sm font-medium text-gray-700">
-                  {level === 'retail'
-                    ? 'Precio Retail'
-                    : `Precio ${level.charAt(0).toUpperCase()}${level.slice(1)}`}
-                  <input
-                    type="number"
-                    name={level}
-                    min="0"
-                    step="0.01"
-                    value={form.price[level]}
-                    onChange={handlePriceChange}
-                    required={level === 'retail'}
-                    className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-                  />
-                </label>
-              ))}
-            </div>
-            {membershipsEnabled ? (
-              <p className="mt-2 text-xs text-gray-500">
-                Si dejas vacio Gold/Premium/Platinum se usara el precio retail.
-              </p>
-            ) : (
-              <p className="mt-2 text-xs text-gray-500">
-                Membresias desactivadas. Solo se usa el precio retail en este producto.
-              </p>
-            )}
-          </fieldset>
+          {isAdminConfigEnabled(adminFieldMap, 'pricing') && renderResponsiveSection({
+            id: 'pricing',
+            title: 'Precios',
+            description: membershipsEnabled
+              ? 'Configura retail y precios por membresia.'
+              : 'Configura el precio retail del producto.',
+            summary: membershipsEnabled ? `${priceLevels.length} niveles` : 'Retail',
+            style: blockStyle('pricing'),
+            children: (
+              <>
+                <div className="grid gap-4 md:grid-cols-2">
+                  {priceLevels.map(level => (
+                    <label key={level} className="text-sm font-medium text-gray-700">
+                      {level === 'retail'
+                        ? 'Precio Retail'
+                        : `Precio ${level.charAt(0).toUpperCase()}${level.slice(1)}`}
+                      <input
+                        type="number"
+                        name={level}
+                        min="0"
+                        step="0.01"
+                        value={form.price[level]}
+                        onChange={handlePriceChange}
+                        required={level === 'retail'}
+                        className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+                      />
+                    </label>
+                  ))}
+                </div>
+                {membershipsEnabled ? (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Si dejas vacio Gold/Premium/Platinum se usara el precio retail.
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs text-gray-500">
+                    Membresias desactivadas. Solo se usa el precio retail en este producto.
+                  </p>
+                )}
+              </>
+            )
+          })}
 
+          {showCollectionSection && renderResponsiveSection({
+            id: 'collection',
+            title: 'Coleccion',
+            description: 'Asigna la temporada o coleccion del producto.',
+            style: blockStyle('collection'),
+            children: (
           <div className="grid gap-4 md:grid-cols-2">
             <label className="text-sm font-medium text-gray-700">
               Coleccion
@@ -1034,8 +1209,16 @@ const CreateProductPage = () => {
               </select>
             </label>
           </div>
+            )
+          })}
 
-          {dynamicAttributeKeys.length > 0 && (
+          {showDynamicAttributesSection && renderResponsiveSection({
+            id: 'dynamic_attributes',
+            title: 'Atributos extra',
+            description: 'Completa atributos reutilizables definidos en categorias.',
+            summary: `${dynamicAttributeKeys.length} campos`,
+            style: blockStyle('dynamic_attributes'),
+            children: (
             <div className="grid gap-4 md:grid-cols-3">
               {dynamicAttributeKeys.map(key => (
                 <label key={key} className="text-sm font-medium text-gray-700">
@@ -1055,13 +1238,16 @@ const CreateProductPage = () => {
                 </label>
               ))}
             </div>
-          )}
+            )
+          })}
 
-          {renderAccordionSection({
+          {isAdminConfigEnabled(adminFieldMap, 'inventory') && renderAccordionSection({
             id: 'inventory',
             title: 'Inventario',
             description: 'Color, tallas activas y cantidades. Esta seccion es la mas extensa y queda colapsada por defecto.',
             summary: `${selectedColors.length} colores · ${selectedSizeCount} tallas · ${totalUnits} uds`,
+            style: blockStyle('inventory'),
+            sectionRef: registerSectionRef('inventory'),
             children: (
           <section className="rounded-lg border border-gray-200 p-4">
             <h3 className="text-sm font-semibold text-gray-700">Inventario por color y talla</h3>
@@ -1298,34 +1484,50 @@ const CreateProductPage = () => {
             )
           })}
 
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input
-              type="checkbox"
-              name="onSale"
-              checked={form.onSale}
-              onChange={handleFieldChange}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            Esta en oferta?
-          </label>
+          {showContentSection && renderResponsiveSection({
+            id: 'content',
+            title: 'Contenido',
+            description: 'Oferta y descripcion comercial del producto.',
+            style: combinedBlockStyle(['on_sale', 'description']),
+            children: (
+              <div className="space-y-4">
+                {isAdminConfigEnabled(adminFieldMap, 'on_sale') && (
+                <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <input
+                    type="checkbox"
+                    name="onSale"
+                    checked={form.onSale}
+                    onChange={handleFieldChange}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  Esta en oferta?
+                </label>
+                )}
 
-          <label className="text-sm font-medium text-gray-700">
-            Descripcion
-            <textarea
-              name="description"
-              value={form.description}
-              onChange={handleFieldChange}
-              rows={4}
-              placeholder="Describe el producto, materiales, recomendaciones, etc."
-              className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
-            />
-          </label>
+                {isAdminConfigEnabled(adminFieldMap, 'description') && (
+                <label className="block text-sm font-medium text-gray-700">
+                  Descripcion
+                  <textarea
+                    name="description"
+                    value={form.description}
+                    onChange={handleFieldChange}
+                    rows={4}
+                    placeholder="Describe el producto, materiales, recomendaciones, etc."
+                    className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
+                  />
+                </label>
+                )}
+              </div>
+            )
+          })}
 
-          {renderAccordionSection({
+          {isAdminConfigEnabled(adminFieldMap, 'images') && renderAccordionSection({
             id: 'images',
             title: 'Imagenes',
             description: 'Carga fotos de tienda o internas. Tambien define la portada.',
             summary: `${pendingImages.length} nuevas`,
+            style: blockStyle('images'),
+            sectionRef: registerSectionRef('images'),
             children: (
           <div>
             {imageVisibilityEnabled && (
@@ -1401,6 +1603,7 @@ const CreateProductPage = () => {
           <button
             type="submit"
             disabled={submitting}
+            style={submitActionStyle}
             className={`hidden w-full rounded-md py-3 text-white font-semibold transition md:block ${
               submitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
             }`}

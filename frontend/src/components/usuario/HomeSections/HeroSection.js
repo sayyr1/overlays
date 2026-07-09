@@ -3,7 +3,15 @@ import { Link } from 'react-router-dom';
 import Modelo from '../../../assets/images/model.png';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
 
-export default function HeroSection() {
+export default function HeroSection({
+  eyebrow = 'Coleccion destacada',
+  title = 'Portadas que venden colecciones, no dashboards.',
+  description = 'Explora lanzamientos, favoritos y selecciones curadas en una vitrina visual mas limpia.',
+  primaryCtaLabel = 'Comprar ahora',
+  primaryCtaTo = '/productos',
+  secondaryCtaLabel = 'Ver colecciones',
+  secondaryCtaTo = '/productos?onSale=true'
+}) {
   const { storeName } = usePublicConfig();
 
   const brandName = storeName;
@@ -25,27 +33,27 @@ export default function HeroSection() {
           <div className="relative flex min-h-[176px] items-center px-6 py-7 sm:min-h-[190px] sm:px-8 lg:min-h-[210px] lg:px-10">
             <div className="max-w-[540px]">
               <span className="inline-flex rounded-full border border-white/10 bg-black/25 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.26em] text-white/70 backdrop-blur">
-                Coleccion destacada
+                {eyebrow}
               </span>
               <h1 className="mt-4 max-w-[440px] text-3xl font-semibold leading-[0.96] text-white sm:text-4xl lg:text-[3.25rem]">
-                Portadas que venden colecciones, no dashboards.
+                {title}
               </h1>
               <p className="mt-3 max-w-[420px] text-sm text-white/70 sm:text-[15px]">
-                Explora lanzamientos, favoritos y selecciones curadas en una vitrina visual mas limpia.
+                {description}
               </p>
 
               <div className="mt-5 flex flex-wrap gap-3">
                 <Link
-                  to="/productos"
+                  to={primaryCtaTo}
                   className="rounded-md bg-white px-5 py-2.5 text-sm font-semibold text-slate-950 transition hover:bg-slate-100"
                 >
-                  Comprar ahora
+                  {primaryCtaLabel}
                 </Link>
                 <Link
-                  to="/productos?onSale=true"
+                  to={secondaryCtaTo}
                   className="rounded-md border border-white/15 bg-black/20 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur transition hover:border-brand hover:text-brand"
                 >
-                  Ver colecciones
+                  {secondaryCtaLabel}
                 </Link>
               </div>
             </div>

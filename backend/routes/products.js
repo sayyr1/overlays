@@ -26,6 +26,23 @@ const applyRegexFilter = (filter, key, value) => {
   if (!regexes.length) return;
   filter[key] = regexes.length === 1 ? regexes[0] : { $in: regexes };
 };
+const buildRegexMatchCondition = (key, value) => {
+  const regexes = prepareRegexArray(value);
+  if (!regexes.length) return null;
+  return regexes.length === 1 ? { [key]: regexes[0] } : { [key]: { $in: regexes } };
+};
+const applyModelFilter = (filter, value) => {
+  const modelCondition = buildRegexMatchCondition('model', value);
+  const legacyTypeCondition = buildRegexMatchCondition('type', value);
+  if (!modelCondition && !legacyTypeCondition) return;
+
+  filter.$and = [
+    ...(filter.$and || []),
+    {
+      $or: [modelCondition, legacyTypeCondition].filter(Boolean)
+    }
+  ];
+};
 const buildSizeConditions = value => {
   const values = Array.isArray(value) ? value : [value];
   const normalized = new Set();
@@ -320,6 +337,7 @@ const formatProduct = (product, options = {}) => {
     imageVisibilityEnabled = false
   } = options;
   const plain = product.toObject({ flattenMaps: true });
+  const resolvedModel = normalizeString(plain.model) || normalizeString(plain.type);
   const price = plain.price || {};
   let variantMap = ensureMap(product.stockByColorSize);
   variantMap = new Map(variantMap);
@@ -366,6 +384,7 @@ const formatProduct = (product, options = {}) => {
 
   return {
     ...plain,
+    model: resolvedModel,
     price: {
       retail: Number(price.retail ?? 0),
       gold: Number(price.gold ?? price.retail ?? 0),
@@ -458,6 +477,10 @@ router.get('/filters-options', async (req, res) => {
     const imageContext = await getImageVisibilityContext(req);
     const storefrontFilter = getStorefrontVisibilityFilter(imageContext.includeInternalImages);
     const brands = await Product.distinct('brand', storefrontFilter);
+    const rawModels = await Product.find(storefrontFilter).select('model type');
+    const models = uniqueStrings(
+      rawModels.flatMap(product => [product.model, product.type])
+    );
     const types = await Product.distinct('type', storefrontFilter);
     const genders = await Product.distinct('gender', storefrontFilter);
     const collections = await Product.distinct('collection', storefrontFilter);
@@ -465,6 +488,7 @@ router.get('/filters-options', async (req, res) => {
     const max = await Product.find(storefrontFilter).sort({ 'price.retail': -1 }).limit(1);
     res.json({
       brands: uniqueStrings(brands),
+      models,
       types: uniqueStrings(types),
       genders: uniqueStrings(genders),
       collections: uniqueStrings(collections),
@@ -482,6 +506,7 @@ router.get('/filtrar', optionalProtect, async (req, res) => {
     const imageContext = await getImageVisibilityContext(req);
     const {
       brand,
+      model,
       type,
       gender,
       collection,
@@ -493,6 +518,7 @@ router.get('/filtrar', optionalProtect, async (req, res) => {
 
     const filter = {};
     applyRegexFilter(filter, 'brand', brand);
+    applyModelFilter(filter, model);
     applyRegexFilter(filter, 'type', type);
     applyRegexFilter(filter, 'gender', gender);
     applyRegexFilter(filter, 'collection', collection);
@@ -515,7 +541,7 @@ router.get('/filtrar', optionalProtect, async (req, res) => {
     }
 
     // Dynamic attribute filters: any unknown query key
-    const knownKeys = new Set(['brand','type','gender','collection','size','onSale','minPrice','maxPrice']);
+    const knownKeys = new Set(['brand','model','type','gender','collection','size','onSale','minPrice','maxPrice']);
     Object.entries(req.query).forEach(([key, value]) => {
       if (!knownKeys.has(key)) {
         applyRegexFilter(filter, `attributes.${key}`, value);
@@ -538,6 +564,7 @@ router.get('/filter', optionalProtect, async (req, res) => {
     const imageContext = await getImageVisibilityContext(req);
     const {
       brand,
+      model,
       type,
       gender,
       collection,
@@ -549,6 +576,7 @@ router.get('/filter', optionalProtect, async (req, res) => {
 
     const filter = {};
     applyRegexFilter(filter, 'brand', brand);
+    applyModelFilter(filter, model);
     applyRegexFilter(filter, 'type', type);
     applyRegexFilter(filter, 'gender', gender);
     applyRegexFilter(filter, 'collection', collection);
@@ -571,7 +599,7 @@ router.get('/filter', optionalProtect, async (req, res) => {
     }
 
     // Dynamic attribute filters: any unknown query key
-    const knownKeys = new Set(['brand','type','gender','collection','size','onSale','minPrice','maxPrice']);
+    const knownKeys = new Set(['brand','model','type','gender','collection','size','onSale','minPrice','maxPrice']);
     Object.entries(req.query).forEach(([key, value]) => {
       if (!knownKeys.has(key)) {
         applyRegexFilter(filter, `attributes.${key}`, value);
@@ -620,8 +648,10 @@ router.get('/:id', optionalProtect, async (req, res) => {
     try {
       const settings = await getSystemSettings();
       const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
+      const catalogProfile = String(settings?.catalogProfile || 'footwear');
       const payload = { ...req.body };
       payload.price = parsePricePayload(req.body.price);
+      payload.model = normalizeString(req.body.model || (catalogProfile === 'footwear' ? req.body.type : ''));
       let stockByColorSizeMap = parseStockByColorSizePayload(
         req.body.stockByColorSize ?? req.body.variants
       );
@@ -673,12 +703,19 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
   try {
     const settings = await getSystemSettings();
     const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
+    const catalogProfile = String(settings?.catalogProfile || 'footwear');
     const product = await Product.findById(req.params.id);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
     const previousStock = getTotalStockQuantity(product);
 
     if (req.body.price) {
       product.price = parsePricePayload(req.body.price);
+    }
+
+    if (req.body.model !== undefined) {
+      product.model = normalizeString(req.body.model);
+    } else if (catalogProfile === 'footwear' && req.body.type !== undefined && !normalizeString(product.model)) {
+      product.model = normalizeString(req.body.type);
     }
 
     const incomingColors = req.body.colors !== undefined
@@ -717,7 +754,7 @@ router.put('/:id', protect, adminOnly, requirePermission('products', 'edit'), as
       product.colors = incomingColors;
     }
 
-    const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'type', 'collection', 'gender', 'onSale', 'images', 'attributes', 'storeVisibility'];
+    const fieldsToUpdate = ['name', 'code', 'description', 'brand', 'model', 'type', 'collection', 'gender', 'onSale', 'images', 'attributes', 'storeVisibility'];
     fieldsToUpdate.forEach(field => {
       if (req.body[field] !== undefined) {
         product[field] = field === 'images'

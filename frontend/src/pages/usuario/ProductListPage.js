@@ -14,6 +14,7 @@ const FILTER_STORAGE_KEY = 'niway:last-product-filters';
 const SERVER_FILTER_KEYS = new Set([
   'brand',
   'type',
+  'model',
   'gender',
   'size',
   'collection',
@@ -52,6 +53,7 @@ const matchesSearch = (product, searchTerm) => {
   const haystack = [
     product.name,
     product.brand,
+    product.model,
     product.type,
     product.collection,
     product.gender,
@@ -101,7 +103,7 @@ const ProductListPage = () => {
   const urlFilters = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const initial = {};
-    ['brand', 'type', 'gender', 'size', 'collection'].forEach(key => {
+    ['brand', 'type', 'model', 'gender', 'size', 'collection'].forEach(key => {
       if (params.has(key)) {
         initial[key] = params.get(key);
       }
@@ -151,8 +153,10 @@ const ProductListPage = () => {
   }, [products, searchTerm, sortKey]);
 
   const activeFilterCount = useMemo(() => {
-    const filterKeys = Object.keys(activeFilters).length;
-    return searchTerm ? filterKeys + 1 : filterKeys;
+    const keys = Object.keys(activeFilters).filter(key => key !== 'type' && key !== 'model');
+    const primaryCatalogCount = activeFilters.type || activeFilters.model ? 1 : 0;
+    const filterCount = keys.length + primaryCatalogCount;
+    return searchTerm ? filterCount + 1 : filterCount;
   }, [activeFilters, searchTerm]);
 
   useEffect(() => {

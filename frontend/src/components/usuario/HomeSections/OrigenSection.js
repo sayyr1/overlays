@@ -6,6 +6,9 @@ const normalizeValue = value => (value ?? '').toString().trim();
 
 export default function OrigenSection({
   title = 'Explora por origen',
+  eyebrow,
+  to = '/origen',
+  linkLabel = 'Ver mas',
   limit = 6,
   products: providedProducts,
   categoriesData: providedCategoriesData,
@@ -91,8 +94,10 @@ export default function OrigenSection({
 
   return (
     <VisualShelfSection
-      title="Origen"
-      to="/origen"
+      eyebrow={eyebrow}
+      title={title}
+      to={to}
+      linkLabel={linkLabel}
       items={items}
       loading={loading}
       emptyMessage="No encontramos origenes disponibles por ahora."

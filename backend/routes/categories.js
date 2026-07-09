@@ -16,6 +16,69 @@ const canManageBrandModels = user =>
   hasPermission(user, 'products', 'create') ||
   hasPermission(user, 'products', 'edit');
 
+const toPlainCategoryMap = valuesByKey => {
+  const response = {};
+  const source = valuesByKey instanceof Map
+    ? valuesByKey
+    : new Map(Object.entries(valuesByKey || {}));
+
+  for (const [key, value] of source.entries()) {
+    response[key] = uniqueStrings(Array.isArray(value) ? value : []);
+  }
+
+  DEFAULT_KEYS.forEach(key => {
+    if (!Object.prototype.hasOwnProperty.call(response, key)) {
+      response[key] = [];
+    }
+  });
+
+  return response;
+};
+
+const toPlainBrandModelMap = brandModels => {
+  const response = {};
+  const source = brandModels instanceof Map
+    ? brandModels
+    : new Map(Object.entries(brandModels || {}));
+
+  for (const [brand, models] of source.entries()) {
+    response[brand] = uniqueStrings(Array.isArray(models) ? models : []);
+  }
+
+  return response;
+};
+
+const sanitizeCategoryMaps = (valuesByKey, brandModels) => {
+  const nextValues = toPlainCategoryMap(valuesByKey);
+  const nextBrandModels = toPlainBrandModelMap(brandModels);
+  const knownBrands = uniqueStrings([
+    ...(nextValues.brand || []),
+    ...Object.keys(nextBrandModels)
+  ]);
+  const blockedTypeValues = new Set(
+    Object.values(nextBrandModels)
+      .flat()
+      .map(value => normalizeEntry(value).toLowerCase())
+      .filter(Boolean)
+  );
+
+  nextValues.brand = knownBrands;
+  nextValues.type = uniqueStrings(nextValues.type || []).filter(
+    value => !blockedTypeValues.has(normalizeEntry(value).toLowerCase())
+  );
+
+  knownBrands.forEach(brand => {
+    if (!Object.prototype.hasOwnProperty.call(nextBrandModels, brand)) {
+      nextBrandModels[brand] = [];
+    }
+  });
+
+  return {
+    valuesByKey: nextValues,
+    brandModels: nextBrandModels
+  };
+};
+
 const ensureCategoryDocument = async () => {
   let doc = await Category.findOne();
   if (!doc) {
@@ -40,13 +103,21 @@ const ensureCategoryDocument = async () => {
     updated = true;
   }
 
-  const brands = doc.valuesByKey.get('brand') || [];
-  brands.forEach(brand => {
-    if (!doc.brandModels.has(brand)) {
-      doc.brandModels.set(brand, []);
-      updated = true;
-    }
-  });
+  const sanitized = sanitizeCategoryMaps(doc.valuesByKey, doc.brandModels);
+  const serializedValues = JSON.stringify(toPlainCategoryMap(doc.valuesByKey));
+  const serializedBrandModels = JSON.stringify(toPlainBrandModelMap(doc.brandModels));
+  const sanitizedValues = JSON.stringify(sanitized.valuesByKey);
+  const sanitizedBrandModels = JSON.stringify(sanitized.brandModels);
+
+  if (serializedValues !== sanitizedValues || serializedBrandModels !== sanitizedBrandModels) {
+    doc.valuesByKey = new Map(
+      Object.entries(sanitized.valuesByKey).map(([key, values]) => [key, uniqueStrings(values)])
+    );
+    doc.brandModels = new Map(
+      Object.entries(sanitized.brandModels).map(([brand, models]) => [brand, uniqueStrings(models)])
+    );
+    updated = true;
+  }
 
   if (updated) {
     await doc.save();
@@ -56,36 +127,11 @@ const ensureCategoryDocument = async () => {
 };
 
 const mapDocToResponse = doc => {
-  const response = {};
-  for (const [key, arr] of doc.valuesByKey.entries()) {
-    response[key] = Array.isArray(arr) ? arr : [];
-  }
-  DEFAULT_KEYS.forEach(key => {
-    if (!Object.prototype.hasOwnProperty.call(response, key)) {
-      response[key] = [];
-    }
-  });
-  return response;
+  return sanitizeCategoryMaps(doc?.valuesByKey, doc?.brandModels).valuesByKey;
 };
 
 const mapBrandModelsToResponse = doc => {
-  const response = {};
-  const brandModels = doc?.brandModels instanceof Map
-    ? doc.brandModels
-    : new Map(Object.entries(doc?.brandModels || {}));
-
-  for (const [brand, models] of brandModels.entries()) {
-    response[brand] = uniqueStrings(Array.isArray(models) ? models : []);
-  }
-
-  const brands = doc?.valuesByKey?.get?.('brand') || [];
-  brands.forEach(brand => {
-    if (!Object.prototype.hasOwnProperty.call(response, brand)) {
-      response[brand] = [];
-    }
-  });
-
-  return response;
+  return sanitizeCategoryMaps(doc?.valuesByKey, doc?.brandModels).brandModels;
 };
 
 router.get('/', async (req, res) => {
@@ -228,12 +274,6 @@ router.post('/brand-models', protect, adminOnly, async (req, res) => {
     if (!brands.includes(brand)) {
       brands.push(brand);
       doc.valuesByKey.set('brand', brands);
-    }
-
-    const types = uniqueStrings(doc.valuesByKey.get('type') || []);
-    if (!types.includes(model)) {
-      types.push(model);
-      doc.valuesByKey.set('type', types);
     }
 
     const currentModels = uniqueStrings(doc.brandModels.get(brand) || []);

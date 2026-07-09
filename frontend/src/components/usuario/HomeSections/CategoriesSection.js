@@ -1,21 +1,32 @@
 import React, { useEffect, useState } from 'react';
 import axios from '../../../api/axiosInstance';
+import { usePublicConfig } from '../../../context/PublicConfigContext';
+import {
+  getPrimaryCatalogBrowseMeta,
+  getPrimaryCatalogValue
+} from '../../../utils/catalogProfile';
 import VisualShelfSection from './VisualShelfSection';
 
 const normalizeValue = value => (value ?? '').toString().trim();
 
 export default function CategoriesSection({
+  title,
+  eyebrow,
+  to = '/categorias',
+  linkLabel = 'Ver mas',
   limit,
   products: providedProducts,
   categoriesData: providedCategoriesData,
   loading: providedLoading = false
 }) {
+  const { settings } = usePublicConfig();
   const [categoriesData, setCategoriesData] = useState(providedCategoriesData || {});
   const [products, setProducts] = useState(providedProducts || []);
   const [loading, setLoading] = useState(
     !providedCategoriesData || !providedProducts ? true : Boolean(providedLoading)
   );
   const [error, setError] = useState(null);
+  const browseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
 
   useEffect(() => {
     if (providedCategoriesData && providedProducts) {
@@ -60,12 +71,21 @@ export default function CategoriesSection({
     };
   }, [providedCategoriesData, providedLoading, providedProducts]);
 
-  const categoryValues = Array.isArray(categoriesData?.type) ? categoriesData.type : [];
+  const categoryValues = Array.isArray(categoriesData?.[browseMeta.fieldKey])
+    ? categoriesData[browseMeta.fieldKey]
+    : Array.from(
+        new Set(
+          products
+            .map(product => getPrimaryCatalogValue(product, settings?.catalogProfile))
+            .filter(Boolean)
+        )
+      ).sort((left, right) => left.localeCompare(right, 'es'));
   const display = (limit ? categoryValues.slice(0, limit) : categoryValues)
     .map(name => {
       const normalizedName = normalizeValue(name);
       const relatedProducts = products.filter(product =>
-        normalizeValue(product.type).toLowerCase() === normalizedName.toLowerCase()
+        getPrimaryCatalogValue(product, settings?.catalogProfile).toLowerCase() ===
+        normalizedName.toLowerCase()
       );
 
       return {
@@ -75,7 +95,7 @@ export default function CategoriesSection({
         meta: relatedProducts.length > 0 ? `${relatedProducts.length} productos` : 'Explorar'
       };
     })
-    .filter(item => item.label);
+    .filter(item => item.label && item.meta !== 'Explorar');
 
   if (error && !loading) {
     return (
@@ -91,11 +111,13 @@ export default function CategoriesSection({
 
   return (
     <VisualShelfSection
-      title="Categorias"
-      to="/categorias"
+      eyebrow={eyebrow}
+      title={title || browseMeta.title}
+      to={to}
+      linkLabel={linkLabel}
       items={display}
       loading={loading}
-      emptyMessage="Aun no hay categorias configuradas."
+      emptyMessage={`Aun no hay ${browseMeta.title.toLowerCase()} configurad${browseMeta.title === 'Categorias' ? 'as' : 'os'}.`}
     />
   );
 }

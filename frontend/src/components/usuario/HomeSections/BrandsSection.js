@@ -3,7 +3,15 @@ import VisualShelfSection from './VisualShelfSection';
 
 const normalizeValue = value => (value ?? '').toString().trim();
 
-export default function BrandsSection({ products = [], loading = false, limit = 6 }) {
+export default function BrandsSection({
+  products = [],
+  loading = false,
+  limit = 6,
+  title = 'Marcas',
+  eyebrow,
+  to = '/marcas',
+  linkLabel = 'Ver mas'
+}) {
   const items = useMemo(() => {
     const grouped = new Map();
 
@@ -37,8 +45,10 @@ export default function BrandsSection({ products = [], loading = false, limit = 
 
   return (
     <VisualShelfSection
-      title="Marcas"
-      to="/marcas"
+      eyebrow={eyebrow}
+      title={title}
+      to={to}
+      linkLabel={linkLabel}
       items={items}
       loading={loading}
       emptyMessage="Aun no hay marcas suficientes para destacar."

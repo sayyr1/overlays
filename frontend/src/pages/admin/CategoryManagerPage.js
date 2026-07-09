@@ -11,6 +11,11 @@ import {
   HiOutlineTrash
 } from 'react-icons/hi2';
 import axios from '../../api/axiosInstance';
+import { usePublicConfig } from '../../context/PublicConfigContext';
+import {
+  buildConfigFieldMap,
+  isAdminConfigEnabled
+} from '../../utils/adminFormConfig';
 
 const PROTECTED_KEYS = new Set(['brand', 'type', 'size', 'collection', 'gender', 'color']);
 
@@ -36,6 +41,7 @@ const normalizeKeyName = value =>
     .replace(/\s+/g, '_');
 
 const CategoryManagerPage = () => {
+  const { settings } = usePublicConfig();
   const [categories, setCategories] = useState({});
   const [brandModels, setBrandModels] = useState({});
   const [catForm, setCatForm] = useState({ key: '', value: '' });
@@ -49,6 +55,10 @@ const CategoryManagerPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [adminFormConfig, setAdminFormConfig] = useState(null);
+  const modelLabel = settings?.catalogProfile === 'apparel' ? 'Referencia / modelo' : 'Modelo';
+  const modelLabelLower = modelLabel.toLowerCase();
+  const modelPluralLabel = settings?.catalogProfile === 'apparel' ? 'referencias / modelos' : 'modelos';
 
   const keys = useMemo(() => Object.keys(categories).sort((a, b) => a.localeCompare(b)), [categories]);
   const brandList = useMemo(
@@ -180,6 +190,32 @@ const CategoryManagerPage = () => {
     loadCategories();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAdminConfig = async () => {
+      try {
+        const { data } = await axios.get('/api/admin-config/forms/admin_category_manager', {
+          withCredentials: true
+        });
+
+        if (!cancelled) {
+          setAdminFormConfig(data || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminFormConfig(null);
+        }
+      }
+    };
+
+    loadAdminConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const syncCategories = nextCategories => {
     const normalized = normalizeCategories(nextCategories);
     setCategories(normalized);
@@ -295,14 +331,10 @@ const CategoryManagerPage = () => {
     try {
       const { data } = await axios.post('/api/categories/brand-models', { brand, model });
       syncBrandModels(data);
-      setCategories(prev => ({
-        ...prev,
-        type: Array.from(new Set([...(prev.type || []), model]))
-      }));
       setBrandModelForm(prev => ({ ...prev, model: '' }));
-      setMessage(`Modelo "${model}" agregado a ${brand}.`);
+      setMessage(`${modelLabel} "${model}" agregado a ${brand}.`);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Error al agregar el modelo.');
+      setError(err?.response?.data?.message || `Error al agregar ${modelLabelLower}.`);
     } finally {
       setSubmitting(false);
     }
@@ -319,9 +351,9 @@ const CategoryManagerPage = () => {
         data: { brand, model }
       });
       syncBrandModels(data);
-      setMessage(`Modelo "${model}" eliminado de ${brand}.`);
+      setMessage(`${modelLabel} "${model}" eliminado de ${brand}.`);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Error al eliminar el modelo.');
+      setError(err?.response?.data?.message || `Error al eliminar ${modelLabelLower}.`);
     }
   };
 
@@ -417,6 +449,15 @@ const CategoryManagerPage = () => {
     );
   };
 
+  const adminFieldMap = useMemo(
+    () => buildConfigFieldMap(adminFormConfig?.fields),
+    [adminFormConfig?.fields]
+  );
+
+  const blockStyle = key => ({
+    order: adminFieldMap[key]?.order ?? 0
+  });
+
   return (
     <div className="min-h-screen bg-surface-50 px-4 py-8 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -455,7 +496,8 @@ const CategoryManagerPage = () => {
         </header>
 
         <section className="grid gap-4 xl:grid-cols-[1fr_0.8fr]">
-          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+          {isAdminConfigEnabled(adminFieldMap, 'add_value') && (
+          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm" style={blockStyle('add_value')}>
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand/10 text-brand">
                 <HiOutlineTag className="text-2xl" />
@@ -500,8 +542,10 @@ const CategoryManagerPage = () => {
               </div>
             </div>
           </article>
+          )}
 
-          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+          {isAdminConfigEnabled(adminFieldMap, 'add_key') && (
+          <article className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm" style={blockStyle('add_key')}>
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700">
                 <HiOutlineFolderPlus className="text-2xl" />
@@ -535,16 +579,18 @@ const CategoryManagerPage = () => {
               La clave se normaliza a minúsculas y reemplaza espacios por `_`.
             </p>
           </article>
+          )}
         </section>
 
         <section className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <article className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm sm:p-5">
+          {isAdminConfigEnabled(adminFieldMap, 'brand_model_form') && (
+          <article className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm sm:p-5" style={blockStyle('brand_model_form')}>
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-100 text-violet-700">
                 <HiOutlineTag className="text-2xl" />
               </span>
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">Conectar modelos a marcas</h2>
+                <h2 className="text-lg font-semibold text-slate-950">Conectar {modelPluralLabel} a marcas</h2>
                 <p className="text-sm text-slate-500">
                   Define qué modelos aparecen para cada marca en el formulario de productos.
                 </p>
@@ -568,7 +614,7 @@ const CategoryManagerPage = () => {
                 </select>
               </label>
               <label className="text-sm text-slate-600">
-                Modelo
+                {modelLabel}
                 <input
                   value={brandModelForm.model}
                   onChange={event => setBrandModelForm(prev => ({ ...prev, model: event.target.value }))}
@@ -582,7 +628,7 @@ const CategoryManagerPage = () => {
                   disabled={submitting || !brandModelForm.brand || !brandModelForm.model.trim()}
                   className="w-full rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:py-3"
                 >
-                  Agregar modelo
+                  Agregar {modelLabelLower}
                 </button>
               </div>
             </div>
@@ -594,24 +640,26 @@ const CategoryManagerPage = () => {
                 <span className="font-semibold text-slate-800">
                   {(brandModels[brandModelForm.brand] || []).length}
                 </span>
-                {' '}modelo{(brandModels[brandModelForm.brand] || []).length === 1 ? '' : 's'} conectado{(brandModels[brandModelForm.brand] || []).length === 1 ? '' : 's'}.
+                {' '}{modelLabelLower}{(brandModels[brandModelForm.brand] || []).length === 1 ? '' : 's'} conectado{(brandModels[brandModelForm.brand] || []).length === 1 ? '' : 's'}.
               </div>
             )}
 
             {!brandList.length && (
               <div className="mt-4 rounded-2xl border border-dashed border-surface-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                Primero agrega marcas en la clave `brand` para poder mapear modelos.
+                Primero agrega marcas en la clave `brand` para poder mapear {modelPluralLabel}.
               </div>
             )}
           </article>
+          )}
 
-          <article className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm sm:p-5">
+          {isAdminConfigEnabled(adminFieldMap, 'brand_model_map') && (
+          <article className="rounded-3xl border border-surface-200 bg-white p-4 shadow-sm sm:p-5" style={blockStyle('brand_model_map')}>
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-700">
                 <HiOutlineSquares2X2 className="text-2xl" />
               </span>
               <div>
-                <h2 className="text-lg font-semibold text-slate-950">Mapa marca -> modelos</h2>
+                <h2 className="text-lg font-semibold text-slate-950">Mapa marca -> {modelPluralLabel}</h2>
                 <p className="text-sm text-slate-500">
                   Aqui se ve exactamente qué modelos quedarán disponibles por cada marca.
                 </p>
@@ -638,7 +686,7 @@ const CategoryManagerPage = () => {
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {[
                     { value: 'all', label: 'Todas' },
-                    { value: 'mapped', label: 'Con modelos' },
+                    { value: 'mapped', label: `Con ${modelPluralLabel}` },
                     { value: 'pending', label: 'Pendientes' }
                   ].map(option => (
                     <button
@@ -663,7 +711,7 @@ const CategoryManagerPage = () => {
                   <input
                     value={brandModelSearchTerm}
                     onChange={event => setBrandModelSearchTerm(event.target.value)}
-                    placeholder="Buscar marca o modelo"
+                    placeholder={`Buscar marca o ${modelLabelLower}`}
                     className="w-full rounded-2xl border border-surface-200 px-10 py-3 text-base text-slate-700 sm:py-2.5 sm:text-sm"
                   />
                 </label>
@@ -673,16 +721,17 @@ const CategoryManagerPage = () => {
                 filteredBrandCards.map(item => renderBrandModelCard(item))
                 ) : (
                   <div className="rounded-2xl border border-dashed border-surface-200 px-4 py-8 text-center text-sm text-slate-500">
-                    No encontramos coincidencias para esa marca o modelo.
+                    No encontramos coincidencias para esa marca o {modelLabelLower}.
                   </div>
                 )
               ) : (
                 <div className="rounded-2xl border border-dashed border-surface-200 px-4 py-8 text-center text-sm text-slate-500">
-                  No hay marcas disponibles para mapear modelos.
+                  No hay marcas disponibles para mapear {modelPluralLabel}.
                 </div>
               )}
             </div>
           </article>
+          )}
         </section>
 
         {(error || message) && (
@@ -697,7 +746,8 @@ const CategoryManagerPage = () => {
           </div>
         )}
 
-        <section className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm">
+        {isAdminConfigEnabled(adminFieldMap, 'category_grid') && (
+        <section className="rounded-3xl border border-surface-200 bg-white p-5 shadow-sm" style={blockStyle('category_grid')}>
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700">
@@ -803,6 +853,7 @@ const CategoryManagerPage = () => {
             </div>
           )}
         </section>
+        )}
       </div>
     </div>
   );

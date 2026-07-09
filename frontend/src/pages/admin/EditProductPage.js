@@ -22,6 +22,10 @@ import {
   sortImagesForPayload,
   updateImageVisibility
 } from '../../utils/productImages';
+import {
+  buildConfigFieldMap,
+  isAdminConfigEnabled
+} from '../../utils/adminFormConfig';
 
 const createEmptyPrice = () => ({
   retail: '',
@@ -56,6 +60,7 @@ const EditProductPage = () => {
   const canEditProducts = hasPermission('products.edit');
   const canCreateModelInline = canManageCategories || canEditProducts;
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
+  const modelFieldLabel = settings?.catalogProfile === 'apparel' ? 'Referencia / modelo' : 'Modelo';
   const priceLevels = membershipsEnabled
     ? ['retail', 'gold', 'premium', 'platinum']
     : ['retail'];
@@ -65,7 +70,7 @@ const EditProductPage = () => {
     price: createEmptyPrice(),
     description: '',
     brand: '',
-    type: '',
+    model: '',
     collection: '',
     gender: 'Unisex',
     attributes: {},
@@ -87,6 +92,7 @@ const EditProductPage = () => {
   const [openSection, setOpenSection] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [creatingModel, setCreatingModel] = useState(false);
+  const [adminFormConfig, setAdminFormConfig] = useState(null);
   const [originalInventory, setOriginalInventory] = useState({
     stockByColorSize: {},
     stockBySize: {},
@@ -164,7 +170,7 @@ const EditProductPage = () => {
           },
           description: product.description ?? '',
           brand: product.brand ?? '',
-          type: product.type ?? '',
+          model: product.model ?? product.type ?? '',
           collection: product.collection ?? '',
           gender: product.gender ?? 'Unisex',
           attributes: normalizedAttributes,
@@ -233,12 +239,55 @@ const EditProductPage = () => {
     });
   }, [categoryGenderOptions]);
 
+  useEffect(() => {
+    if (!form.brand) {
+      setForm(prev => (prev.model ? { ...prev, model: '' } : prev));
+      return;
+    }
+
+    if (!availableModels.length) {
+      return;
+    }
+
+    setForm(prev => (
+      prev.model && availableModels.includes(prev.model)
+        ? prev
+        : { ...prev, model: '' }
+    ));
+  }, [availableModels, form.brand]);
+
   useEffect(
     () => () => {
       pendingImages.forEach(item => URL.revokeObjectURL(item.previewUrl));
     },
     [pendingImages]
   );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAdminConfig = async () => {
+      try {
+        const { data } = await axios.get('/api/admin-config/forms/admin_product_edit', {
+          withCredentials: true
+        });
+
+        if (!cancelled) {
+          setAdminFormConfig(data || null);
+        }
+      } catch {
+        if (!cancelled) {
+          setAdminFormConfig(null);
+        }
+      }
+    };
+
+    loadAdminConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const selectedColors = useMemo(() => Object.keys(variantState), [variantState]);
 
@@ -363,11 +412,7 @@ const EditProductPage = () => {
     try {
       const { data } = await axios.post('/api/categories/brand-models', { brand, model });
       setBrandModels(data || {});
-      setCategories(prev => ({
-        ...prev,
-        type: Array.from(new Set([...(prev.type || []), model])).sort((left, right) => left.localeCompare(right))
-      }));
-      setForm(prev => ({ ...prev, type: model }));
+      setForm(prev => ({ ...prev, model }));
       return model;
     } catch (error) {
       window.alert(error.response?.data?.message || 'No se pudo crear el modelo.');
@@ -593,7 +638,8 @@ const EditProductPage = () => {
         price: normalizedPrice,
         description: form.description,
         brand: form.brand,
-        type: form.type,
+        model: form.model,
+        type: '',
         collection: form.collection,
         gender: form.gender,
         attributes,
@@ -621,6 +667,21 @@ const EditProductPage = () => {
       setSubmitting(false);
     }
   };
+
+  const adminFieldMap = useMemo(
+    () => buildConfigFieldMap(adminFormConfig?.fields),
+    [adminFormConfig?.fields]
+  );
+
+  const blockStyle = key => ({
+    order: adminFieldMap[key]?.order ?? 0
+  });
+
+  const editIdentityKeys = ['name', 'code', 'brand', 'model', 'collection', 'gender'];
+  const showEditIdentity = editIdentityKeys.some(key => isAdminConfigEnabled(adminFieldMap, key));
+  const fieldStyle = key => ({
+    order: adminFieldMap[key]?.order ?? 0
+  });
 
   if (loading) {
     return <div className="min-h-screen bg-gray-50 p-6 text-center text-gray-500">Cargando...</div>;
@@ -795,11 +856,11 @@ const EditProductPage = () => {
     </div>
   );
 
-  const renderAccordionSection = ({ id, title, description, summary, children }) => {
+  const renderAccordionSection = ({ id, title, description, summary, children, style }) => {
     const isOpen = openSection === id;
 
     return (
-      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+      <section className="rounded-2xl border border-gray-200 bg-white shadow-sm" style={style}>
         <button
           type="button"
           onClick={() => setOpenSection(prev => (prev === id ? '' : id))}
@@ -845,9 +906,11 @@ const EditProductPage = () => {
             </span>
           </div>
         </div>
-        <form id="edit-product-form" onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <label className="text-sm font-medium text-gray-700">
+        <form id="edit-product-form" onSubmit={handleSubmit} className="flex flex-col gap-4">
+          {showEditIdentity && (
+          <div className="grid gap-4 md:grid-cols-2" style={blockStyle('identity')}>
+            {isAdminConfigEnabled(adminFieldMap, 'name') && (
+            <label className="text-sm font-medium text-gray-700" style={fieldStyle('name')}>
               Nombre
               <input
                 type="text"
@@ -858,7 +921,9 @@ const EditProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
               />
             </label>
-            <label className="text-sm font-medium text-gray-700">
+            )}
+            {isAdminConfigEnabled(adminFieldMap, 'code') && (
+            <label className="text-sm font-medium text-gray-700" style={fieldStyle('code')}>
               Codigo
               <input
                 type="text"
@@ -867,9 +932,12 @@ const EditProductPage = () => {
                 className="mt-1 w-full rounded-md border border-gray-200 bg-gray-100 p-3 text-gray-500"
               />
             </label>
+            )}
           </div>
+          )}
 
-          <fieldset className="rounded-lg border border-gray-200 p-4">
+          {isAdminConfigEnabled(adminFieldMap, 'pricing') && (
+          <fieldset className="rounded-lg border border-gray-200 p-4" style={blockStyle('pricing')}>
             <legend className="px-2 text-sm font-semibold text-gray-700">Precios</legend>
             <div className="grid gap-4 md:grid-cols-2">
               {priceLevels.map(level => (
@@ -900,9 +968,12 @@ const EditProductPage = () => {
               </p>
             )}
           </fieldset>
+          )}
 
-          <div className="grid gap-4 md:grid-cols-3">
-            <label className="text-sm font-medium text-gray-700">
+          {showEditIdentity && (
+          <div className="grid gap-4 md:grid-cols-3" style={blockStyle('identity')}>
+            {isAdminConfigEnabled(adminFieldMap, 'brand') && (
+            <label className="text-sm font-medium text-gray-700" style={fieldStyle('brand')}>
               Marca
               <select
                 name="brand"
@@ -918,22 +989,27 @@ const EditProductPage = () => {
                 ))}
               </select>
             </label>
+            )}
+            {isAdminConfigEnabled(adminFieldMap, 'model') && (
             <BrandModelInput
               brand={form.brand}
-              value={form.type}
+              value={form.model}
               options={availableModels}
               onChange={nextValue =>
                 setForm(prev => ({
                   ...prev,
-                  type: nextValue
+                  model: nextValue
                 }))
               }
               onCreate={handleCreateModel}
               canCreate={canCreateModelInline}
               creating={creatingModel}
-              label="Modelo"
+              label={modelFieldLabel}
+              style={fieldStyle('model')}
             />
-            <label className="text-sm font-medium text-gray-700">
+            )}
+            {isAdminConfigEnabled(adminFieldMap, 'collection') && (
+            <label className="text-sm font-medium text-gray-700" style={fieldStyle('collection')}>
               Coleccion
               <select
                 name="collection"
@@ -949,9 +1025,12 @@ const EditProductPage = () => {
                 ))}
               </select>
             </label>
+            )}
           </div>
+          )}
 
-          <label className="text-sm font-medium text-gray-700">
+          {isAdminConfigEnabled(adminFieldMap, 'gender') && (
+          <label className="text-sm font-medium text-gray-700" style={fieldStyle('gender')}>
             Genero
             <select
               name="gender"
@@ -966,9 +1045,10 @@ const EditProductPage = () => {
               ))}
             </select>
           </label>
+          )}
 
-          {dynamicAttributeKeys.length > 0 && (
-            <div className="grid gap-4 md:grid-cols-3">
+          {isAdminConfigEnabled(adminFieldMap, 'dynamic_attributes') && dynamicAttributeKeys.length > 0 && (
+            <div className="grid gap-4 md:grid-cols-3" style={blockStyle('dynamic_attributes')}>
               {dynamicAttributeKeys.map(key => {
                 const selectedVal = form.attributes?.[key] || '';
                 const values = Array.from(
@@ -998,7 +1078,7 @@ const EditProductPage = () => {
             </div>
           )}
 
-          {renderAccordionSection({
+          {isAdminConfigEnabled(adminFieldMap, 'inventory') && renderAccordionSection({
             id: 'inventory',
             title: 'Inventario',
             description: 'Color, tallas activas y cantidades. Esta seccion queda plegada por defecto para acortar la vista.',
@@ -1242,7 +1322,8 @@ const EditProductPage = () => {
             )
           })}
 
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
+          {isAdminConfigEnabled(adminFieldMap, 'on_sale') && (
+          <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700" style={blockStyle('on_sale')}>
             <input
               type="checkbox"
               name="onSale"
@@ -1252,8 +1333,10 @@ const EditProductPage = () => {
             />
             Esta en oferta?
           </label>
+          )}
 
-          <label className="text-sm font-medium text-gray-700">
+          {isAdminConfigEnabled(adminFieldMap, 'description') && (
+          <label className="text-sm font-medium text-gray-700" style={blockStyle('description')}>
             Descripcion
             <textarea
               name="description"
@@ -1263,12 +1346,14 @@ const EditProductPage = () => {
               className="mt-1 w-full rounded-md border border-gray-300 p-3 focus:border-blue-500 focus:outline-none"
             />
           </label>
+          )}
 
-          {renderAccordionSection({
+          {isAdminConfigEnabled(adminFieldMap, 'images') && renderAccordionSection({
             id: 'images',
             title: 'Imagenes',
             description: 'Gestiona fotos actuales, nuevas cargas, portada y visibilidad interna.',
             summary: `${existingImages.length + pendingImages.length} totales`,
+            style: blockStyle('images'),
             children: (
           <>
           {imageVisibilityEnabled && (

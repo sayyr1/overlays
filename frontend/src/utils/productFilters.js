@@ -1,6 +1,7 @@
 const FILTER_STATE_KEYS = [
   'brand',
   'type',
+  'model',
   'gender',
   'size',
   'collection',
@@ -12,6 +13,7 @@ const FILTER_STATE_KEYS = [
 export const DEFAULT_FILTER_STATE = {
   brand: '',
   type: '',
+  model: '',
   gender: '',
   size: '',
   collection: '',

@@ -7,14 +7,14 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: '#0f766e',
-          dark: '#0d4f47',
-          light: '#14b8a6',
-          muted: '#38ada9'
+          DEFAULT: 'rgb(var(--color-brand, 15 118 110) / <alpha-value>)',
+          dark: 'rgb(var(--color-brand-dark, 13 79 71) / <alpha-value>)',
+          light: 'rgb(var(--color-brand-light, 20 184 166) / <alpha-value>)',
+          muted: 'rgb(var(--color-brand-muted, 56 173 169) / <alpha-value>)'
         },
         accent: {
-          DEFAULT: '#f97316',
-          soft: '#ffb677'
+          DEFAULT: 'rgb(var(--color-accent, 249 115 22) / <alpha-value>)',
+          soft: 'rgb(var(--color-accent-soft, 255 182 119) / <alpha-value>)'
         },
         surface: {
           50: '#f8fafc',
@@ -24,8 +24,8 @@ module.exports = {
         }
       },
       fontFamily: {
-        sans: ['"Inter"', 'system-ui', 'sans-serif'],
-        display: ['"Playfair Display"', '"Times New Roman"', 'serif']
+        sans: ['var(--font-body)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-heading)', '"Times New Roman"', 'serif']
       },
       boxShadow: {
         'brand-sm': '0 12px 30px -20px rgba(15, 118, 110, 0.35)',

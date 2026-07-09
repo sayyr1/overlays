@@ -7,6 +7,10 @@ import { usePublicConfig } from '../../context/PublicConfigContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatCurrency } from '../../utils/pricing';
 import {
+  getPrimaryCatalogBrowseMeta,
+  getPrimaryCatalogValue
+} from '../../utils/catalogProfile';
+import {
   buildNestedVariantsWithFallback,
   normalizeVariantColor
 } from '../../utils/inventory';
@@ -63,6 +67,7 @@ const ProductDetailsPage = () => {
   const canViewProductInterest = isModuleEnabled('crm') && hasPermission('crm.productInterestView');
   const canEditProducts = hasPermission('products.edit');
   const imageVisibilityEnabled = Boolean(settings?.enableInternalProductImages);
+  const primaryBrowseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
 
   useEffect(() => {
     axios
@@ -122,6 +127,7 @@ const ProductDetailsPage = () => {
   const galleryPreviewImages = getAdminGalleryPreviewImages(product);
   const coverImageId = publicImages[0]?.public_id || publicImages[0]?.url || '';
   const isStorePublic = product?.storeVisibility === 'public';
+  const primaryCatalogValue = getPrimaryCatalogValue(product, settings?.catalogProfile);
 
   const handleStoreVisibilityChange = async nextVisibility => {
     if (!canEditProducts || !product || nextVisibility === product.storeVisibility) {
@@ -200,7 +206,7 @@ const ProductDetailsPage = () => {
               <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-500">
                 <span>Cod. {product.code}</span>
                 <span>{product.gender || 'Sin genero'}</span>
-                <span>{product.type || 'Sin tipo'}</span>
+                <span>{primaryCatalogValue || `Sin ${primaryBrowseMeta.singular}`}</span>
                 {product.brand && <span>{product.brand}</span>}
                 {product.collection && <span>{product.collection}</span>}
               </div>
@@ -404,9 +410,9 @@ const ProductDetailsPage = () => {
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">
-                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Categoria</p>
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-slate-400">{primaryBrowseMeta.filterLabel}</p>
                   <p className="mt-1 text-sm font-semibold text-slate-900">
-                    {product.category || product.type || 'Sin categoria'}
+                    {primaryCatalogValue || product.category || `Sin ${primaryBrowseMeta.singular}`}
                   </p>
                 </div>
                 <div className="rounded-2xl border border-surface-200 bg-surface-50 px-4 py-3">

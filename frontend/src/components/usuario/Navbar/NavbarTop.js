@@ -10,6 +10,7 @@ import {
   subscribeGuestOrderTracking
 } from '../../../utils/guestOrderTracking';
 import { buildProductFilterUrl } from '../../../utils/productFilters';
+import { getPrimaryCatalogBrowseMeta } from '../../../utils/catalogProfile';
 import { FiChevronRight, FiMenu, FiSearch, FiX } from 'react-icons/fi';
 import { HiOutlineShoppingBag } from 'react-icons/hi';
 import LogoBg from '../../../assets/images/background.png';
@@ -87,7 +88,7 @@ const isItemVisible = item => {
 const NavbarTop = () => {
   const { count } = useCart();
   const { isAuthenticated, logout, user, isSuperAdmin, hasAnyPermission } = useAuth();
-  const { branding, storeName, loading, isModuleEnabled } = usePublicConfig();
+  const { branding, storeName, loading, isModuleEnabled, settings } = usePublicConfig();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -117,6 +118,7 @@ const NavbarTop = () => {
   const brandName = storeName;
   const productsEnabled = isModuleEnabled('products');
   const categoriesEnabled = isModuleEnabled('categories');
+  const browseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
   const ordersEnabled = isModuleEnabled('orders');
   const paymentsEnabled = isModuleEnabled('payments');
   const menuEnabled = isModuleEnabled('menu');
@@ -451,7 +453,7 @@ const NavbarTop = () => {
                         className="hover:text-brand transition-colors duration-200"
                         to="/productos"
                       >
-                        Categorias
+                        {browseMeta.navLabel}
                       </Link>
                     </li>
                   )}

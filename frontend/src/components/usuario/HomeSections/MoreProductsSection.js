@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import axios from '../../../api/axiosInstance';
 import ProductShelfSection from './ProductShelfSection';
 
-const MoreProductsSection = ({ products: providedProducts, loading: providedLoading = false }) => {
+const MoreProductsSection = ({
+  products: providedProducts,
+  loading: providedLoading = false,
+  title = 'Nuevos',
+  eyebrow,
+  to = '/nuevos',
+  linkLabel = 'Ver mas',
+  limit = 12
+}) => {
   const [recentProducts, setRecentProducts] = useState([]);
   const [loading, setLoading] = useState(!providedProducts);
 
@@ -18,7 +26,7 @@ const MoreProductsSection = ({ products: providedProducts, loading: providedLoad
           return !Number.isNaN(createdAt.valueOf()) && createdAt >= twoWeeksAgo;
         })
         .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-        .slice(0, 12);
+        .slice(0, limit);
     };
 
     if (providedProducts) {
@@ -40,7 +48,7 @@ const MoreProductsSection = ({ products: providedProducts, loading: providedLoad
     };
 
     fetchRecentProducts();
-  }, [providedLoading, providedProducts]);
+  }, [limit, providedLoading, providedProducts]);
 
   if (!loading && recentProducts.length === 0) {
     return null;
@@ -48,8 +56,10 @@ const MoreProductsSection = ({ products: providedProducts, loading: providedLoad
 
   return (
     <ProductShelfSection
-      title="Nuevos"
-      to="/nuevos"
+      eyebrow={eyebrow}
+      title={title}
+      to={to}
+      linkLabel={linkLabel}
       products={recentProducts}
       loading={loading}
     />

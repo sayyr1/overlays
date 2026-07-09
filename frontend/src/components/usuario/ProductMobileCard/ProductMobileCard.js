@@ -8,6 +8,7 @@ import { trackWhatsAppClick } from '../../../services/crmTracking';
 import { getPriceForUser, formatCurrency } from '../../../utils/pricing';
 import { buildWhatsAppHref, generateLeadCode } from '../../../utils/whatsappLead';
 import { buildNestedVariantsWithFallback, summarizeNestedVariants } from '../../../utils/inventory';
+import { getPrimaryCatalogValue } from '../../../utils/catalogProfile';
 import { HeartIcon } from '@heroicons/react/24/outline';
 
 const ProductMobileCard = ({ product, variant = 'default' }) => {
@@ -46,6 +47,10 @@ const ProductMobileCard = ({ product, variant = 'default' }) => {
     const candidate = Number(product.compareAtPrice || 0);
     return candidate > priceForUser ? candidate : 0;
   }, [priceForUser, product.compareAtPrice]);
+  const primaryCatalogValue = useMemo(
+    () => getPrimaryCatalogValue(product, settings?.catalogProfile),
+    [product, settings?.catalogProfile]
+  );
 
   const clearNavigateFeedback = useCallback(() => {
     if (resetTimerRef.current) {
@@ -357,7 +362,7 @@ const ProductMobileCard = ({ product, variant = 'default' }) => {
 
         <div className="flex items-center justify-between text-[11px] text-slate-500">
           <span>{stockSummary.total > 0 ? `${stockSummary.total} unidades visibles` : 'Sin disponibilidad'}</span>
-          {product.type ? <span>{product.type}</span> : null}
+          {primaryCatalogValue ? <span>{primaryCatalogValue}</span> : null}
         </div>
 
         <div className="flex flex-col gap-2">

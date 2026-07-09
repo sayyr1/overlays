@@ -19,7 +19,9 @@ const BrandModelInput = ({
   canCreate = false,
   creating = false,
   disabled = false,
-  label = 'Modelo'
+  label = 'Modelo',
+  className = '',
+  style
 }) => {
   const [query, setQuery] = useState(value || '');
   const [isOpen, setIsOpen] = useState(false);
@@ -116,7 +118,7 @@ const BrandModelInput = ({
   };
 
   return (
-    <label className="text-sm font-medium text-gray-700">
+    <label className={`text-sm font-medium text-gray-700 ${className}`.trim()} style={style}>
       {label}
       <div className="relative mt-1">
         <div className="flex items-center rounded-md border border-gray-300 bg-white focus-within:border-blue-500">

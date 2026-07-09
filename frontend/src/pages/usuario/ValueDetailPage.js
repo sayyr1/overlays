@@ -3,6 +3,11 @@ import { Link, useParams } from 'react-router-dom';
 import { FiChevronDown, FiX } from 'react-icons/fi';
 import axios from '../../api/axiosInstance';
 import ProductMobileCard from '../../components/usuario/ProductMobileCard/ProductMobileCard';
+import { usePublicConfig } from '../../context/PublicConfigContext';
+import {
+  getPrimaryCatalogBrowseMeta,
+  getPrimaryCatalogValue
+} from '../../utils/catalogProfile';
 
 const SORT_OPTIONS = [
   { value: 'featured', label: 'Destacados' },
@@ -38,7 +43,7 @@ const resolveAttributeValue = (product, keyName) => {
 };
 
 const getProductFieldValue = (product, filterKey) => {
-  if (['brand', 'type', 'collection', 'gender'].includes(filterKey)) {
+  if (['brand', 'type', 'model', 'collection', 'gender'].includes(filterKey)) {
     return normalizeValue(product?.[filterKey]);
   }
 
@@ -62,6 +67,8 @@ export default function ValueDetailPage({
   titleFormatter,
   descriptionFormatter
 }) {
+  const { settings } = usePublicConfig();
+  const primaryBrowseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
   const params = useParams();
   const rawValue = params?.[paramName] || '';
   const value = decodeURIComponent(rawValue);
@@ -111,7 +118,12 @@ export default function ValueDetailPage({
 
   const filteredProducts = useMemo(() => {
     const next = products.filter(product => {
-      if (selectedType && normalizeValue(product.type) !== selectedType) return false;
+      if (
+        selectedType &&
+        getPrimaryCatalogValue(product, settings?.catalogProfile) !== selectedType
+      ) {
+        return false;
+      }
       if (selectedGender && normalizeValue(product.gender) !== selectedGender) return false;
       if (selectedCollection && normalizeValue(product.collection) !== selectedCollection) return false;
       return true;
@@ -133,9 +145,19 @@ export default function ValueDetailPage({
     }
 
     return next;
-  }, [products, selectedCollection, selectedGender, selectedType, sortKey]);
+  }, [products, selectedCollection, selectedGender, selectedType, settings?.catalogProfile, sortKey]);
 
-  const types = useMemo(() => getUniqueOptions(products, 'type'), [products]);
+  const types = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          products
+            .map(product => getPrimaryCatalogValue(product, settings?.catalogProfile))
+            .filter(Boolean)
+        )
+      ).sort((a, b) => a.localeCompare(b, 'es')),
+    [products, settings?.catalogProfile]
+  );
   const genders = useMemo(() => getUniqueOptions(products, 'gender'), [products]);
   const collections = useMemo(() => getUniqueOptions(products, 'collection'), [products]);
   const activeFilterCount = useMemo(
@@ -173,7 +195,7 @@ export default function ValueDetailPage({
 
               <div className="space-y-5 px-4 py-5">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Categoria</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">{primaryBrowseMeta.filterLabel}</p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button
                       type="button"
@@ -389,7 +411,7 @@ export default function ValueDetailPage({
 
                 <div className="space-y-5 px-4 py-5">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">Categoria</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-white/55">{primaryBrowseMeta.filterLabel}</p>
                     <div className="mt-3 flex flex-wrap gap-2">
                       <button
                         type="button"

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from '../../../api/axiosInstance';
 import HeroSection from '../HomeSections/HeroSection';
 import FeaturedProductsSection from '../HomeSections/FeaturedProductsSection';
@@ -8,16 +8,32 @@ import MoreProductsSection from '../HomeSections/MoreProductsSection';
 import BrandsSection from '../HomeSections/BrandsSection';
 import CollectionsSection from '../HomeSections/CollectionsSection';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
+import { createDefaultHomeSections, normalizeHomeSections } from '../../../utils/homeLayout';
 
 export default function HomePage() {
-  const { loading, isModuleEnabled } = usePublicConfig();
+  const { loading, homeLayout, isModuleEnabled } = usePublicConfig();
   const [products, setProducts] = useState([]);
   const [categoriesData, setCategoriesData] = useState({});
   const [productsLoading, setProductsLoading] = useState(true);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
 
-  const productsEnabled = isModuleEnabled('products');
-  const categoriesEnabled = isModuleEnabled('categories');
+  const sections = useMemo(
+    () => normalizeHomeSections(homeLayout?.sections || createDefaultHomeSections()),
+    [homeLayout]
+  );
+  const visibleSections = useMemo(
+    () => sections.filter(section => section.enabled !== false),
+    [sections]
+  );
+  const needsProducts = visibleSections.some(section =>
+    ['hero', 'new_arrivals', 'featured_products', 'categories', 'brands', 'collections', 'origins'].includes(section.type)
+  );
+  const needsCategories = visibleSections.some(section =>
+    ['categories', 'origins'].includes(section.type)
+  );
+
+  const productsEnabled = isModuleEnabled('products') && needsProducts;
+  const categoriesEnabled = isModuleEnabled('categories') && needsCategories;
 
   useEffect(() => {
     if (!productsEnabled) {
@@ -93,33 +109,117 @@ export default function HomePage() {
     return <div className="min-h-[40vh]" />;
   }
 
+  const renderSection = section => {
+    if (section.type === 'hero') {
+      return (
+        <HeroSection
+          eyebrow={section.settings?.eyebrow || section.eyebrow || undefined}
+          title={section.settings?.title || undefined}
+          description={section.settings?.description || undefined}
+          primaryCtaLabel={section.settings?.primaryCtaLabel || undefined}
+          primaryCtaTo={section.settings?.primaryCtaTo || undefined}
+          secondaryCtaLabel={section.settings?.secondaryCtaLabel || undefined}
+          secondaryCtaTo={section.settings?.secondaryCtaTo || undefined}
+        />
+      );
+    }
+
+    if (section.type === 'new_arrivals') {
+      return (
+        <MoreProductsSection
+          products={products}
+          loading={productsLoading}
+          title={section.title || 'Nuevos'}
+          eyebrow={section.eyebrow || undefined}
+          to={section.linkTo || '/nuevos'}
+          linkLabel={section.linkLabel || 'Ver mas'}
+          limit={section.limit || 12}
+        />
+      );
+    }
+
+    if (section.type === 'featured_products') {
+      return (
+        <FeaturedProductsSection
+          products={products}
+          loading={productsLoading}
+          title={section.title || 'Ofertas'}
+          eyebrow={section.eyebrow || undefined}
+          to={section.linkTo || '/ofertas'}
+          linkLabel={section.linkLabel || 'Ver mas'}
+          limit={section.limit || 12}
+        />
+      );
+    }
+
+    if (section.type === 'categories' && categoriesEnabled) {
+      return (
+        <CategoriesSection
+          title={section.title || undefined}
+          eyebrow={section.eyebrow || undefined}
+          to={section.linkTo || '/categorias'}
+          linkLabel={section.linkLabel || 'Ver mas'}
+          limit={section.limit || 6}
+          products={products}
+          categoriesData={categoriesData}
+          loading={productsLoading || categoriesLoading}
+        />
+      );
+    }
+
+    if (section.type === 'brands') {
+      return (
+        <BrandsSection
+          products={products}
+          loading={productsLoading}
+          title={section.title || 'Marcas'}
+          eyebrow={section.eyebrow || undefined}
+          to={section.linkTo || '/marcas'}
+          linkLabel={section.linkLabel || 'Ver mas'}
+          limit={section.limit || 6}
+        />
+      );
+    }
+
+    if (section.type === 'collections') {
+      return (
+        <CollectionsSection
+          products={products}
+          loading={productsLoading}
+          title={section.title || 'Coleccion'}
+          eyebrow={section.eyebrow || undefined}
+          to={section.linkTo || '/colecciones'}
+          linkLabel={section.linkLabel || 'Ver mas'}
+          limit={section.limit || 6}
+        />
+      );
+    }
+
+    if (section.type === 'origins' && categoriesEnabled) {
+      return (
+        <OrigenSection
+          title={section.title || 'Origen'}
+          eyebrow={section.eyebrow || undefined}
+          to={section.linkTo || '/origen'}
+          linkLabel={section.linkLabel || 'Ver mas'}
+          limit={section.limit || 6}
+          products={products}
+          categoriesData={categoriesData}
+          loading={productsLoading || categoriesLoading}
+        />
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="flex flex-col">
-      {productsEnabled && <HeroSection />}
-      {productsEnabled && (
-        <MoreProductsSection products={products} loading={productsLoading} />
-      )}
-      {productsEnabled && (
-        <FeaturedProductsSection products={products} loading={productsLoading} />
-      )}
-      {productsEnabled && categoriesEnabled && (
-        <CategoriesSection
-          limit={6}
-          products={products}
-          categoriesData={categoriesData}
-          loading={productsLoading || categoriesLoading}
-        />
-      )}
-      {productsEnabled && <BrandsSection products={products} loading={productsLoading} />}
-      {productsEnabled && <CollectionsSection products={products} loading={productsLoading} />}
-      {productsEnabled && categoriesEnabled && (
-        <OrigenSection
-          limit={6}
-          products={products}
-          categoriesData={categoriesData}
-          loading={productsLoading || categoriesLoading}
-        />
-      )}
+      {visibleSections.map(section => (
+        <React.Fragment key={section.id}>
+          {productsEnabled || section.type === 'hero' ? renderSection(section) : null}
+        </React.Fragment>
+      ))}
     </div>
   );
 }

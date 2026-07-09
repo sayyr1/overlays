@@ -5,6 +5,10 @@ import ProductImage from '../../components/usuario/ProductImage';
 import { usePublicConfig } from '../../context/PublicConfigContext';
 import { useAuth } from '../../context/AuthContext';
 import {
+  getPrimaryCatalogBrowseMeta,
+  getPrimaryCatalogValue
+} from '../../utils/catalogProfile';
+import {
   buildNestedVariantsWithFallback,
   normalizeVariantColor
 } from '../../utils/inventory';
@@ -262,7 +266,7 @@ const getVariantPillClassName = qty => {
 
 const ProductPage = () => {
   const storedState = readStoredInventoryState();
-  const { isModuleEnabled, loading: modulesLoading } = usePublicConfig();
+  const { isModuleEnabled, loading: modulesLoading, settings } = usePublicConfig();
   const { hasPermission } = useAuth();
   const [products, setProducts] = useState([]);
   const [modalData, setModalData] = useState(null);
@@ -293,6 +297,7 @@ const ProductPage = () => {
   const canAdjustInventory = hasPermission('inventory.adjust');
   const canViewInventory = hasPermission('inventory.view') || canAdjustInventory;
   const inventoryVisible = inventoryEnabled && canViewInventory;
+  const primaryCatalogMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
 
   const fetchProducts = async () => {
     setIsRefreshing(true);
@@ -515,7 +520,8 @@ const ProductPage = () => {
     catalogItems.forEach(({ product }) => {
       if (product.brand) brands.add(String(product.brand).trim());
       if (product.collection) collections.add(String(product.collection).trim());
-      if (product.type) types.add(String(product.type).trim());
+      const primaryCatalogValue = getPrimaryCatalogValue(product, settings?.catalogProfile);
+      if (primaryCatalogValue) types.add(primaryCatalogValue);
       if (product.gender) genders.add(String(product.gender).trim());
 
       getProductAttributes(product).forEach(([key, rawValue]) => {
@@ -554,7 +560,7 @@ const ProductPage = () => {
         return acc;
       }, {})
     };
-  }, [catalogItems]);
+  }, [catalogItems, settings?.catalogProfile]);
 
   const filteredProducts = useMemo(() => {
     const normalized = searchTerm.trim().toLowerCase();
@@ -568,7 +574,7 @@ const ProductPage = () => {
         product.sku,
         product.brand,
         product.collection,
-        product.type,
+        getPrimaryCatalogValue(product, settings?.catalogProfile),
         product.gender,
         ...getProductAttributes(product).map(([, value]) => value)
       ];
@@ -599,7 +605,7 @@ const ProductPage = () => {
       const exactMatches = [
         ['brand', advancedFilters.brand, product.brand],
         ['collection', advancedFilters.collection, product.collection],
-        ['type', advancedFilters.type, product.type],
+        ['type', advancedFilters.type, getPrimaryCatalogValue(product, settings?.catalogProfile)],
         ['gender', advancedFilters.gender, product.gender]
       ];
 
@@ -707,7 +713,7 @@ const ProductPage = () => {
 
         return rightRiskScore - leftRiskScore;
       });
-  }, [advancedFilters, catalogItems, filterOptions.locationKey, inventoryVisible, mobileInventoryView, searchTerm, sortBy, stockFilter]);
+  }, [advancedFilters, catalogItems, filterOptions.locationKey, inventoryVisible, mobileInventoryView, searchTerm, settings?.catalogProfile, sortBy, stockFilter]);
 
   const catalogStats = useMemo(() => {
     const totalCount = catalogItems.length;
@@ -756,7 +762,7 @@ const ProductPage = () => {
       chips.push({ key: 'collection', label: 'Coleccion', value: advancedFilters.collection });
     }
     if (advancedFilters.type) {
-      chips.push({ key: 'type', label: 'Tipo', value: advancedFilters.type });
+      chips.push({ key: 'type', label: primaryCatalogMeta.filterLabel, value: advancedFilters.type });
     }
     if (advancedFilters.gender) {
       chips.push({ key: 'gender', label: 'Genero', value: advancedFilters.gender });
@@ -787,7 +793,7 @@ const ProductPage = () => {
     }
 
     return chips;
-  }, [advancedFilters, inventoryVisible, stockFilter]);
+  }, [advancedFilters, inventoryVisible, primaryCatalogMeta.filterLabel, stockFilter]);
 
   const hasActiveFilters = activeFilterChips.length > 0;
 
@@ -1140,11 +1146,11 @@ const ProductPage = () => {
                   'Todas las colecciones'
                 )}
                 {renderSelect(
-                  'Tipo',
+                  primaryCatalogMeta.filterLabel,
                   advancedFilters.type,
                   event => setAdvancedFilters(prev => ({ ...prev, type: event.target.value })),
                   filterOptions.types,
-                  'Todos los tipos'
+                  settings?.catalogProfile === 'footwear' ? 'Todos los modelos' : 'Todos los tipos'
                 )}
                 {renderSelect(
                   'Genero',
@@ -1527,7 +1533,7 @@ const ProductPage = () => {
                                   )}
                                 </div>
                                 <p className="mt-1 text-xs uppercase tracking-[0.2em] text-slate-400">
-                                  {product.gender || 'Sin genero'} / {product.type || 'Sin tipo'}
+                                  {product.gender || 'Sin genero'} / {getPrimaryCatalogValue(product, settings?.catalogProfile) || `Sin ${primaryCatalogMeta.singular}`}
                                 </p>
                                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500">
                                   <span>Cod. {product.code}</span>
@@ -1718,11 +1724,11 @@ const ProductPage = () => {
                 'Todas las colecciones'
               )}
               {renderSelect(
-                'Tipo',
+                primaryCatalogMeta.filterLabel,
                 draftFilters.type,
                 event => setDraftFilters(prev => ({ ...prev, type: event.target.value })),
                 filterOptions.types,
-                'Todos los tipos'
+                settings?.catalogProfile === 'footwear' ? 'Todos los modelos' : 'Todos los tipos'
               )}
               {renderSelect(
                 'Genero',

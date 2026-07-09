@@ -7,10 +7,20 @@
 @layer base {
   :root {
     --primary-color: #78d64b;
-    --secondary-color: #111111;
     --background-color: #141414;
+    --surface-color: #1c1c1c;
     --text-color: #f3f4f6;
-    --app-bg-overlay: radial-gradient(900px circle at 50% -10%, rgba(120,214,75,0.08), transparent 45%),
+    --heading-color: #ffffff;
+    --muted-color: #a1a1aa;
+    --font-body: 'Inter';
+    --font-heading: 'Playfair Display';
+    --color-brand: 120 214 75;
+    --color-brand-dark: 77 138 47;
+    --color-brand-light: 163 226 131;
+    --color-brand-muted: 189 236 166;
+    --color-accent: 249 115 22;
+    --color-accent-soft: 251 180 126;
+    --theme-app-overlay: radial-gradient(900px circle at 50% -10%, rgba(120,214,75,0.08), transparent 45%),
       linear-gradient(180deg, rgba(19,19,19,0.98), rgba(19,19,19,0.98));
   }
 
@@ -21,7 +31,7 @@
   body {
     @apply font-sans antialiased;
     color: var(--text-color);
-    background-image: var(--app-bg-overlay);
+    background-image: var(--theme-app-overlay);
     background-size: cover;
     background-repeat: no-repeat;
     background-attachment: fixed;
@@ -32,7 +42,8 @@
   h2,
   h3,
   h4 {
-    @apply font-display tracking-tight text-white;
+    @apply font-display tracking-tight;
+    color: var(--heading-color);
   }
 
   ::selection {
@@ -45,6 +56,74 @@
   .content-surface {
     background: transparent;
   }
+
+  .theme-app-surface {
+    background-color: var(--background-color);
+    color: var(--text-color);
+  }
+
+  .theme-panel {
+    background-color: var(--surface-color);
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--surface-color) 72%, white 28%);
+    box-shadow: 0 18px 40px -28px rgb(var(--color-brand) / 0.35);
+  }
+
+  .theme-panel-subtle {
+    background-color: color-mix(in srgb, var(--surface-color) 92%, var(--background-color) 8%);
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--surface-color) 70%, white 30%);
+  }
+
+  .theme-input {
+    background-color: color-mix(in srgb, var(--surface-color) 88%, white 12%);
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--surface-color) 62%, white 38%);
+  }
+
+  .theme-input::placeholder {
+    color: color-mix(in srgb, var(--muted-color) 88%, transparent 12%);
+  }
+
+  .theme-button-primary {
+    background-color: rgb(var(--color-brand));
+    color: color-mix(in srgb, var(--heading-color) 15%, black 85%);
+  }
+
+  .theme-button-secondary {
+    background-color: transparent;
+    color: var(--text-color);
+    border: 1px solid color-mix(in srgb, var(--surface-color) 58%, white 42%);
+  }
+
+  body[data-theme-button-style='pill'] .theme-button-primary,
+  body[data-theme-button-style='pill'] .theme-button-secondary,
+  body[data-theme-button-style='pill'] .theme-input {
+    border-radius: 9999px;
+  }
+
+  body[data-theme-button-style='sharp'] .theme-button-primary,
+  body[data-theme-button-style='sharp'] .theme-button-secondary,
+  body[data-theme-button-style='sharp'] .theme-input {
+    border-radius: 0.5rem;
+  }
+
+  body[data-theme-panel-style='outline'] .theme-panel,
+  body[data-theme-panel-style='outline'] .theme-panel-subtle {
+    background-color: transparent;
+    border-width: 1px;
+  }
+
+  body[data-theme-form-style='minimal'] .theme-input {
+    background-color: transparent;
+    border-width: 0 0 1px;
+    border-radius: 0.5rem 0.5rem 0 0;
+  }
+
+  body[data-theme-form-style='outline'] .theme-input {
+    background-color: transparent;
+  }
+
   .glass-card {
     @apply rounded-3xl border border-white/10 bg-[#1c1c1c] shadow-card-lg;
   }
@@ -59,6 +138,18 @@
 
   .metric-chip {
     @apply inline-flex items-center gap-1 rounded-full bg-surface-100 px-3 py-1 text-xs font-medium text-slate-600;
+  }
+
+  .branding-preview-grid {
+    background-color: #f8fafc;
+    background-image:
+      linear-gradient(45deg, rgba(148, 163, 184, 0.16) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(148, 163, 184, 0.16) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(148, 163, 184, 0.16) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(148, 163, 184, 0.16) 75%);
+    background-size: 24px 24px;
+    background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+    border: 1px solid rgba(148, 163, 184, 0.18);
   }
 
   .dash-grid {

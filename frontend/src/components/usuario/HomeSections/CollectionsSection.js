@@ -3,7 +3,15 @@ import VisualShelfSection from './VisualShelfSection';
 
 const normalizeValue = value => (value ?? '').toString().trim();
 
-export default function CollectionsSection({ products = [], loading = false, limit = 6 }) {
+export default function CollectionsSection({
+  products = [],
+  loading = false,
+  limit = 6,
+  title = 'Coleccion',
+  eyebrow,
+  to = '/colecciones',
+  linkLabel = 'Ver mas'
+}) {
   const items = useMemo(() => {
     const grouped = new Map();
 
@@ -37,8 +45,10 @@ export default function CollectionsSection({ products = [], loading = false, lim
 
   return (
     <VisualShelfSection
-      title="Coleccion"
-      to="/colecciones"
+      eyebrow={eyebrow}
+      title={title}
+      to={to}
+      linkLabel={linkLabel}
       items={items}
       loading={loading}
     />

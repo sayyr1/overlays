@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from '../../../api/axiosInstance';
+import { usePublicConfig } from '../../../context/PublicConfigContext';
 import {
   DEFAULT_FILTER_STATE,
   areFiltersDifferent,
@@ -17,10 +18,12 @@ const sortOptions = values =>
   ).sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
 
 const ProductFilters = ({ onFilterChange, refreshKey, storeSlug, activeFilters, variant = 'panel' }) => {
+  const { settings } = usePublicConfig();
   const [filters, setFilters] = useState(() => normalizeFiltersForState(activeFilters));
   const [options, setOptions] = useState({
     brands: [],
     types: [],
+    models: [],
     genders: [],
     collections: [],
     sizes: [],
@@ -49,6 +52,7 @@ const ProductFilters = ({ onFilterChange, refreshKey, storeSlug, activeFilters, 
       setOptions({
         brands: sortOptions(filtersData.brands || []),
         types: sortOptions(filtersData.types || []),
+        models: sortOptions(filtersData.models || []),
         genders: sortOptions(filtersData.genders || []),
         collections: sortOptions(filtersData.collections || []),
         sizes: sortOptions(categoriesData.size || []),
@@ -78,6 +82,10 @@ const ProductFilters = ({ onFilterChange, refreshKey, storeSlug, activeFilters, 
     const payload = sanitizeFiltersForQuery(filters);
     return Object.keys(payload).length > 0;
   }, [filters]);
+  const primaryCatalogFieldName = settings?.catalogProfile === 'footwear' ? 'model' : 'type';
+  const primaryCatalogLabel = settings?.catalogProfile === 'footwear' ? 'Modelo' : 'Categoria';
+  const primaryCatalogPlaceholder = settings?.catalogProfile === 'footwear' ? 'Todos los modelos' : 'Todos los tipos';
+  const primaryCatalogOptions = primaryCatalogFieldName === 'model' ? options.models : options.types;
 
   const isSheet = variant === 'sheet';
   const isSidebar = variant === 'sidebar';
@@ -88,6 +96,12 @@ const ProductFilters = ({ onFilterChange, refreshKey, storeSlug, activeFilters, 
 
     setFilters(prev => {
       const candidate = { ...prev, [name]: nextValue };
+      if (name === 'model') {
+        candidate.type = '';
+      }
+      if (name === 'type') {
+        candidate.model = '';
+      }
       if (!areFiltersDifferent(prev, candidate)) {
         return prev;
       }
@@ -152,17 +166,17 @@ const ProductFilters = ({ onFilterChange, refreshKey, storeSlug, activeFilters, 
 
           <div>
             <label className="mb-2 block text-[11px] font-semibold uppercase tracking-[0.24em] text-white/55">
-              Categoria
+              {primaryCatalogLabel}
             </label>
             <select
-              name="type"
-              value={filters.type}
+              name={primaryCatalogFieldName}
+              value={filters[primaryCatalogFieldName]}
               onChange={handleFieldChange}
               disabled={loadingOptions}
               className="w-full rounded-xl border border-white/10 bg-[#222] px-4 py-3 text-sm text-white focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
             >
-              <option value="">Todos los tipos</option>
-              {options.types.map(option => (
+              <option value="">{primaryCatalogPlaceholder}</option>
+              {primaryCatalogOptions.map(option => (
                 <option key={option} value={option}>
                   {option}
                 </option>
@@ -315,14 +329,14 @@ const ProductFilters = ({ onFilterChange, refreshKey, storeSlug, activeFilters, 
         </select>
 
         <select
-          name="type"
-          value={filters.type}
+          name={primaryCatalogFieldName}
+          value={filters[primaryCatalogFieldName]}
           onChange={handleFieldChange}
           disabled={loadingOptions}
           className={`w-full border border-white/10 bg-[#222] text-white focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand ${isSheet ? 'rounded-xl px-4 py-3 text-sm' : 'rounded-md py-2 px-3 text-sm'}`}
         >
-          <option value="">Todos los tipos</option>
-          {options.types.map(option => (
+          <option value="">{primaryCatalogPlaceholder}</option>
+          {primaryCatalogOptions.map(option => (
             <option key={option} value={option}>
               {option}
             </option>

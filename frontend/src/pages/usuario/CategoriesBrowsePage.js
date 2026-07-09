@@ -1,15 +1,20 @@
 import React from 'react';
 import SectionValueGridPage from './SectionValueGridPage';
+import { usePublicConfig } from '../../context/PublicConfigContext';
+import { getPrimaryCatalogBrowseMeta } from '../../utils/catalogProfile';
 
 export default function CategoriesBrowsePage() {
+  const { settings } = usePublicConfig();
+  const browseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
+
   return (
     <SectionValueGridPage
-      title="Categorias"
-      description="Explora todas las categorias disponibles y entra rapido a cada grupo del catalogo."
-      categoryKey="type"
-      queryKey="type"
+      title={browseMeta.title}
+      description={browseMeta.description}
+      categoryKey={browseMeta.fieldKey}
+      queryKey={browseMeta.fieldKey}
       detailBasePath="/categoria"
-      emptyMessage="Aun no hay categorias configuradas."
+      emptyMessage={`Aun no hay ${browseMeta.title.toLowerCase()} configurad${browseMeta.title === 'Categorias' ? 'as' : 'os'}.`}
     />
   );
 }

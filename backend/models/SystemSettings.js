@@ -15,6 +15,13 @@ const systemSettingsSchema = new mongoose.Schema({
   phone: { type: String, trim: true, default: '' },
   whatsapp: { type: String, trim: true, default: '' },
   address: { type: String, trim: true, default: '' },
+  catalogProfile: {
+    type: String,
+    trim: true,
+    enum: ['footwear', 'apparel', 'custom'],
+    default: 'footwear'
+  },
+  catalogProfileLabel: { type: String, trim: true, default: 'Zapatos' },
   socialLinks: {
     type: Map,
     of: String,

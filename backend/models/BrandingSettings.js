@@ -7,7 +7,9 @@ const brandingSettingsSchema = new mongoose.Schema({
     default: 'default'
   },
   logoUrl: { type: String, trim: true, default: '' },
+  logoPublicId: { type: String, trim: true, default: '' },
   faviconUrl: { type: String, trim: true, default: '' },
+  faviconPublicId: { type: String, trim: true, default: '' },
   navbarName: { type: String, trim: true, default: 'Tu tienda' },
   primaryColor: { type: String, trim: true, default: '#0f766e' },
   secondaryColor: { type: String, trim: true, default: '#111827' },

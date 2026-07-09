@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
 import { trackWhatsAppClick } from '../../../services/crmTracking';
+import { getPrimaryCatalogBrowseMeta } from '../../../utils/catalogProfile';
 
 const socialEntries = socialLinks => {
   if (!socialLinks || typeof socialLinks !== 'object') return [];
@@ -10,7 +11,7 @@ const socialEntries = socialLinks => {
 
 const STORE_LINKS = [
   { label: 'Catalogo', to: '/productos' },
-  { label: 'Categorias', to: '/categorias' },
+  { label: 'Categorias', to: '/categorias', key: 'primary-browse' },
   { label: 'Ofertas', to: '/productos?onSale=true' },
   { label: 'Mis pedidos', to: '/mis-pedidos' }
 ];
@@ -18,6 +19,10 @@ const STORE_LINKS = [
 export default function Footer() {
   const { settings, branding, storeName, textMap, isModuleEnabled } = usePublicConfig();
   const socials = socialEntries(settings?.socialLinks);
+  const browseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
+  const storeLinks = STORE_LINKS.map(item =>
+    item.key === 'primary-browse' ? { ...item, label: browseMeta.navLabel } : item
+  );
   const sanitizedWhatsapp = String(settings?.whatsapp || '').replace(/\D/g, '');
   const footerText =
     textMap.footer_text ||
@@ -52,7 +57,7 @@ export default function Footer() {
           <div>
             <h4 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-white">Store</h4>
             <ul className="space-y-2 text-sm text-white/70">
-              {STORE_LINKS.map(item => (
+              {storeLinks.map(item => (
                 <li key={item.label}>
                   <Link to={item.to} className="transition hover:text-brand">
                     {item.label}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   BrowserRouter as Router,
   Routes,
@@ -47,12 +47,16 @@ import { CartProvider } from './context/CartContext';
 import { PublicConfigProvider } from './context/PublicConfigContext';
 import SuperAdminDashboardPage from './pages/superadmin/SuperAdminDashboardPage';
 import GeneralSettingsPage from './pages/superadmin/GeneralSettingsPage';
+import CatalogProfilePage from './pages/superadmin/CatalogProfilePage';
 import BrandingSettingsPage from './pages/superadmin/BrandingSettingsPage';
+import HomeBuilderPage from './pages/superadmin/HomeBuilderPage';
+import ThemeSettingsPage from './pages/superadmin/ThemeSettingsPage';
 import ModuleConfigPage from './pages/superadmin/ModuleConfigPage';
 import PaymentMethodsPage from './pages/superadmin/PaymentMethodsPage';
 import TextSettingsPage from './pages/superadmin/TextSettingsPage';
 import AuditLogsPage from './pages/superadmin/AuditLogsPage';
 import AccessControlPage from './pages/superadmin/AccessControlPage';
+import FormBuilderPage from './pages/superadmin/FormBuilderPage';
 import SuperAdminLayout from './components/superadmin/SuperAdminLayout';
 import Footer from './components/usuario/HomeSections/Footer';
 import CRMDashboardPage from './pages/admin/CRMDashboardPage';
@@ -62,9 +66,12 @@ import CRMContactDetailPage from './pages/admin/CRMContactDetailPage';
 import CRMTasksPage from './pages/admin/CRMTasksPage';
 import CRMAbandonedCartsPage from './pages/admin/CRMAbandonedCartsPage';
 import CRMConfigPage from './pages/admin/CRMConfigPage';
+import { usePublicConfig } from './context/PublicConfigContext';
+import { applyThemeToDocument, getThemeByScope } from './utils/themeRuntime';
 
 const AppContent = () => {
   const location = useLocation();
+  const { themes } = usePublicConfig();
   const hideNavbarRoutes = ['/login', '/register'];
 
   const operationalAdminRoutes = [
@@ -86,9 +93,15 @@ const AppContent = () => {
   const isSuperAdminRoute = location.pathname.startsWith('/super-admin');
   const isBackofficeRoute = isOperationalAdminRoute || isSuperAdminRoute;
   const isCreateProductRoute = location.pathname.startsWith('/crear-producto');
+  const themeScope = isSuperAdminRoute ? 'superadmin' : isOperationalAdminRoute ? 'admin' : 'storefront';
 
   const showNavbar = !hideNavbarRoutes.includes(location.pathname);
   const showStoreFooter = showNavbar && !isBackofficeRoute;
+
+  useEffect(() => {
+    const theme = getThemeByScope(themes, themeScope);
+    applyThemeToDocument(theme, themeScope);
+  }, [themeScope, themes]);
 
   return (
     <>
@@ -99,12 +112,12 @@ const AppContent = () => {
         tabIndex="-1"
         className={
           isOperationalAdminRoute
-            ? `ml-0 md:ml-72 min-h-screen bg-surface-50 pb-24 md:pb-16 ${
+            ? `theme-app-surface ml-0 md:ml-72 min-h-screen pb-24 md:pb-16 ${
                 isCreateProductRoute ? 'pt-4 md:pt-8' : 'pt-28 md:pt-32'
               } transition-all duration-200`
             : isSuperAdminRoute
-              ? 'min-h-screen bg-surface-50'
-              : 'min-h-screen content-surface'
+              ? 'theme-app-surface min-h-screen'
+              : 'theme-app-surface min-h-screen content-surface'
         }
       >
         <Routes>
@@ -432,11 +445,15 @@ const AppContent = () => {
           >
             <Route index element={<SuperAdminDashboardPage />} />
             <Route path="settings" element={<GeneralSettingsPage />} />
+            <Route path="catalog-profile" element={<CatalogProfilePage />} />
             <Route path="branding" element={<BrandingSettingsPage />} />
+            <Route path="home-builder" element={<HomeBuilderPage />} />
+            <Route path="themes" element={<ThemeSettingsPage />} />
             <Route path="modules" element={<ModuleConfigPage />} />
             <Route path="access-control" element={<AccessControlPage />} />
             <Route path="payment-methods" element={<PaymentMethodsPage />} />
             <Route path="text-settings" element={<TextSettingsPage />} />
+            <Route path="forms" element={<FormBuilderPage />} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
           </Route>
 

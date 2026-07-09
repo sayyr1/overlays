@@ -51,6 +51,7 @@ export default function VisualShelfSection({
   eyebrow,
   title,
   to,
+  linkLabel,
   items = [],
   loading = false,
   emptyMessage
@@ -59,7 +60,7 @@ export default function VisualShelfSection({
     return emptyMessage ? (
       <section className="bg-[#141414] py-8">
         <div className="container mx-auto px-4 lg:px-8">
-          <HomeSectionHeader eyebrow={eyebrow} title={title} to={to} />
+          <HomeSectionHeader eyebrow={eyebrow} title={title} to={to} linkLabel={linkLabel} />
           <div className="mt-6 rounded-[24px] border border-white/10 bg-[#1b1b1b] px-6 py-10 text-center text-sm text-white/55 shadow-inner">
             {emptyMessage}
           </div>
@@ -71,7 +72,7 @@ export default function VisualShelfSection({
   return (
     <section className="bg-[#141414] py-8">
       <div className="container mx-auto px-4 lg:px-8">
-        <HomeSectionHeader eyebrow={eyebrow} title={title} to={to} />
+        <HomeSectionHeader eyebrow={eyebrow} title={title} to={to} linkLabel={linkLabel} />
 
         <div className="mt-6">
           {loading ? (

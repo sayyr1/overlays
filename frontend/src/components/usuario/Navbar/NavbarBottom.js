@@ -6,6 +6,7 @@ import { HiOutlineShoppingBag } from 'react-icons/hi';
 import { useCart } from '../../../context/CartContext';
 import { useAuth } from '../../../context/AuthContext';
 import { usePublicConfig } from '../../../context/PublicConfigContext';
+import { getPrimaryCatalogBrowseMeta } from '../../../utils/catalogProfile';
 import {
   getGuestOrderTracking,
   subscribeGuestOrderTracking
@@ -13,14 +14,14 @@ import {
 
 const navigationLinks = [
   { to: '/', label: 'Inicio', Icon: AiOutlineHome },
-  { to: '/categorias', label: 'Categorias', Icon: FiTag },
+  { to: '/categorias', label: 'Categorias', Icon: FiTag, key: 'primary-browse' },
   { to: '/cart', label: 'Carrito', Icon: HiOutlineShoppingBag, withBadge: true }
 ];
 
 const NavbarBottom = () => {
   const { count } = useCart();
   const { isAuthenticated } = useAuth();
-  const { isModuleEnabled, loading } = usePublicConfig();
+  const { isModuleEnabled, loading, settings } = usePublicConfig();
   const navigate = useNavigate();
   const location = useLocation();
   const navRef = useRef(null);
@@ -49,11 +50,14 @@ const NavbarBottom = () => {
   const categoriesEnabled = isModuleEnabled('categories');
   const ordersEnabled = isModuleEnabled('orders');
   const paymentsEnabled = isModuleEnabled('payments');
-  const storeItems = navigationLinks.filter(link => {
+  const browseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
+  const storeItems = navigationLinks
+    .map(link => (link.key === 'primary-browse' ? { ...link, label: browseMeta.navLabel } : link))
+    .filter(link => {
     if (link.to === '/categorias') return categoriesEnabled && isModuleEnabled('products');
     if (link.to === '/cart') return ordersEnabled && paymentsEnabled;
     return true;
-  });
+    });
   const navItems = [...storeItems, ...(guestTrackingItem ? [guestTrackingItem] : []), sessionItem];
 
   useEffect(() => subscribeGuestOrderTracking(setGuestOrderTracking), []);

@@ -11,6 +11,10 @@ import { usePublicConfig } from '../../../context/PublicConfigContext';
 import { trackProductView, trackWhatsAppClick } from '../../../services/crmTracking';
 import { getPriceForUser, formatCurrency } from '../../../utils/pricing';
 import { ORDER_HOLD_LABEL } from '../../../utils/orderConstants';
+import {
+  getPrimaryCatalogBrowseMeta,
+  getPrimaryCatalogValue
+} from '../../../utils/catalogProfile';
 import { buildWhatsAppHref, generateLeadCode } from '../../../utils/whatsappLead';
 import {
   buildNestedVariantsWithFallback,
@@ -76,10 +80,13 @@ const getColorLabelMap = product => {
   return map;
 };
 
-const buildMarketFiltersHref = product => {
+const buildMarketFiltersHref = (product, profileKey) => {
   const params = new URLSearchParams();
+  const primaryCatalogValue = getPrimaryCatalogValue(product, profileKey);
   if (product?.brand) params.set('brand', product.brand);
-  if (product?.type) params.set('type', product.type);
+  if (primaryCatalogValue) {
+    params.set(profileKey === 'footwear' ? 'model' : 'type', primaryCatalogValue);
+  }
   if (product?.gender) params.set('gender', product.gender);
   const query = params.toString();
   return query ? `/productos?${query}` : '/productos';
@@ -191,6 +198,7 @@ const ProductDetail = () => {
   const { addItem } = useCart();
   const { membershipLevel } = useAuth();
   const { textMap, isModuleEnabled, settings } = usePublicConfig();
+  const primaryBrowseMeta = getPrimaryCatalogBrowseMeta(settings?.catalogProfile);
   const modalRoot = typeof document !== 'undefined' ? document.body : null;
 
   const resetZoomDragState = useCallback(() => {
@@ -219,6 +227,7 @@ const ProductDetail = () => {
         const { data: productData } = await axios.get(`/api/products/${id}`);
         if (cancelled) return;
         setProduct(productData);
+        const primaryCatalogValue = getPrimaryCatalogValue(productData, settings?.catalogProfile);
         const matrix = buildVariantMatrix(productData);
         const defaults = findFirstVariant(matrix);
         setSelectedColor(defaults.color);
@@ -237,7 +246,10 @@ const ProductDetail = () => {
           .filter(item => item._id !== productData._id)
           .filter(item =>
             (productData.brand && item.brand === productData.brand) ||
-            (productData.type && item.type === productData.type) ||
+            (
+              primaryCatalogValue &&
+              getPrimaryCatalogValue(item, settings?.catalogProfile) === primaryCatalogValue
+            ) ||
             (productData.collection && item.collection === productData.collection)
           )
           .slice(0, 8);
@@ -251,7 +263,7 @@ const ProductDetail = () => {
     return () => {
       cancelled = true;
     };
-  }, [id, resetZoomDragState]);
+  }, [id, resetZoomDragState, settings?.catalogProfile]);
 
   useEffect(() => {
     if (!product?._id || !isModuleEnabled('crm')) {
@@ -387,7 +399,14 @@ const ProductDetail = () => {
     return 'Disponible ahora';
   }, [availableForSelected, hasAnySizes, selectedColor, selectedSize]);
 
-  const marketFiltersHref = useMemo(() => buildMarketFiltersHref(product), [product]);
+  const primaryCatalogValue = useMemo(
+    () => getPrimaryCatalogValue(product, settings?.catalogProfile),
+    [product, settings?.catalogProfile]
+  );
+  const marketFiltersHref = useMemo(
+    () => buildMarketFiltersHref(product, settings?.catalogProfile),
+    [product, settings?.catalogProfile]
+  );
   const marketPulseLabel = useMemo(() => {
     if (totalSold >= 12) return `${totalSold} vendidos recientemente`;
     if (totalReserved >= 3) return `${totalReserved} reservas activas`;
@@ -749,7 +768,9 @@ const ProductDetail = () => {
 
   const breadcrumbItems = [
     { label: 'Home', to: '/' },
-    product?.type ? { label: product.type, to: `/categoria/${encodeURIComponent(product.type)}` } : null,
+    primaryCatalogValue
+      ? { label: primaryCatalogValue, to: `/categoria/${encodeURIComponent(primaryCatalogValue)}` }
+      : null,
     product?.gender ? { label: product.gender, to: `/productos?gender=${encodeURIComponent(product.gender)}` } : null,
     product?.brand ? { label: product.brand, to: `/productos?brand=${encodeURIComponent(product.brand)}` } : null
   ].filter(Boolean);
@@ -1072,7 +1093,7 @@ const ProductDetail = () => {
                   <div className="grid gap-2 text-[13px] sm:grid-cols-2">
                     <div><span className="text-white/45">Marca:</span> <span className="text-white">{product.brand || '—'}</span></div>
                     <div><span className="text-white/45">Genero:</span> <span className="text-white">{product.gender || '—'}</span></div>
-                    <div><span className="text-white/45">Tipo:</span> <span className="text-white">{product.type || '—'}</span></div>
+                    <div><span className="text-white/45">{primaryBrowseMeta.filterLabel}:</span> <span className="text-white">{primaryCatalogValue || '—'}</span></div>
                     <div><span className="text-white/45">Coleccion:</span> <span className="text-white">{product.collection || '—'}</span></div>
                   </div>
                 </div>

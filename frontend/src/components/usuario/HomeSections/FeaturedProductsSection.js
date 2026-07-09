@@ -2,7 +2,15 @@ import React, { useEffect, useState } from 'react';
 import axios from '../../../api/axiosInstance';
 import ProductShelfSection from './ProductShelfSection';
 
-const FeaturedProductsSection = ({ products: providedProducts, loading: providedLoading = false }) => {
+const FeaturedProductsSection = ({
+  products: providedProducts,
+  loading: providedLoading = false,
+  title = 'Ofertas',
+  eyebrow,
+  to = '/ofertas',
+  linkLabel = 'Ver mas',
+  limit = 12
+}) => {
   const [promoProducts, setPromoProducts] = useState([]);
   const [loading, setLoading] = useState(!providedProducts);
   const [error, setError] = useState(null);
@@ -12,7 +20,7 @@ const FeaturedProductsSection = ({ products: providedProducts, loading: provided
       const filtered = providedProducts.filter(product =>
         product.onSale === true || (typeof product.discount === 'number' && product.discount > 0)
       );
-      setPromoProducts(filtered.slice(0, 12));
+      setPromoProducts(filtered.slice(0, limit));
       setLoading(Boolean(providedLoading));
       setError(null);
       return;
@@ -24,7 +32,7 @@ const FeaturedProductsSection = ({ products: providedProducts, loading: provided
         const filtered = (data || []).filter(product =>
           product.onSale === true || (typeof product.discount === 'number' && product.discount > 0)
         );
-        setPromoProducts(filtered.slice(0, 12));
+        setPromoProducts(filtered.slice(0, limit));
       } catch (err) {
         console.error('Error cargando productos destacados', err);
         setError('No se pudieron cargar los productos destacados.');
@@ -34,7 +42,7 @@ const FeaturedProductsSection = ({ products: providedProducts, loading: provided
     };
 
     fetchAndFilter();
-  }, [providedLoading, providedProducts]);
+  }, [limit, providedLoading, providedProducts]);
 
   if (error && !loading) {
     return (
@@ -50,8 +58,10 @@ const FeaturedProductsSection = ({ products: providedProducts, loading: provided
 
   return (
     <ProductShelfSection
-      title="Ofertas"
-      to="/ofertas"
+      eyebrow={eyebrow}
+      title={title}
+      to={to}
+      linkLabel={linkLabel}
       products={promoProducts}
       loading={loading}
       emptyMessage="No hay productos destacados por el momento. Vuelve a revisar en unas horas."

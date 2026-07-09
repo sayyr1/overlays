@@ -1,9 +1,12 @@
 import express from 'express';
 import {
+  getFormDefinitions,
   getBrandingSettings,
+  getHomeLayoutSettings,
   getPaymentMethods,
   getSystemSettings,
-  getTextSettings
+  getTextSettings,
+  getThemeSettings
 } from '../services/systemConfigService.js';
 import { getPublicModules, isModuleEnabled } from '../services/moduleAccessService.js';
 
@@ -37,6 +40,8 @@ router.get('/settings', async (req, res) => {
     phone: settings.phone,
     whatsapp: settings.whatsapp,
     address: settings.address,
+    catalogProfile: settings.catalogProfile,
+    catalogProfileLabel: settings.catalogProfileLabel,
     socialLinks: sanitizeMap(settings.socialLinks),
     footerText: settings.footerText,
     enableInternalProductImages: Boolean(settings.enableInternalProductImages)
@@ -48,6 +53,8 @@ router.get('/branding', async (req, res) => {
   res.json({
     logoUrl: branding.logoUrl,
     faviconUrl: branding.faviconUrl,
+    logoPublicId: branding.logoPublicId,
+    faviconPublicId: branding.faviconPublicId,
     navbarName: branding.navbarName,
     primaryColor: branding.primaryColor,
     secondaryColor: branding.secondaryColor,
@@ -55,6 +62,36 @@ router.get('/branding', async (req, res) => {
     textColor: branding.textColor,
     visualStyle: branding.visualStyle
   });
+});
+
+router.get('/home-layout', async (req, res) => {
+  const homeLayout = await getHomeLayoutSettings();
+  res.json({
+    sections: Array.isArray(homeLayout.sections) ? homeLayout.sections : []
+  });
+});
+
+router.get('/themes', async (req, res) => {
+  const themes = await getThemeSettings();
+  res.json(
+    themes.map(theme => ({
+      scope: theme.scope,
+      label: theme.label,
+      primaryColor: theme.primaryColor,
+      accentColor: theme.accentColor,
+      backgroundColor: theme.backgroundColor,
+      surfaceColor: theme.surfaceColor,
+      textColor: theme.textColor,
+      headingColor: theme.headingColor,
+      mutedColor: theme.mutedColor,
+      fontBody: theme.fontBody,
+      fontHeading: theme.fontHeading,
+      buttonStyle: theme.buttonStyle,
+      panelStyle: theme.panelStyle,
+      formStyle: theme.formStyle,
+      navStyle: theme.navStyle
+    }))
+  );
 });
 
 router.get('/payment-methods', async (req, res) => {
@@ -81,6 +118,22 @@ router.get('/text-settings', async (req, res) => {
 router.get('/modules', async (req, res) => {
   const modules = await getPublicModules();
   res.json(modules);
+});
+
+router.get('/forms', async (req, res) => {
+  const forms = await getFormDefinitions({ scope: 'storefront', enabledOnly: true });
+  res.json(forms);
+});
+
+router.get('/forms/:key', async (req, res) => {
+  const forms = await getFormDefinitions({ scope: 'storefront', enabledOnly: true });
+  const form = forms.find(item => item.key === req.params.key);
+
+  if (!form) {
+    return res.status(404).json({ message: 'Formulario no encontrado' });
+  }
+
+  return res.json(form);
 });
 
 export default router;

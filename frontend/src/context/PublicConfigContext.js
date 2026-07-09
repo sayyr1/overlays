@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import axios from '../api/axiosInstance';
 
 const PublicConfigContext = createContext(null);
-const ALL_SECTIONS = ['settings', 'branding', 'paymentMethods', 'textSettings', 'modules'];
+const ALL_SECTIONS = ['settings', 'branding', 'homeLayout', 'paymentMethods', 'textSettings', 'modules', 'themes'];
 
 const toTextMap = items =>
   Array.isArray(items)
@@ -66,17 +66,15 @@ const resolveStoreName = (settings, branding) =>
 
 const applyBrandingToDocument = branding => {
   if (typeof document === 'undefined' || !branding) return;
-  const root = document.documentElement;
-  root.style.setProperty('--primary-color', branding.primaryColor || '#0f766e');
-  root.style.setProperty('--secondary-color', branding.secondaryColor || '#111827');
-  root.style.setProperty('--background-color', branding.backgroundColor || '#0b1220');
-  root.style.setProperty('--text-color', branding.textColor || '#0f172a');
 
   if (branding.faviconUrl) {
-    const existing = document.querySelector("link[rel='icon']");
-    if (existing) {
-      existing.href = branding.faviconUrl;
+    let existing = document.querySelector("link[rel='icon']");
+    if (!existing) {
+      existing = document.createElement('link');
+      existing.setAttribute('rel', 'icon');
+      document.head.appendChild(existing);
     }
+    existing.href = branding.faviconUrl;
   }
 };
 
@@ -97,6 +95,11 @@ const readSection = async section => {
     return data || null;
   }
 
+  if (section === 'homeLayout') {
+    const { data } = await axios.get('/api/public/home-layout');
+    return data || { sections: [] };
+  }
+
   if (section === 'paymentMethods') {
     const { data } = await axios.get('/api/public/payment-methods');
     return sortPaymentMethods(Array.isArray(data) ? data : []);
@@ -112,31 +115,42 @@ const readSection = async section => {
     return sortModules(Array.isArray(data) ? data : []);
   }
 
+  if (section === 'themes') {
+    const { data } = await axios.get('/api/public/themes');
+    return Array.isArray(data) ? data : [];
+  }
+
   return null;
 };
 
 export const PublicConfigProvider = ({ children }) => {
   const [settings, setSettings] = useState(null);
   const [branding, setBranding] = useState(null);
+  const [homeLayout, setHomeLayout] = useState({ sections: [] });
   const [paymentMethods, setPaymentMethods] = useState([]);
   const [textSettings, setTextSettings] = useState([]);
   const [modules, setModules] = useState([]);
+  const [themes, setThemes] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const applySectionValue = useCallback((section, data) => {
     if (section === 'settings') setSettings(data);
     if (section === 'branding') setBranding(data);
+    if (section === 'homeLayout') setHomeLayout(data || { sections: [] });
     if (section === 'paymentMethods') setPaymentMethods(Array.isArray(data) ? data : []);
     if (section === 'textSettings') setTextSettings(Array.isArray(data) ? data : []);
     if (section === 'modules') setModules(Array.isArray(data) ? data : []);
+    if (section === 'themes') setThemes(Array.isArray(data) ? data : []);
   }, []);
 
   const clearSectionValue = useCallback(section => {
     if (section === 'settings') setSettings(null);
     if (section === 'branding') setBranding(null);
+    if (section === 'homeLayout') setHomeLayout({ sections: [] });
     if (section === 'paymentMethods') setPaymentMethods([]);
     if (section === 'textSettings') setTextSettings([]);
     if (section === 'modules') setModules([]);
+    if (section === 'themes') setThemes([]);
   }, []);
 
   const loadPublicConfig = useCallback(async (sections = ALL_SECTIONS, options = {}) => {
@@ -208,8 +222,24 @@ export const PublicConfigProvider = ({ children }) => {
     setBranding(nextBranding || null);
   }, []);
 
+  const setPublicHomeLayout = useCallback(nextHomeLayout => {
+    setHomeLayout(nextHomeLayout || { sections: [] });
+  }, []);
+
   const setPublicModules = useCallback(nextModules => {
     setModules(sortModules(Array.isArray(nextModules) ? nextModules : []));
+  }, []);
+
+  const setPublicThemes = useCallback(nextThemes => {
+    setThemes(Array.isArray(nextThemes) ? nextThemes : []);
+  }, []);
+
+  const upsertPublicTheme = useCallback(nextTheme => {
+    if (!nextTheme?.scope) return;
+    setThemes(prev => {
+      const filtered = prev.filter(item => item.scope !== nextTheme.scope);
+      return [...filtered, nextTheme].sort((left, right) => left.scope.localeCompare(right.scope));
+    });
   }, []);
 
   const upsertPublicModule = useCallback(nextModule => {
@@ -249,11 +279,13 @@ export const PublicConfigProvider = ({ children }) => {
     () => ({
       settings,
       branding,
+      homeLayout,
       storeName: resolveStoreName(settings, branding),
       businessName: settings?.businessName?.trim() || settings?.tradeName?.trim() || 'Tu negocio',
       paymentMethods,
       textSettings,
       modules,
+      themes,
       moduleMap,
       textMap: toTextMap(textSettings),
       loading,
@@ -263,18 +295,23 @@ export const PublicConfigProvider = ({ children }) => {
       areModulesEnabled,
       setPublicSettings,
       setPublicBranding,
+      setPublicHomeLayout,
       setPublicModules,
+      setPublicThemes,
       upsertPublicModule,
       upsertPublicPaymentMethod,
       removePublicPaymentMethod,
-      upsertPublicTextSetting
+      upsertPublicTextSetting,
+      upsertPublicTheme
     }),
     [
       settings,
       branding,
+      homeLayout,
       paymentMethods,
       textSettings,
       modules,
+      themes,
       moduleMap,
       loading,
       loadPublicConfig,
@@ -282,11 +319,14 @@ export const PublicConfigProvider = ({ children }) => {
       areModulesEnabled,
       setPublicSettings,
       setPublicBranding,
+      setPublicHomeLayout,
       setPublicModules,
+      setPublicThemes,
       upsertPublicModule,
       upsertPublicPaymentMethod,
       removePublicPaymentMethod,
-      upsertPublicTextSetting
+      upsertPublicTextSetting,
+      upsertPublicTheme
     ]
   );
 

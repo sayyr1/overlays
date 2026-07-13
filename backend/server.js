@@ -19,7 +19,7 @@ import productRoutes from './routes/products.js';
 import orderRoutes from './routes/orders.js';
 import { router as userRoutes } from './routes/users.js';
 import cartRoutes from './routes/cart.js';
-import { ensureDefaultSettings } from './services/systemConfigService.js';
+import { ensureDefaultSettingsIfMissing } from './services/systemConfigService.js';
 import { expirePendingOrders } from './controllers/orderController.js';
 
 dotenv.config();
@@ -127,7 +127,7 @@ const initializeServer = async () => {
       await mongoose.connection.asPromise();
     }
 
-    await ensureDefaultSettings();
+    await ensureDefaultSettingsIfMissing();
     return mongoose.connection;
   })().catch(error => {
     initializationPromise = null;

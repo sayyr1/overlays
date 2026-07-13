@@ -42,7 +42,6 @@ const sortModules = items =>
   );
 
 const LEGACY_STORE_NAMES = new Set([
-  'niway store',
   'tu tienda',
   'tu negocio'
 ]);
@@ -82,6 +81,11 @@ const applyStoreNameToDocument = storeName => {
   if (typeof document === 'undefined') return;
   const normalized = storeName?.trim() || 'Tu tienda';
   document.title = normalized;
+};
+
+const readBootstrap = async () => {
+  const { data } = await axios.get('/api/public/bootstrap');
+  return data || {};
 };
 
 const readSection = async section => {
@@ -153,15 +157,34 @@ export const PublicConfigProvider = ({ children }) => {
     if (section === 'themes') setThemes([]);
   }, []);
 
+  const applyBootstrapData = useCallback(payload => {
+    setSettings(payload?.settings || null);
+    setBranding(payload?.branding || null);
+    setHomeLayout(payload?.homeLayout || { sections: [] });
+    setPaymentMethods(sortPaymentMethods(Array.isArray(payload?.paymentMethods) ? payload.paymentMethods : []));
+    setTextSettings(sortTextSettings(Array.isArray(payload?.textSettings) ? payload.textSettings : []));
+    setModules(sortModules(Array.isArray(payload?.modules) ? payload.modules : []));
+    setThemes(Array.isArray(payload?.themes) ? payload.themes : []);
+  }, []);
+
   const loadPublicConfig = useCallback(async (sections = ALL_SECTIONS, options = {}) => {
     const normalizedSections = Array.isArray(sections) ? sections : [sections];
     const shouldSetLoading = options.setLoading ?? true;
+    const shouldUseBootstrap =
+      normalizedSections.length === ALL_SECTIONS.length &&
+      ALL_SECTIONS.every(section => normalizedSections.includes(section));
 
     if (shouldSetLoading) {
       setLoading(true);
     }
 
     try {
+      if (shouldUseBootstrap) {
+        const payload = await readBootstrap();
+        applyBootstrapData(payload);
+        return;
+      }
+
       const responses = await Promise.allSettled(
         normalizedSections.map(async section => ({
           section,
@@ -184,7 +207,7 @@ export const PublicConfigProvider = ({ children }) => {
         setLoading(false);
       }
     }
-  }, [applySectionValue, clearSectionValue]);
+  }, [applyBootstrapData, applySectionValue, clearSectionValue]);
 
   useEffect(() => {
     loadPublicConfig();

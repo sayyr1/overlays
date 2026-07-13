@@ -3,7 +3,7 @@ import { getStoredVisitorSessionId } from '../utils/visitorSession';
 
 const resolvedApiUrl = String(process.env.REACT_APP_API_URL || '').trim();
 const baseURL = resolvedApiUrl || (process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000');
-const AUTH_TOKEN_STORAGE_KEY = 'niway_auth_token';
+const AUTH_TOKEN_STORAGE_KEY = 'runacommerce_auth_token';
 
 if (process.env.NODE_ENV !== 'production') {
   console.log('API baseURL:', baseURL);

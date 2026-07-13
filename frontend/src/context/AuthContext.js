@@ -1,12 +1,39 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import axios, {
   clearStoredAuthToken,
+  getStoredAuthToken,
   setStoredAuthToken
 } from '../api/axiosInstance';
 
 const AuthContext = createContext(null);
 const EMPTY_PERMISSIONS = {};
 const INTERNAL_ROLES = new Set(['sales', 'owner', 'admin', 'superadmin']);
+const AUTH_REQUIRED_PATH_PREFIXES = [
+  '/super-admin',
+  '/admin-dashboard',
+  '/dashboard',
+  '/pedidos',
+  '/ventas',
+  '/gestionar-categorias',
+  '/menu-builder',
+  '/crear-producto',
+  '/editar-producto',
+  '/crm',
+  '/mis-pedidos'
+];
+
+const shouldHydrateSession = () => {
+  if (typeof window === 'undefined') {
+    return true;
+  }
+
+  if (getStoredAuthToken()) {
+    return true;
+  }
+
+  const pathname = String(window.location?.pathname || '').trim();
+  return AUTH_REQUIRED_PATH_PREFIXES.some(prefix => pathname.startsWith(prefix));
+};
 
 const parsePermission = (moduleOrDescriptor, action) => {
   if (action) {
@@ -26,6 +53,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchSession = useCallback(async () => {
+    if (!shouldHydrateSession()) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data } = await axios.get('/api/users/verify-token', { withCredentials: true });
       setUser(data.user);

@@ -9,8 +9,8 @@ import {
   sanitizeFiltersForQuery
 } from '../../utils/productFilters';
 
-const SCROLL_STORAGE_KEY = 'niway:product-list-scroll';
-const FILTER_STORAGE_KEY = 'niway:last-product-filters';
+const SCROLL_STORAGE_KEY = 'runacommerce:product-list-scroll';
+const FILTER_STORAGE_KEY = 'runacommerce:last-product-filters';
 const SERVER_FILTER_KEYS = new Set([
   'brand',
   'type',
@@ -311,7 +311,7 @@ const ProductListPage = () => {
     const titleParts = [activeFilters.brand, activeFilters.type, activeFilters.gender].filter(Boolean);
     const title = titleParts.length > 0
       ? titleParts.join(' - ')
-      : activeFilters.collection || 'Catalogo Niway';
+      : activeFilters.collection || 'Catalogo Runa Commerce';
 
     const description = activeFilters.brand
       ? `${activeFilters.brand} concentra una seleccion mas curada para navegar rapido desde movil.`

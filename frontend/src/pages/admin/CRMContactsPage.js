@@ -21,7 +21,7 @@ import {
   getContactValueTier
 } from '../../components/crm/crmUi';
 
-const SAVED_VIEWS_KEY = 'niway.crm.savedViews';
+const SAVED_VIEWS_KEY = 'runacommerce.crm.savedViews';
 
 const EMPTY_FILTERS = {
   q: '',
@@ -428,7 +428,7 @@ const CRMContactsPage = () => {
                   value={leadLinkForm.leadCode}
                   onChange={handleLeadLinkChange}
                   className="mt-1.5 w-full rounded-2xl border border-surface-200 px-3 py-2.5 uppercase"
-                  placeholder="NW-AB12CD"
+                  placeholder="RC-AB12CD"
                   required
                 />
               </label>

@@ -14,7 +14,7 @@ import {
 } from '../../utils/inventory';
 
 const LOW_STOCK_THRESHOLD = 5;
-const INVENTORY_FILTER_STORAGE_KEY = 'niway-admin-inventory-filters-v1';
+const INVENTORY_FILTER_STORAGE_KEY = 'runacommerce-admin-inventory-filters-v1';
 
 const DEFAULT_ADVANCED_FILTERS = Object.freeze({
   brand: '',

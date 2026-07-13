@@ -6,7 +6,7 @@ export const normalizeLeadCode = value =>
 
 const randomChunk = () => Math.random().toString(36).slice(2, 6).toUpperCase();
 
-export const generateLeadCode = (prefix = 'NW') => {
+export const generateLeadCode = (prefix = 'RC') => {
   const timeChunk = Date.now().toString(36).slice(-4).toUpperCase();
   return `${prefix}-${timeChunk}${randomChunk()}`;
 };

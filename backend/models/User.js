@@ -15,7 +15,7 @@ export const INTERNAL_USER_ROLES = Object.freeze([
   USER_ROLES.SUPERADMIN
 ]);
 
-export const SYSTEM_USER_EMAIL_DOMAIN = 'users.niway.local';
+export const SYSTEM_USER_EMAIL_DOMAIN = 'users.runacommerce.local';
 
 const USERNAME_PATTERN = /^[a-z0-9._-]{4,32}$/;
 

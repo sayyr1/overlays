@@ -1,5 +1,5 @@
 {
-  "name": "niway",
+  "name": "runacommerce",
   "private": true,
   "dependencies": {
     "bcryptjs": "^2.4.3",

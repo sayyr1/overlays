@@ -8,6 +8,9 @@ import FormDefinition from '../models/FormDefinition.js';
 import HomeLayoutSettings from '../models/HomeLayoutSettings.js';
 import { ensureDefaultCRMConfig } from './crmConfigService.js';
 
+let defaultsPresenceChecked = false;
+let defaultsPresencePromise = null;
+
 const DEFAULT_SYSTEM_SETTINGS = {
   businessName: 'Tu negocio',
   tradeName: 'Tu tienda',
@@ -590,6 +593,38 @@ export const ensureDefaultSettings = async () => {
   if (existingPaymentMethods === 0) {
     await PaymentMethod.insertMany(DEFAULT_PAYMENT_METHODS);
   }
+};
+
+export const ensureDefaultSettingsIfMissing = async () => {
+  if (defaultsPresenceChecked) {
+    return;
+  }
+
+  if (defaultsPresencePromise) {
+    return defaultsPresencePromise;
+  }
+
+  defaultsPresencePromise = (async () => {
+    const [hasSystemSettings, hasBrandingSettings, hasHomeLayout, hasModules, hasThemes] = await Promise.all([
+      SystemSettings.exists({ singletonKey: 'default' }),
+      BrandingSettings.exists({ singletonKey: 'default' }),
+      HomeLayoutSettings.exists({ singletonKey: 'default' }),
+      ModuleConfig.exists({}),
+      ThemeSettings.exists({})
+    ]);
+
+    if (hasSystemSettings && hasBrandingSettings && hasHomeLayout && hasModules && hasThemes) {
+      defaultsPresenceChecked = true;
+      return;
+    }
+
+    await ensureDefaultSettings();
+    defaultsPresenceChecked = true;
+  })().finally(() => {
+    defaultsPresencePromise = null;
+  });
+
+  return defaultsPresencePromise;
 };
 
 export const getSystemSettings = () => ensureSingleton(SystemSettings, DEFAULT_SYSTEM_SETTINGS);

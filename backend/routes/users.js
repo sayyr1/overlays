@@ -21,7 +21,7 @@ import { getEffectivePermissions, normalizePermissionMatrix } from '../constants
 const router = express.Router();
 const isProduction = process.env.NODE_ENV === 'production';
 
-const resolveCookieDomain = () => {
+const resolveCookieDomain = req => {
   const rawValue = String(process.env.COOKIE_DOMAIN || '').trim();
   if (!rawValue) {
     return '';
@@ -43,17 +43,31 @@ const resolveCookieDomain = () => {
     return '';
   }
 
+  const requestHost = String(req?.hostname || req?.headers?.host || '')
+    .trim()
+    .replace(/:\d+$/, '')
+    .toLowerCase();
+  const normalizedHost = requestHost.replace(/^\.+/, '');
+
+  if (
+    normalizedHost &&
+    normalizedHost !== normalizedValue.toLowerCase() &&
+    !normalizedHost.endsWith(`.${normalizedValue.toLowerCase()}`)
+  ) {
+    return '';
+  }
+
   return normalizedValue;
 };
 
-const getAuthCookieOptions = () => {
+const getAuthCookieOptions = req => {
   const cookieOptions = {
     httpOnly: true,
     sameSite: isProduction ? 'none' : 'lax',
     secure: isProduction
   };
 
-  const cookieDomain = resolveCookieDomain();
+  const cookieDomain = resolveCookieDomain(req);
   if (cookieDomain) {
     cookieOptions.domain = cookieDomain;
   }
@@ -61,10 +75,10 @@ const getAuthCookieOptions = () => {
   return cookieOptions;
 };
 
-const attachAuthCookie = (res, token) => {
+const attachAuthCookie = (req, res, token) => {
   try {
     res.cookie('access_token', token, {
-      ...getAuthCookieOptions(),
+      ...getAuthCookieOptions(req),
       maxAge: 60 * 60 * 1000
     });
   } catch (error) {
@@ -322,7 +336,7 @@ router.post('/register', async (req, res) => {
     });
 
     const token = generateToken(user._id, user.role, user.isAdmin);
-    attachAuthCookie(res, token);
+    attachAuthCookie(req, res, token);
 
     res.status(201).json({
       token,
@@ -377,7 +391,7 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    attachAuthCookie(res, token);
+    attachAuthCookie(req, res, token);
 
     let serializedUser;
     try {
@@ -401,7 +415,7 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/logout', (req, res) => {
-  res.clearCookie('access_token', getAuthCookieOptions());
+  res.clearCookie('access_token', getAuthCookieOptions(req));
   res.status(204).end();
 });
 

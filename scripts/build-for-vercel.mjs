@@ -12,7 +12,9 @@ const run = (command, options = {}) => {
   }
 };
 
-run('npm install --prefix frontend');
+// El proyecto heredado incluye un adaptador de Cloudinary con un peer dependency
+// antiguo; esta opción conserva las versiones bloqueadas en package-lock.
+run('npm install --prefix frontend --legacy-peer-deps');
 run('npm run build --prefix frontend', {
   env: {
     ...process.env,

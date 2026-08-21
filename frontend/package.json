@@ -11,6 +11,7 @@
     "axios": "^1.17.0",
     "browser-image-compression": "^2.0.2",
     "framer-motion": "^12.23.12",
+    "pusher-js": "^8.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-icons": "^5.5.0",

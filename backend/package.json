@@ -7,7 +7,10 @@
     "start": "node server.js",
     "build": "cd ..\\frontend; npm install; npm run build",
     "set-user-role": "node scripts/setUserRole.js",
-    "reset-user-access": "node scripts/resetUserAccess.js"
+    "reset-user-access": "node scripts/resetUserAccess.js",
+    "create-admin": "node scripts/createSportsAdmin.js",
+    "seed-demo": "node scripts/seedSportsDemo.js",
+    "test": "node --test tests/sportsClock.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -20,7 +23,8 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.6.3",
     "multer": "^2.1.1",
-    "multer-storage-cloudinary": "^4.0.0"
+    "multer-storage-cloudinary": "^4.0.0",
+    "pusher": "^5.3.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.0"

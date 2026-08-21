@@ -6,293 +6,59 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-import brandRoutes from './routes/brands.js';
-import categoryRoutes from './routes/categories.js';
-import navigationRoutes from './routes/navigation.js';
-import superAdminRoutes from './routes/superAdmin.js';
-import publicRoutes from './routes/public.js';
-import trackingRoutes from './routes/tracking.js';
-import crmRoutes from './routes/crm.js';
-import adminConfigRoutes from './routes/adminConfig.js';
-import productRoutes from './routes/products.js';
-import orderRoutes from './routes/orders.js';
-import { router as userRoutes } from './routes/users.js';
-import cartRoutes from './routes/cart.js';
-import { ensureDefaultSettingsIfMissing } from './services/systemConfigService.js';
-import { expirePendingOrders } from './controllers/orderController.js';
+import sportsRoutes from './routes/sports.js';
 
 dotenv.config();
-
 const app = express();
 const isVercelRuntime = Boolean(process.env.VERCEL);
-
 app.set('trust proxy', 1);
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const isDirectExecution = process.argv[1]
-  ? path.resolve(process.argv[1]) === __filename
-  : false;
-
-const LOCAL_ALLOWED_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:5000',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:5000'
-];
-
-const DEFAULT_ALLOWED_ORIGINS = [...LOCAL_ALLOWED_ORIGINS];
-
-const parseAllowedOrigins = () =>
-  [
-    process.env.PUBLIC_APP_URL,
-    process.env.PUBLIC_WEB_URL,
-    process.env.STORE_URL,
-    process.env.FRONTEND_URL,
-    process.env.APP_URL,
-    ...String(process.env.CORS_ORIGINS || '').split(',')
-  ]
-    .map(item => String(item || '').trim())
-    .filter(Boolean);
-
-const allowVercelPreviewOrigins = () => {
-  if (process.env.ALLOW_VERCEL_PREVIEW_ORIGINS == null) {
-    return isVercelRuntime;
-  }
-
-  const value = String(process.env.ALLOW_VERCEL_PREVIEW_ORIGINS).trim().toLowerCase();
-  return !['false', '0', 'no'].includes(value);
-};
-
-const allowedOrigins = new Set([
-  ...DEFAULT_ALLOWED_ORIGINS,
-  ...parseAllowedOrigins(),
-  ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [])
-]);
-
-const isOriginAllowed = origin => {
-  if (!origin) {
-    return true;
-  }
-
-  if (allowedOrigins.has(origin)) {
-    return true;
-  }
-
+const isDirectExecution = process.argv[1] ? path.resolve(process.argv[1]) === __filename : false;
+const localOrigins = ['http://localhost:3000', 'http://localhost:5000', 'http://127.0.0.1:3000', 'http://127.0.0.1:5000'];
+const configuredOrigins = [process.env.APP_BASE_URL, process.env.FRONTEND_URL, ...String(process.env.CORS_ORIGINS || '').split(',')].map(value => String(value || '').trim()).filter(Boolean);
+const allowedOrigins = new Set([...localOrigins, ...configuredOrigins, ...(process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [])]);
+const isPrivateDevelopmentOrigin = origin => {
   try {
-    const hostname = new URL(origin).hostname;
-    if (allowVercelPreviewOrigins() && hostname.endsWith('.vercel.app')) {
-      return true;
-    }
-  } catch {
-    return false;
-  }
-
-  return false;
+    const url = new URL(origin);
+    if (!['http:', 'https:'].includes(url.protocol) || !['3000', '5000', ''].includes(url.port)) return false;
+    const host = url.hostname;
+    return /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host) || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) || /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host);
+  } catch { return false; }
 };
-
-app.use(cors({
-  origin: (origin, callback) => {
-    if (isOriginAllowed(origin)) {
-      return callback(null, true);
-    }
-    return callback(new Error(`CORS not allowed for this origin: ${origin}`));
-  },
-  credentials: true
-}));
-
-app.use(express.json({ limit: '25mb' }));
-app.use(express.urlencoded({ extended: true, limit: '25mb' }));
+const isOriginAllowed = origin => {
+  if (!origin || allowedOrigins.has(origin) || (!isVercelRuntime && isPrivateDevelopmentOrigin(origin))) return true;
+  try { return Boolean(isVercelRuntime && new URL(origin).hostname.endsWith('.vercel.app')); } catch { return false; }
+};
+app.use(cors({ origin: (origin, callback) => callback(isOriginAllowed(origin) ? null : new Error('Origen no permitido por CORS'), isOriginAllowed(origin)), credentials: true }));
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: '2mb' }));
 app.use(cookieParser());
+app.use((req, res, next) => { res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'SAMEORIGIN'); res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin'); next(); });
 
-let initializationPromise = null;
-let orderExpirationInterval = null;
-let lastOrderExpirationRunAt = 0;
-let pendingOrderExpirationPromise = null;
-
+let initializationPromise;
 const initializeServer = async () => {
-  if (initializationPromise) {
-    return initializationPromise;
-  }
-
+  if (initializationPromise) return initializationPromise;
   initializationPromise = (async () => {
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI no esta configurada');
-    }
-
-    if (mongoose.connection.readyState === 0) {
-      await mongoose.connect(process.env.MONGO_URI);
-    } else if (mongoose.connection.readyState === 2) {
-      await mongoose.connection.asPromise();
-    }
-
-    await ensureDefaultSettingsIfMissing();
+    const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+    if (!mongoUri) throw new Error('MONGODB_URI no está configurada');
+    if (mongoose.connection.readyState === 0) await mongoose.connect(mongoUri);
+    else if (mongoose.connection.readyState === 2) await mongoose.connection.asPromise();
     return mongoose.connection;
-  })().catch(error => {
-    initializationPromise = null;
-    throw error;
-  });
-
+  })().catch(error => { initializationPromise = null; throw error; });
   return initializationPromise;
 };
-
-const startOrderExpirationTask = () => {
-  if (isVercelRuntime || orderExpirationInterval) {
-    return;
-  }
-
-  orderExpirationInterval = setInterval(() => {
-    expirePendingOrders().catch(error => {
-      console.error('Error expirando pedidos pendientes:', error);
-    });
-  }, 5 * 60 * 1000);
-};
-
-const runPendingOrderExpiration = async ({ force = false } = {}) => {
-  const now = Date.now();
-  if (!force && now - lastOrderExpirationRunAt < 60 * 1000) {
-    return false;
-  }
-
-  if (!pendingOrderExpirationPromise) {
-    pendingOrderExpirationPromise = expirePendingOrders()
-      .then(() => {
-        lastOrderExpirationRunAt = Date.now();
-        return true;
-      })
-      .finally(() => {
-        pendingOrderExpirationPromise = null;
-      });
-  }
-
-  return pendingOrderExpirationPromise;
-};
-
-const mutatingMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
-
-const isTrustedCookieMutation = req => {
-  if (!mutatingMethods.has(req.method)) {
-    return true;
-  }
-
-  if (!req.cookies?.access_token) {
-    return true;
-  }
-
-  if (req.headers.authorization?.startsWith('Bearer ')) {
-    return true;
-  }
-
-  const origin = req.headers.origin;
-  if (origin) {
-    return isOriginAllowed(origin);
-  }
-
-  const referer = req.headers.referer;
-  if (referer) {
-    try {
-      return isOriginAllowed(new URL(referer).origin);
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
-};
-
-app.use(async (req, res, next) => {
-  try {
-    await initializeServer();
-    await runPendingOrderExpiration();
-    next();
-  } catch (error) {
-    console.error('Error inicializando servidor:', error);
-    res.status(500).json({
-      message: 'No se pudo inicializar el backend'
-    });
-  }
-});
-
+app.use(async (req, res, next) => { try { await initializeServer(); next(); } catch (error) { console.error('Error inicializando servidor:', error.message); res.status(500).json({ message: 'No se pudo inicializar el backend.' }); } });
 app.use((req, res, next) => {
-  if (isTrustedCookieMutation(req)) {
-    return next();
-  }
-
-  return res.status(403).json({
-    message: 'Solicitud bloqueada por validacion de origen'
-  });
+  const mutating = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method);
+  if (!mutating || !req.cookies?.sports_session || req.headers.authorization?.startsWith('Bearer ') || isOriginAllowed(req.headers.origin || '')) return next();
+  return res.status(403).json({ message: 'Solicitud bloqueada por validación de origen.' });
 });
-
-app.get('/health', (req, res) => {
-  res.json({
-    ok: true,
-    runtime: isVercelRuntime ? 'vercel' : 'node',
-    mongoReadyState: mongoose.connection.readyState
-  });
-});
-
-app.get('/', (req, res) => {
-  res.json({
-    ok: true,
-    service: 'store-backend',
-    runtime: isVercelRuntime ? 'vercel' : 'node'
-  });
-});
-
-app.get('/api/internal/expire-pending-orders', async (req, res) => {
-  try {
-    const userAgent = String(req.headers['user-agent'] || '');
-    const isCronRequest = userAgent.includes('vercel-cron/1.0');
-
-    if (isVercelRuntime && !isCronRequest) {
-      return res.status(403).json({ message: 'Ruta interna no disponible' });
-    }
-
-    await runPendingOrderExpiration({ force: true });
-    return res.json({ ok: true });
-  } catch (error) {
-    console.error('Error ejecutando expiracion interna de pedidos:', error);
-    return res.status(500).json({ message: 'No se pudo ejecutar la expiracion de pedidos' });
-  }
-});
-
-app.use('/api/brands', brandRoutes);
-app.use('/api/categories', categoryRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/navigation', navigationRoutes);
-app.use('/api/super-admin', superAdminRoutes);
-app.use('/api/public', publicRoutes);
-app.use('/api/tracking', trackingRoutes);
-app.use('/api/crm', crmRoutes);
-app.use('/api/admin-config', adminConfigRoutes);
+app.get('/health', (req, res) => res.json({ ok: true, service: 'imbabura-en-vivo-api', runtime: isVercelRuntime ? 'vercel' : 'node', mongoReadyState: mongoose.connection.readyState }));
+app.use('/api/sports', sportsRoutes);
 
 const buildPath = path.join(__dirname, '..', 'frontend', 'build');
-const hasLocalFrontendBuild = fs.existsSync(buildPath);
-
-if (!isVercelRuntime && hasLocalFrontendBuild) {
-  app.use(express.static(buildPath));
-  app.get('/{*path}', (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
-  });
-}
-
-if (!isVercelRuntime && isDirectExecution) {
-  initializeServer()
-    .then(() => {
-      startOrderExpirationTask();
-      const port = Number(process.env.PORT || 5000);
-      app.listen(port, () => {
-        console.log(`Backend escuchando en puerto ${port}`);
-      });
-    })
-    .catch(error => {
-      console.error('Error conectando a MongoDB:', error);
-      process.exitCode = 1;
-    });
-}
-
+if (!isVercelRuntime && fs.existsSync(buildPath)) { app.use(express.static(buildPath)); app.get('/{*path}', (req, res) => res.sendFile(path.join(buildPath, 'index.html'))); }
+app.use((error, req, res, next) => { console.error('Error de aplicación:', error.message); res.status(500).json({ message: 'Error interno del servidor.' }); });
+if (!isVercelRuntime && isDirectExecution) initializeServer().then(() => app.listen(Number(process.env.PORT || 5000), () => console.log(`Backend escuchando en puerto ${process.env.PORT || 5000}`))).catch(error => { console.error('Error conectando a MongoDB:', error.message); process.exitCode = 1; });
 export default app;

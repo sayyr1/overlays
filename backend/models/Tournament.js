@@ -1,10 +1,23 @@
 import mongoose from 'mongoose';
+import { broadcastModes, broadcastTypes } from '../services/broadcastConfig.js';
 
 const mediaSchema = new mongoose.Schema({
   publicId: String, secureUrl: String, width: Number, height: Number, format: String
 }, { _id: false });
 
 const tournamentSchema = new mongoose.Schema({
+  mode: { type: String, enum: broadcastModes, default: 'sports' },
+  broadcast: {
+    scenes: { type: [new mongoose.Schema({
+      id: { type: String, required: true, maxlength: 80 },
+      type: { type: String, required: true, enum: broadcastTypes },
+      label: { type: String, required: true, maxlength: 60 },
+      title: { type: String, default: '', maxlength: 100 },
+      subtitle: { type: String, default: '', maxlength: 180 },
+      seconds: { type: Number, default: 300, min: 1, max: 3600 },
+      duration: { type: Number, default: 0, min: 0, max: 3600 },
+    }, { _id: false })], default: [], validate: { validator: scenes => scenes.length <= 30 && new Set(scenes.map(s => s.id)).size === scenes.length, message: 'Máximo 30 gráficos con identificadores únicos.' } },
+  },
   name: { type: String, required: true, trim: true, maxlength: 120 },
   slug: { type: String, required: true, unique: true, lowercase: true, trim: true, index: true },
   season: { type: String, trim: true, maxlength: 60 },

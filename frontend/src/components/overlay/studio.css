@@ -1,0 +1,18 @@
+﻿.broadcast-controls > p, .broadcast-editor > p, .broadcast-copy p { color: #b8c8d8; line-height: 1.6; font-size: .95rem; }
+.broadcast-scenes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .7rem; margin: 1rem 0; }
+.broadcast-scenes button { display: grid; align-content: start; gap: .5rem; min-width: 0; min-height: 130px; padding: 1rem; text-align: left; }
+.broadcast-scenes small { font-size: .7rem; letter-spacing: .04em; color: #c9d8e5; }
+.broadcast-scenes strong { font-size: 1rem; }
+.broadcast-scenes span { font-size: .85rem; line-height: 1.4; overflow-wrap: anywhere; font-weight: 400; }
+.broadcast-scenes .broadcast-on-air { border: 1px solid #e8888d; background: #622e37; color: white; }
+.broadcast-actions { display: flex; flex-wrap: wrap; gap: .6rem; margin: 1rem 0; }
+.broadcast-editor { grid-column: 1 / -1; min-width: 0; }
+.broadcast-editor fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.broadcast-editor-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.broadcast-edit-card, .broadcast-copy { padding: 1rem; border: 1px solid #36516b; border-radius: .7rem; background: #0d2135; }
+.broadcast-edit-card { display: grid; gap: .8rem; min-width: 0; }
+.broadcast-edit-card label, .broadcast-copy label, .resource form > label { display: grid; gap: .4rem; font-size: .9rem; color: #cfdae4; }
+.broadcast-copy { margin-top: 1.5rem; display: grid; gap: .75rem; max-width: 680px; }
+.broadcast-copy input { width: 100%; }
+@media (max-width: 700px) { .broadcast-editor-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 370px) { .broadcast-scenes { grid-template-columns: minmax(0, 1fr); } }

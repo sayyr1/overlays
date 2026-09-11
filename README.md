@@ -1,5 +1,19 @@
 # Imbabura en Vivo · Centro de gráficos
 
+## Transmisiones de presentaciones, IRL y uso general
+
+En **Configuración previa → Nueva transmisión**, elige Deportes, Presentación / entrevista, IRL / en exteriores o General. Las tres últimas opciones funcionan sin equipos, jugadores ni partidos. Los torneos existentes conservan el modo Deportes.
+
+Cada transmisión general comienza con ocho plantillas: inicio, cuenta regresiva, pausa, cierre, conductor/invitado, tema, ubicación o aviso y redes/contacto. Personaliza sus textos en Configuración previa y pulsa **Guardar biblioteca**. Puedes agregar hasta 30 gráficos. Los que tengan el título vacío permanecen deshabilitados en el control en vivo.
+
+En **Control en vivo**, pulsa un gráfico para emitirlo y vuelve a pulsarlo para retirarlo. **Volver a cámara** retira la placa principal; **Limpiar salida** retira todas las capas. La cuenta regresiva usa la hora de activación guardada en el servidor y permanece en 00:00 al terminar hasta retirarla (o hasta la caducidad configurada). La duración 0 conserva el gráfico hasta retirarlo manualmente. Editar una plantilla no cambia un gráfico que ya está en aire: vuelve a emitirlo para aplicar los textos nuevos.
+
+La biblioteca se conserva entre sesiones. **Duplicar preparación** crea otra transmisión con los textos, diseños, colores y logo guardados, una salida vacía y un enlace nuevo; los auspiciantes se configuran aparte. También puedes reutilizar la misma transmisión y conservar su enlace. El enlace de control remoto muestra los botones generales cuando corresponde. El enlace de OBS mantiene el formato `/overlay/torneo/:slug` por compatibilidad.
+
+El enlace inicial de OBS aparece en el panel para copiarlo sin regenerarlo. Guarda ese enlace antes de cerrar la página. **Regenerar enlace OBS** invalida el anterior.
+
+Para revisar composiciones sin servicios externos, ejecuta `node scripts/preview-overlays.cjs` y abre `docs/overlay-preview.html`. La galería utiliza datos ficticios y la composición React real; la cuenta regresiva de esta galería estática es solo una muestra visual.
+
 Aplicación MERN interna de CODEBRIQ Media para operar gráficos de fútbol y emitirlos por OBS. MongoDB es la fuente de verdad; Pusher Channels solo distribuye las actualizaciones posteriores a cada guardado.
 
 ## Arquitectura

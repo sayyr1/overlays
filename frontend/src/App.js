@@ -1,6 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
 import "./App.css";
+import OverlayComposition from "./components/overlay/OverlayComposition";
+import { BroadcastControls, BroadcastEditor, TransmissionFields } from "./components/overlay/BroadcastStudio";
 
 const API = String(
   process.env.REACT_APP_API_URL ||
@@ -47,396 +49,19 @@ const clockText = (clock, now) => {
   return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
 };
 
-function OverlayComposition({ snapshot, preview = false }) {
-  const [now, setNow] = useState(Date.now());
+function ResponsivePreview({ snapshot, className = "" }) {
+  const frame = useRef(null);
+  const [scale, setScale] = useState(0);
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
+    const observer = new ResizeObserver(([entry]) => setScale(entry.contentRect.width / 1920));
+    if (frame.current) observer.observe(frame.current);
+    return () => observer.disconnect();
   }, []);
-  const match = snapshot?.match;
-  const graphics = snapshot?.graphics || {};
-  const colors = snapshot?.tournament?.colors || {};
-  if (!match)
-    return (
-      <div className={`overlay-root ${preview ? "overlay-preview" : ""}`}>
-        <div className="overlay-empty">Esperando partido activo</div>
-      </div>
-    );
-  return (
-    <div
-      className={`overlay-root ${preview ? "overlay-preview" : ""}`}
-      style={{
-        "--primary": colors.primary,
-        "--secondary": colors.secondary,
-        "--accent": colors.accent,
-        "--text": colors.text,
-        "--background": colors.background,
-      }}
-    >
-      {graphics.scoreboardVisible && (
-        <div className="scorebug">
-          {snapshot.tournament?.logo?.secureUrl && (
-            <img
-              className="scorebug-brand"
-              src={snapshot.tournament.logo.secureUrl}
-              alt=""
-            />
-          )}
-          <div className="team-side">
-            {match.homeTeam?.crest?.secureUrl && (
-              <img src={match.homeTeam.crest.secureUrl} alt="" />
-            )}
-            <b>{match.homeTeam?.code}</b>
-          </div>
-          <strong>
-            {match.score.home} — {match.score.away}
-          </strong>
-          <div className="team-side right">
-            <b>{match.awayTeam?.code}</b>
-            {match.awayTeam?.crest?.secureUrl && (
-              <img src={match.awayTeam.crest.secureUrl} alt="" />
-            )}
-          </div>
-          {graphics.clockVisible && (
-            <span className="clock">
-              {clockText(match.clock, now)} · {match.clock.period}
-              {match.clock.addedTime ? ` +${match.clock.addedTime}` : ""}
-            </span>
-          )}
-        </div>
-      )}
-      {graphics.clockVisible && !graphics.scoreboardVisible && (
-        <div className="standalone-clock">
-          {clockText(match.clock, now)} · {match.clock.period}
-        </div>
-      )}
-      {graphics.channelBugVisible && (
-        <div className="channel-bug">
-          IMBABURA
-          <br />
-          <b>EN VIVO</b>
-        </div>
-      )}
-      {graphics.sponsorBugVisible && (
-        <SponsorRibbon sponsors={snapshot?.sponsors || []} now={now} />
-      )}
-      {graphics.main && (
-        <RenderGraphic
-          key={graphics.main.id}
-          graphic={graphics.main}
-          match={match}
-          tournament={snapshot.tournament}
-          kind="main"
-        />
-      )}
-      {graphics.temporary && (
-        <Graphic
-          key={graphics.temporary.id}
-          graphic={graphics.temporary}
-          match={match}
-          tournament={snapshot.tournament}
-          kind="temporary"
-        />
-      )}
-      {graphics.lowerThird && (
-        <Graphic
-          key={graphics.lowerThird.id}
-          graphic={graphics.lowerThird}
-          match={match}
-          tournament={snapshot.tournament}
-          kind="lower"
-        />
-      )}
+  return <div ref={frame} className={"responsive-preview " + className}>
+    <div style={{ width: 1920, height: 1080, transform: "scale(" + scale + ")", transformOrigin: "top left" }}>
+      <OverlayComposition snapshot={snapshot} preview />
     </div>
-  );
-}
-
-function SponsorRibbon({ sponsors, now }) {
-  const active = sponsors.filter((sponsor) => sponsor.active !== false);
-  if (!active.length)
-    return (
-      <section className="sponsor-ribbon sponsor-ribbon-empty">
-        Configura auspiciantes en el panel
-      </section>
-    );
-  const total = active.reduce(
-    (sum, sponsor) => sum + Math.max(3, Number(sponsor.durationSeconds) || 10),
-    0,
-  );
-  let cursor = Math.floor(now / 1000) % total;
-  let sponsor = active[0];
-  for (const item of active) {
-    cursor -= Math.max(3, Number(item.durationSeconds) || 10);
-    if (cursor < 0) {
-      sponsor = item;
-      break;
-    }
-  }
-  return (
-    <section
-      key={sponsor.id}
-      className="sponsor-ribbon"
-      style={{
-        "--sponsor-bg": sponsor.backgroundColor || "#101720",
-        "--sponsor-text": sponsor.textColor || "#ffffff",
-        "--sponsor-accent": sponsor.accentColor || "#e0b84d",
-      }}
-    >
-      <div className="sponsor-logo">
-        {sponsor.logo?.secureUrl ? (
-          <img src={sponsor.logo.secureUrl} alt="" />
-        ) : (
-          <b>{sponsor.name.slice(0, 2).toUpperCase()}</b>
-        )}
-      </div>
-      <div className="sponsor-copy">
-        <span>{sponsor.category || "AUSPICIANTE OFICIAL"}</span>
-        <strong>{sponsor.name}</strong>
-        {sponsor.headline && <b>{sponsor.headline}</b>}
-        {sponsor.description && <p>{sponsor.description}</p>}
-      </div>
-      <div className="sponsor-details">
-        {[
-          ["DIRECCIÓN", sponsor.location],
-          ["TELÉFONO", sponsor.phone],
-          ["WEB / EMAIL", sponsor.url?.replace(/^https?:\/\//, "")],
-        ]
-          .filter(([, value]) => value)
-          .map(([label, value]) => (
-            <div className="sponsor-detail" key={label}>
-              <span>{label}</span>
-              <b>{value}</b>
-            </div>
-          ))}
-      </div>
-    </section>
-  );
-}
-
-function RenderGraphic(props) {
-  const { graphic, match } = props;
-  if (["descanso", "resultado_final"].includes(graphic.type))
-    return (
-      <MatchScoreCard
-        match={match}
-        tournament={props.tournament}
-        final={graphic.type === "resultado_final"}
-      />
-    );
-  if (graphic.type === "estadisticas") {
-    const rows = [
-      ["Posesion", "possession", "%"],
-      ["Remates", "shots", ""],
-      ["Al arco", "onTarget", ""],
-      ["Corners", "corners", ""],
-      ["Faltas", "fouls", ""],
-    ];
-    return (
-      <section className="graphic graphic-full">
-        <span className="graphic-kicker">ESTADISTICAS DEL PARTIDO</span>
-        <h1>
-          {match.homeTeam?.shortName} <em>vs</em> {match.awayTeam?.shortName}
-        </h1>
-        <div className="stat-board">
-          {rows.map(([name, field, suffix]) => (
-            <p key={field}>
-              <b>
-                {match.stats?.home?.[field] ?? 0}
-                {suffix}
-              </b>
-              <span>{name}</span>
-              <b>
-                {match.stats?.away?.[field] ?? 0}
-                {suffix}
-              </b>
-            </p>
-          ))}
-        </div>
-        <div className="graphic-bar" />
-      </section>
-    );
-  }
-  if (graphic.type === "tabla_vivo")
-    return (
-      <section className="graphic graphic-full">
-        <span className="graphic-kicker">TABLA EN VIVO</span>
-        <h1>
-          {match.homeTeam?.name}{" "}
-          <em>
-            {match.score.home} - {match.score.away}
-          </em>{" "}
-          {match.awayTeam?.name}
-        </h1>
-        <p>Resultado provisional de la jornada</p>
-        <div className="graphic-bar" />
-      </section>
-    );
-  if (graphic.type === "arbitros")
-    return (
-      <section className="graphic graphic-full">
-        <span className="graphic-kicker">CUERPO ARBITRAL</span>
-        <h1>{match.officials?.referee || "Árbitro por confirmar"}</h1>
-        <p>
-          {(match.officials?.assistants || []).join(" · ") ||
-            "Asistentes por confirmar"}
-        </p>
-        <div className="graphic-bar" />
-      </section>
-    );
-  if (["presentacion", "enfrentamiento"].includes(graphic.type))
-    return (
-      <section className="opening-card">
-        <span className="opening-kicker">PROXIMAMENTE</span>
-        <p>{props.tournament?.name || "FUTBOL EN VIVO"}</p>
-        <div className="opening-matchup">
-          <div>
-            {match.homeTeam?.crest?.secureUrl ? (
-              <img src={match.homeTeam.crest.secureUrl} alt="" />
-            ) : null}
-            <b>
-              {match.homeTeam?.shortName || match.homeTeam?.name || "Local"}
-            </b>
-          </div>
-          <strong>VS</strong>
-          <div>
-            {match.awayTeam?.crest?.secureUrl ? (
-              <img src={match.awayTeam.crest.secureUrl} alt="" />
-            ) : null}
-            <b>
-              {match.awayTeam?.shortName || match.awayTeam?.name || "Visitante"}
-            </b>
-          </div>
-        </div>
-        <footer>{match.stadium || "ESTADIO POR CONFIRMAR"}</footer>
-      </section>
-    );
-  return <Graphic {...props} />;
-}
-
-function MatchScoreCard({ match, tournament, final }) {
-  const stage = final ? "RESULTADO FINAL" : "MEDIO TIEMPO";
-  const detail = final ? "FINAL DEL PARTIDO" : "FINAL DEL PRIMER TIEMPO";
-  const minute = final ? "90'" : "45'";
-  const teamName = (team, fallback) => team?.shortName || team?.name || fallback;
-  const Team = ({ team, fallback }) => (
-    <div className="match-showcase-team">
-      <div className="match-showcase-crest">
-        {team?.crest?.secureUrl ? (
-          <img src={team.crest.secureUrl} alt="" />
-        ) : (
-          <span>{team?.code || fallback}</span>
-        )}
-      </div>
-      <b>{teamName(team, fallback)}</b>
-    </div>
-  );
-  return (
-    <section className={`match-showcase-card ${final ? "is-final" : "is-halftime"}`}>
-      <header className="match-showcase-header">
-        <span>{tournament?.name || "FÚTBOL EN VIVO"}</span>
-        {tournament?.logo?.secureUrl && (
-          <img src={tournament.logo.secureUrl} alt="" />
-        )}
-        <strong>{stage}</strong>
-      </header>
-      <div className="match-showcase-body">
-        <Team team={match.homeTeam} fallback="LOC" />
-        <div className="match-showcase-score">
-          <strong>{match.score.home}</strong>
-          <div className="match-showcase-divider">
-            <i>—</i>
-            <b>{minute}</b>
-          </div>
-          <strong>{match.score.away}</strong>
-          <span>{detail}</span>
-        </div>
-        <Team team={match.awayTeam} fallback="VIS" />
-      </div>
-      <footer className="match-showcase-footer">
-        <span>{match.round || "PARTIDO OFICIAL"}</span>
-        <b>{match.stadium || "TRANSMISIÓN EN VIVO"}</b>
-      </footer>
-    </section>
-  );
-}
-
-function Graphic({ graphic, match, tournament, kind }) {
-  const label =
-    {
-      presentacion: "PRESENTACIÓN DEL PARTIDO",
-      enfrentamiento: "ENFRENTAMIENTO",
-      alineacion_local: "ALINEACIÓN LOCAL",
-      alineacion_visitante: "ALINEACIÓN VISITANTE",
-      formacion_local: "FORMACIÓN LOCAL",
-      formacion_visitante: "FORMACIÓN VISITANTE",
-      descanso: "MEDIO TIEMPO",
-      resultado_final: "RESULTADO FINAL",
-      gol: "¡GOOOL!",
-      yellow_card: "TARJETA AMARILLA",
-      red_card: "TARJETA ROJA",
-      substitution: "SUSTITUCIÓN",
-      patrocinador: "PRESENTADO POR",
-      aviso: "AVISO INFORMATIVO",
-      rotulo_jugador: "JUGADOR",
-      rotulo_entrenador: "ENTRENADOR",
-      narradores: "NARRACIÓN",
-      comentaristas: "COMENTARIOS",
-    }[graphic.type] || "IMBABURA EN VIVO";
-  const full = kind === "main";
-  const lineup =
-    graphic.type.includes("alineacion") || graphic.type.includes("formacion");
-  const isHome = graphic.type.endsWith("local");
-  const lineupItems = isHome ? match.lineups?.home : match.lineups?.away;
-  return (
-    <section
-      className={`graphic ${full ? "graphic-full" : ""} ${kind === "lower" ? "graphic-lower" : ""}`}
-    >
-      <span className="graphic-kicker">{label}</span>
-      {full && !lineup && (
-        <>
-          <h1>
-            {match.homeTeam?.name}{" "}
-            <em>
-              {graphic.type === "resultado_final"
-                ? `${match.score.home} — ${match.score.away}`
-                : "vs"}
-            </em>{" "}
-            {match.awayTeam?.name}
-          </h1>
-          <p>
-            {graphic.type === "resultado_final"
-              ? "Marcador final"
-              : `${match.stadium || "Imbabura"} · ${match.round || "Partido oficial"}`}
-          </p>
-        </>
-      )}
-      {lineup && (
-        <>
-          <h1>{isHome ? match.homeTeam?.name : match.awayTeam?.name}</h1>
-          <div className="lineup-list">
-            {(lineupItems || [])
-              .filter((item) => item.starter)
-              .map((item) => (
-                <span key={item.player?._id}>
-                  {item.player?.number || "—"} ·{" "}
-                  {item.player?.sportsName || item.player?.fullName}
-                </span>
-              ))}
-          </div>
-        </>
-      )}
-      {!full && (
-        <h1>
-          {graphic.data?.playerName ||
-            graphic.data?.name ||
-            graphic.data?.message ||
-            graphic.data?.teamName ||
-            tournament.name}
-        </h1>
-      )}
-      <div className="graphic-bar" />
-    </section>
-  );
+  </div>;
 }
 
 function Overlay() {
@@ -570,6 +195,11 @@ function RemoteControl() {
   };
   if (error && !snapshot)
     return <main className="remote-shell remote-error"><h1>Control remoto no disponible</h1><p>{error}</p></main>;
+  if (snapshot?.mode && snapshot.mode !== 'sports') return <main className="remote-shell">
+    <header className="remote-header"><h1>{snapshot.tournament?.name}</h1></header>
+    <BroadcastControls snapshot={snapshot} send={send} busy={busy} />
+    {error && <p role="alert">{error}</p>}
+  </main>;
   return (
     <main className="remote-shell">
       <header className="remote-header">
@@ -951,6 +581,10 @@ function StatsControl({ snapshot, control, disabled }) {
 
 function Dashboard({ admin, setAdmin }) {
   const [tab, setTab] = useState("live");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [broadcastBusy, setBroadcastBusy] = useState(false);
+  const [createdLink, setCreatedLink] = useState('');
+  const loadSequence = useRef(0);
   const [tournaments, setTournaments] = useState([]);
   const [selectedId, setSelectedId] = useState("");
   const [teams, setTeams] = useState([]);
@@ -971,6 +605,7 @@ function Dashboard({ admin, setAdmin }) {
   const [statusNow, setStatusNow] = useState(Date.now());
   const selected =
     tournaments.find((t) => t._id === selectedId) || tournaments[0];
+  const general = selected?.mode && selected.mode !== 'sports';
   const activeMatch = matches.find((m) => m._id === selected?.activeMatch?._id);
   const graphics = useMemo(() => snapshot?.graphics || {}, [snapshot]);
   const onAirLayers = [
@@ -1031,26 +666,31 @@ function Dashboard({ admin, setAdmin }) {
     window.setTimeout(() => setNotice(""), 3000);
   };
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
     try {
       const ts = await api("/tournaments");
+      if (sequence !== loadSequence.current) return;
       setTournaments(ts);
       const id = selectedId || ts[0]?._id;
       if (!id) return;
+      const isGeneral = ts.find(t => t._id === id)?.mode && ts.find(t => t._id === id).mode !== 'sports';
       const [teamData, matchData, state, playerData, sponsorData] =
         await Promise.all([
-          api(`/teams?tournament=${id}`),
-          api(`/matches?tournament=${id}`),
+          isGeneral ? Promise.resolve([]) : api(`/teams?tournament=${id}`),
+          isGeneral ? Promise.resolve([]) : api(`/matches?tournament=${id}`),
           api(`/tournaments/${id}/overlay-state`),
-          api(`/players/by-tournament/${id}`),
+          isGeneral ? Promise.resolve([]) : api(`/players/by-tournament/${id}`),
           api(`/sponsors?tournament=${id}`),
         ]);
+      if (sequence !== loadSequence.current) return;
       setTeams(teamData);
       setMatches(matchData);
       setSnapshot(state);
       setPlayers(playerData);
       setSponsors(sponsorData);
       const active = ts.find((t) => t._id === id)?.activeMatch?._id;
-      setEvents(active ? await api(`/matches/${active}/events`) : []);
+      const history = active ? await api(`/matches/${active}/events`) : [];
+      if (sequence === loadSequence.current) setEvents(history);
     } catch (e) {
       say(e.message);
     }
@@ -1058,6 +698,18 @@ function Dashboard({ admin, setAdmin }) {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    if (!general || !selected?._id) return undefined;
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const next = await api(`/tournaments/${selected._id}/overlay-state`);
+        if (mounted) setSnapshot(previous => !previous || previous.tournamentId !== next.tournamentId || next.revision >= previous.revision ? next : previous);
+      } catch { /* Connection feedback is handled by the health indicator. */ }
+    };
+    const timer = window.setInterval(refresh, 3000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, [general, selected?._id]);
   useEffect(() => {
     let mounted = true;
     const checkHealth = async () => {
@@ -1214,20 +866,33 @@ function Dashboard({ admin, setAdmin }) {
     e.preventDefault();
     const form = new FormData(e.target);
     try {
-      await api("/tournaments", {
+      const result = await api("/tournaments", {
         method: "POST",
         body: JSON.stringify({
           name: form.get("name"),
+          mode: form.get("mode") || 'sports',
           season: form.get("season"),
           slug: form.get("slug"),
         }),
       });
       e.target.reset();
+      setSelectedId(result.tournament._id);
+      setCreatedLink(`${window.location.origin}${result.overlayUrl}`);
       await load();
-      say("Torneo creado. Guarda el token entregado al crear la URL de OBS.");
+      say("Transmisión creada. Tu enlace de OBS está disponible en el panel.");
     } catch (err) {
       say(err.message);
     }
+  };
+  const sendBroadcast = async (action, extra = {}) => {
+    if (broadcastBusy || !selected) return;
+    setBroadcastBusy(true);
+    try {
+      const result = await api(`/tournaments/${selected._id}/broadcast/control`, { method: 'POST', body: JSON.stringify({ action, ...extra }) });
+      setSnapshot(result.snapshot);
+      say('Salida actualizada.');
+    } catch (error) { say(error.message); }
+    finally { setBroadcastBusy(false); }
   };
   const create = async (e, type) => {
     e.preventDefault();
@@ -1315,6 +980,7 @@ function Dashboard({ admin, setAdmin }) {
   };
   useEffect(() => {
     const handler = (e) => {
+      if (general) return;
       if (isInput(e.target)) return;
       const map = {
         " ": () =>
@@ -1343,10 +1009,8 @@ function Dashboard({ admin, setAdmin }) {
           </div>
         </aside>
         <section className="workspace">
-          <Config title="Crear primer torneo" onSubmit={createTournament}>
-            <input name="name" placeholder="Nombre del torneo" required />
-            <input name="season" placeholder="Temporada" />
-            <input name="slug" placeholder="slug-del-torneo" />
+          <Config title="Crear primera transmisión" onSubmit={createTournament}>
+            <TransmissionFields />
           </Config>
         </section>
       </main>
@@ -1383,10 +1047,10 @@ function Dashboard({ admin, setAdmin }) {
           Marca y tema
         </button>
         <button className="outline sidebar-action" onClick={copyUrl}>
-          Copiar URL OBS
+          Regenerar enlace OBS
         </button>
         <button className="outline sidebar-action" onClick={copyRemoteUrl}>
-          Copiar control remoto
+          Regenerar enlace remoto
         </button>
         <button
           className="outline sidebar-exit"
@@ -1411,21 +1075,45 @@ function Dashboard({ admin, setAdmin }) {
         </div>
       </aside>
       <section className="workspace">
-        {notice && <div className="toast">{notice}</div>}
+        {notice && <div className="toast" role="status">{notice}</div>}
+        {createdLink && <section className="workspace-menu" aria-label="Enlace de la nueva transmisión">
+          <strong>Guarda el enlace de OBS de tu nueva transmisión</strong>
+          <input aria-label="Enlace OBS" readOnly value={createdLink} onFocus={event => event.target.select()} />
+          <button className="outline" onClick={async () => { try { await navigator.clipboard.writeText(createdLink); say('Enlace copiado.'); } catch { say('Selecciona el enlace y cópialo manualmente.'); } }}>Copiar enlace</button>
+          <button className="outline" onClick={() => setCreatedLink('')}>Ya lo guardé</button>
+        </section>}
         <header>
           <div>
             <span className="eyebrow">
               {tab === "live"
                 ? "STREAM DECK · TRANSMISIÓN"
-                : "PREPARACIÓN DEL PARTIDO"}
+                : general ? "PREPARACIÓN DE LA TRANSMISIÓN" : "PREPARACIÓN DEL PARTIDO"}
             </span>
             <h1>{selected.name}</h1>
           </div>
-          <span className="status">
-            ● Sincronizado · rev. {snapshot?.revision ?? 0}
-          </span>
+          <div className="workspace-tools">
+            <span className={`status ${apiOnline === false ? "status-offline" : ""}`} role="status">
+              {apiOnline === false ? "Sin conexión" : snapshot ? "Estado recibido" : "Conectando…"}
+            </span>
+            <button className="outline mobile-menu-toggle" aria-expanded={menuOpen} aria-controls="workspace-menu" onClick={() => setMenuOpen(!menuOpen)}>Más</button>
+          </div>
         </header>
-        {tab === "live" ? (
+        {menuOpen && <section id="workspace-menu" className="workspace-menu" aria-label={general ? "Transmisión y sesión" : "Torneo y sesión"}>
+          <label htmlFor="mobile-tournament">{general ? "Transmisión activa" : "Torneo activo"}</label>
+          <select id="mobile-tournament" value={selected._id} onChange={event => { setSelectedId(event.target.value); setMenuOpen(false); }}>
+            {tournaments.map(t => <option key={t._id} value={t._id}>{t.name} {t.season}</option>)}
+          </select>
+          <p>Regenerar un enlace invalida el anterior. Actualiza OBS o el dispositivo remoto después.</p>
+          <button className="outline" onClick={copyUrl}>Regenerar enlace OBS</button>
+          <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
+          <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
+        </section>}
+        {tab === "live" && general ? (
+          <section className="live-layout">
+            <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>
+            <div className="preview-panel"><h2>Salida de la transmisión</h2><ResponsivePreview snapshot={snapshot} className="preview-frame" /><p>Vista previa de la misma composición de OBS.</p></div>
+          </section>
+        ) : tab === "live" ? (
           <>
             <section className="live-operator-bar">
               <div>
@@ -1481,11 +1169,10 @@ function Dashboard({ admin, setAdmin }) {
                   control={control}
                   disabled={!activeMatch}
                 />
-                <StatsControl
-                  snapshot={snapshot}
-                  control={control}
-                  disabled={!activeMatch}
-                />
+                <details className="secondary-controls">
+                  <summary>Estadísticas del partido</summary>
+                  <StatsControl snapshot={snapshot} control={control} disabled={!activeMatch} />
+                </details>
                 <section className="cue-console" aria-label="Cola de gráficos">
                   <div className="cue-console-heading">
                     <div>
@@ -1530,7 +1217,7 @@ function Dashboard({ admin, setAdmin }) {
                       disabled={!selectedCue || !activeMatch}
                       onClick={takeCue}
                     >
-                      <span>TAKE</span>
+                      <span>Emitir gráfico</span>
                       <b>{selectedCue?.duration ? `${selectedCue.duration}s` : "AL AIRE"}</b>
                     </button>
                     <button
@@ -1549,7 +1236,7 @@ function Dashboard({ admin, setAdmin }) {
                   <div className="library-heading">
                     <div>
                       <span>BIBLIOTECA DE GRAFICOS</span>
-                      <p>Elige una categoría, prepara el gráfico y envíalo con TAKE.</p>
+                      <p>Elige una categoría, prepara el gráfico y pulsa Emitir gráfico.</p>
                     </div>
                   </div>
                   <div className="library-tabs" role="tablist" aria-label="Categorías de gráficos">
@@ -1666,20 +1353,12 @@ function Dashboard({ admin, setAdmin }) {
                   <span>PREVISUALIZACION · SIGUIENTE</span>
                   <b>{selectedCue ? selectedCue.label : "SELECCIONA UN GRAFICO"}</b>
                 </div>
-                <div className="preview-frame cue-preview-frame">
-                  <div className="preview-scaler">
-                    <OverlayComposition snapshot={cuePreviewSnapshot} preview />
-                  </div>
-                </div>
+                <ResponsivePreview snapshot={cuePreviewSnapshot} className="preview-frame cue-preview-frame" />
                 <div className="program-preview-header">
                   <span>PROGRAMA · SALIDA OBS</span>
                   <b>{onAirLabel}</b>
                 </div>
-                <div className="preview-frame">
-                  <div className="preview-scaler">
-                    <OverlayComposition snapshot={snapshot} preview />
-                  </div>
-                </div>
+                <ResponsivePreview snapshot={snapshot} className="preview-frame" />
                 <div className="program-strip">
                   <span>EN AIRE</span>
                   <strong>{onAirLabel}</strong>
@@ -1707,14 +1386,14 @@ function Dashboard({ admin, setAdmin }) {
                     className="outline preview-expand"
                     onClick={() => setPreviewOpen(true)}
                   >
-                    Ampliar preview
+                    Ampliar salida
                   </button>
                 </div>
                 <p>
                   {activeMatch
                     ? `${activeMatch.homeTeam?.name} vs ${activeMatch.awayTeam?.name}`
                     : "Sin partido activo"}{" "}
-                  · Última sincronización: ahora
+                  · {snapshot?.generatedAt ? "Estado recibido a las " + new Date(snapshot.generatedAt).toLocaleTimeString() : "Esperando estado"}
                 </p>
               </div>
             </section>
@@ -1753,11 +1432,10 @@ function Dashboard({ admin, setAdmin }) {
           <ThemeManager key={selected._id} tournament={selected} onSaved={load} say={say} />
         ) : (
           <section className="setup-grid">
-            <Config title="Nuevo torneo" onSubmit={createTournament}>
-              <input name="name" placeholder="Nombre" required />
-              <input name="season" placeholder="Temporada" />
-              <input name="slug" placeholder="Slug" />
+            <Config title="Nueva transmisión" onSubmit={createTournament}>
+              <TransmissionFields />
             </Config>
+            {general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
             <Config title="Equipos" onSubmit={(e) => create(e, "teams")}>
               <input name="name" placeholder="Nombre" required />
               <input name="shortName" placeholder="Nombre corto" required />
@@ -1823,6 +1501,7 @@ function Dashboard({ admin, setAdmin }) {
                 </button>
               )}
             />
+            </>}
           </section>
         )}
       </section>
@@ -1838,11 +1517,7 @@ function Dashboard({ admin, setAdmin }) {
                 Cerrar
               </button>
             </header>
-            <div className="preview-modal-frame">
-              <div className="preview-modal-scaler">
-                <OverlayComposition snapshot={snapshot} preview />
-              </div>
-            </div>
+            <ResponsivePreview snapshot={snapshot} className="preview-modal-frame" />
             <p>
               La misma composición de OBS, ampliada para verificar gráficos y
               posición.

@@ -10,7 +10,7 @@
     "reset-user-access": "node scripts/resetUserAccess.js",
     "create-admin": "node scripts/createSportsAdmin.js",
     "seed-demo": "node scripts/seedSportsDemo.js",
-    "test": "node --test tests/sportsClock.test.js"
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

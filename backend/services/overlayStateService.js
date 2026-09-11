@@ -28,6 +28,7 @@ export const getOverlaySnapshot = async tournamentId => {
   const activeGraphic = graphic => graphic?.expiresAt && new Date(graphic.expiresAt).getTime() <= Date.now() ? null : graphic;
   return {
     tournamentId: String(tournament._id), revision: state.revision, generatedAt: new Date().toISOString(),
+    mode: tournament.mode || 'sports', broadcast: tournament.broadcast,
     overlayLastSeenAt: state.overlayLastSeenAt,
     tournament: { id: tournament._id, name: tournament.name, season: tournament.season, logo: tournament.logo, colors: tournament.colors, branding: tournament.branding, slug: tournament.slug },
     match: match && { id: match._id, status: match.status, stadium: match.stadium, round: match.round, scheduledAt: match.scheduledAt, score: match.score, discipline: match.discipline, stats: match.stats, lineups: match.lineups, officials: match.officials, broadcastTeam: match.broadcastTeam, clock: match.clock, homeTeam: serializeTeam(match.homeTeam), awayTeam: serializeTeam(match.awayTeam) },

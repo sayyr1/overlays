@@ -3261,3 +3261,73 @@ header h1 {
   .stat-control-row { grid-template-columns: 60px 1fr 1fr; }
   .stat-control-row > div { grid-template-columns: 25px 1fr 25px; }
 }
+
+/* Operator workspace: fluid previews and accessible controls across devices. */
+.app-shell { grid-template-columns: 220px minmax(0, 1fr); }
+.workspace, .deck, .preview-panel, .resource, .record-list { min-width: 0; }
+.workspace { padding: 1.5rem; }
+.workspace-tools { display: flex; align-items: center; gap: .75rem; }
+.mobile-menu-toggle { display: none; }
+.status-offline { color: #ffadb4; }
+.app-shell button, .remote-shell button { min-height: 44px; }
+.app-shell input, .app-shell select, .app-shell textarea { min-width: 0; max-width: 100%; font-size: 1rem; }
+.app-shell button:focus-visible, .remote-shell button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #ffd66b; outline-offset: 3px; }
+.app-shell button:disabled, .remote-shell button:disabled { opacity: .45; cursor: not-allowed; }
+.app-shell .eyebrow, .operator-signals span, .library-context, .library-tab, .deck-key > span, .clock-actions button, .period-actions button, .stat-control-row > span { font-size: .8rem; }
+.scene-row { grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); }
+.live-layout { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); }
+.preview-panel { position: sticky; top: 1rem; }
+.responsive-preview { position: relative; width: 100%; height: auto; aspect-ratio: 16 / 9; overflow: hidden; padding: 0; }
+.responsive-preview > div { position: absolute; top: 0; left: 0; }
+.secondary-controls { margin: 1rem 0; border: 1px solid #385b78; border-radius: .75rem; }
+.secondary-controls summary { padding: 1rem; cursor: pointer; font-weight: 700; }
+.secondary-controls .stats-console { margin: 0; border: 0; }
+.stat-control-row { grid-template-columns: minmax(75px, 1fr) 1.2fr 1.2fr; gap: .5rem; }
+.stat-control-row > div { grid-template-columns: 44px minmax(24px, 1fr) 44px; }
+.stat-control-row button { padding: .25rem; }
+.theme-grid, .sponsor-admin-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.workspace-menu { display: grid; gap: .75rem; padding: 1rem; margin-bottom: 1rem; border: 1px solid #385b78; border-radius: .75rem; background: #102a40; }
+.workspace-menu p { margin: 0; color: #c4d8e7; font-size: .875rem; }
+.preview-modal { padding: 1rem; overflow-y: auto; }
+.preview-modal > section { max-height: calc(100dvh - 2rem); overflow-y: auto; }
+.toast { max-width: calc(100vw - 2rem); overflow-wrap: anywhere; }
+@media (max-width: 1200px) {
+  .live-layout { grid-template-columns: minmax(0, 1fr); }
+  .preview-panel { position: static; }
+  .theme-grid, .sponsor-admin-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 900px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); }
+  .workspace { padding: 1rem; }
+}
+@media (max-width: 760px) {
+  .workspace { padding: 1rem .75rem; }
+  .mobile-menu-toggle { display: inline-flex; align-items: center; }
+  .workspace > header { flex-wrap: wrap; gap: .6rem; }
+  .workspace > header h1 { max-width: none; white-space: normal; overflow-wrap: anywhere; font-size: 1.2rem; }
+  .workspace > header > div:first-child { flex: 1 1 170px; min-width: 0; }
+  .workspace-tools { flex-wrap: wrap; gap: .5rem; }
+  .workspace .status { font-size: .8rem; }
+  .app-shell > aside .sidebar-nav { font-size: .75rem; min-height: 54px; }
+  .operator-signals span, .operator-signals span:nth-child(3) { display: inline-flex; font-size: .75rem; }
+  .preview-panel { order: 0; }
+  .cue-preview-frame { display: block; }
+  .cue-preview-header { display: flex; }
+  .scene-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scene { font-size: .875rem; }
+  .clock-console { grid-template-columns: minmax(0, 1fr); }
+  .clock-actions button, .period-actions button { min-height: 44px; font-size: .8rem; }
+  .score-team > span { font-size: .875rem; }
+  .deck-key { font-size: .95rem; min-height: 80px; }
+  .library-tab, .library-context, .history p { font-size: .875rem; }
+  .stat-control-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .stat-control-row > span { grid-column: 1 / -1; font-size: .875rem; }
+  .stat-control-row > div { grid-template-columns: 44px minmax(20px, 1fr) 44px; }
+  .remote-shell { min-height: 100dvh; }
+  .remote-shell button, .remote-bottom-nav button { font-size: .875rem; }
+  .remote-header h1 { white-space: normal; overflow-wrap: anywhere; }
+  .toast { bottom: calc(6rem + env(safe-area-inset-bottom)); top: auto; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .remote-goal-confirm { animation: none; }
+}

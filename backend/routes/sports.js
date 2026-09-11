@@ -16,6 +16,7 @@ import { currentElapsedSeconds, pauseClock, startClock } from '../services/sport
 import { authenticateOverlayChannel, overlayChannel } from '../services/sportsRealtime.js';
 import { findTournamentByOverlayToken, findTournamentByRemoteToken, getOverlaySnapshot, hashOverlayToken, issueOverlayToken, recordOverlayHeartbeat, updateOverlayState } from '../services/overlayStateService.js';
 import { runMatchControl } from '../services/matchControlService.js';
+import { broadcastChanges, defaultBroadcastScenes } from '../services/broadcastConfig.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 }, files: 1 }, { });
@@ -50,11 +51,29 @@ router.get('/tournaments', requireSportsAdmin, asyncRoute(async (req, res) => re
 router.post('/tournaments', requireSportsAdmin, asyncRoute(async (req, res) => {
   requireText(req.body?.name, 'El nombre'); const slug = slugify(req.body?.slug || req.body?.name); requireText(slug, 'El slug');
   const token = issueOverlayToken();
-  const tournament = await Tournament.create({ ...pick(req.body || {}, ['name', 'season', 'startDate', 'endDate', 'logo', 'active', 'colors', 'branding']), slug, overlayTokenHash: hashOverlayToken(token), overlayTokenPrefix: token.slice(0, 8) });
-  await OverlayState.create({ tournament: tournament._id });
+  const mode = req.body?.mode || 'sports';
+  const tournament = await Tournament.create({ ...pick(req.body || {}, ['name', 'season', 'startDate', 'endDate', 'logo', 'active', 'colors', 'branding']), mode, broadcast: req.body?.broadcast || { scenes: defaultBroadcastScenes(mode, req.body.name) }, slug, overlayTokenHash: hashOverlayToken(token), overlayTokenPrefix: token.slice(0, 8) });
+  await OverlayState.create({ tournament: tournament._id, scoreboardVisible: mode === 'sports', clockVisible: mode === 'sports' });
   res.status(201).json({ tournament, overlayToken: token, overlayUrl: `/overlay/torneo/${slug}?token=${token}` });
 }));
 router.get('/tournaments/:id', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const tournament = await Tournament.findById(req.params.id).populate('activeMatch'); if (!tournament) return res.status(404).json({ message: 'Torneo no encontrado.' }); res.json(tournament); }));
+router.put('/tournaments/:id/broadcast', requireSportsAdmin, asyncRoute(async (req, res) => {
+  if (invalidId(res, req.params.id)) return;
+  const tournament = await Tournament.findById(req.params.id);
+  if (!tournament) return res.status(404).json({ message: 'Transmisión no encontrada.' });
+  if ((tournament.mode || 'sports') === 'sports') return res.status(400).json({ message: 'Esta configuración es para transmisiones generales.' });
+  if (!Array.isArray(req.body?.scenes)) return res.status(400).json({ message: 'Envía una lista de gráficos.' });
+  tournament.broadcast = { scenes: req.body.scenes };
+  await tournament.save();
+  const { snapshot } = await updateOverlayState(tournament._id, {}, req.sportsAdmin._id);
+  res.json({ tournament, snapshot });
+}));
+router.post('/tournaments/:id/broadcast/control', requireSportsAdmin, asyncRoute(async (req, res) => {
+  if (invalidId(res, req.params.id)) return;
+  const tournament = await Tournament.findById(req.params.id);
+  if (!tournament) return res.status(404).json({ message: 'Transmisión no encontrada.' });
+  res.json(await updateOverlayState(tournament._id, broadcastChanges(tournament, req.body || {}), req.sportsAdmin._id));
+}));
 router.get('/tournaments/:id/overlay-state', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const snapshot = await getOverlaySnapshot(req.params.id); if (!snapshot) return res.status(404).json({ message: 'Torneo no encontrado.' }); res.json(snapshot); }));
 router.put('/tournaments/:id', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const values = pick(req.body || {}, ['name', 'season', 'startDate', 'endDate', 'logo', 'active', 'colors', 'branding', 'activeMatch']); if (req.body?.slug) values.slug = slugify(req.body.slug); const tournament = await Tournament.findByIdAndUpdate(req.params.id, values, { new: true, runValidators: true }); if (!tournament) return res.status(404).json({ message: 'Torneo no encontrado.' }); await updateOverlayState(tournament._id, {}, req.sportsAdmin._id); res.json(tournament); }));
 router.post('/tournaments/:id/overlay-token', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const token = issueOverlayToken(); const tournament = await Tournament.findByIdAndUpdate(req.params.id, { overlayTokenHash: hashOverlayToken(token), overlayTokenPrefix: token.slice(0, 8) }, { new: true }); if (!tournament) return res.status(404).json({ message: 'Torneo no encontrado.' }); res.json({ overlayToken: token, overlayUrl: `/overlay/torneo/${tournament.slug}?token=${token}` }); }));
@@ -125,6 +144,7 @@ router.get('/remote/tournaments/:slug', asyncRoute(async (req, res) => { const t
 router.post('/remote/tournaments/:slug/control', asyncRoute(async (req, res) => {
   const tournament = await findTournamentByRemoteToken(req.params.slug, req.query.token || req.body?.token);
   if (!tournament) return res.status(403).json({ message: 'El enlace de control no es válido.' });
+  if (tournament.mode && tournament.mode !== 'sports') return res.json(await updateOverlayState(tournament._id, broadcastChanges(tournament, req.body || {}), null));
   if (!tournament.activeMatch) return res.status(409).json({ message: 'No hay un partido activo para controlar.' });
   if (!remoteActions.has(String(req.body?.action || ''))) return res.status(400).json({ message: 'Esta acción no está disponible en el control remoto.' });
   res.json(await runMatchControl({ matchId: tournament.activeMatch, input: req.body || {} }));

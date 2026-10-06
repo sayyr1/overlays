@@ -22,13 +22,15 @@ export default function ReplayPanel({ tournament, api }) {
     finally { pending.current = false; setBusy(false); }
   };
   const replay = status?.replay || {};
+  const hasReplayStatus = typeof replay.bufferAvailable === 'boolean';
   const ready = Boolean(status?.connected && replay.bufferAvailable);
   const locked = busy || replay.pending || !status?.connected;
   const clips = (replay.clips || []).filter(clip => clip.tournamentId === tournament._id);
-  return <section className="replay-panel" aria-label="Control de repeticiones"><header><div><span className="eyebrow">REPETICIONES</span><h2>Jugada a jugada</h2></div><span className={`replay-signal ${replay.bufferActive ? 'is-active' : ''}`}>{replay.playingClipId ? 'REPETICIÓN EN AIRE' : replay.bufferActive ? 'Capturando' : 'Búfer detenido'}</span></header>
+  return <section className="replay-panel" aria-label="Control de repeticiones"><header><div><span className="eyebrow">REPETICIONES</span><h2>Jugada a jugada</h2></div><span className={`replay-signal ${replay.bufferActive ? 'is-active' : ''}`}>{!status?.connected ? 'Sin conexión' : !hasReplayStatus ? 'Estado no disponible' : replay.playingClipId ? 'REPETICIÓN EN AIRE' : replay.bufferActive ? 'Capturando' : 'Búfer detenido'}</span></header>
     {(error || replay.error) && <p className="brand-error" role="alert">{error || replay.error}</p>}
     {!status?.connected && <p className="replay-help">{status?.message || 'Comprobando el puente de casa…'}</p>}
-    {status?.connected && !replay.bufferAvailable && <p className="replay-help">Habilita el búfer de repetición en Ajustes → Salida de OBS. La duración se configura allí; recomendamos 20 segundos.</p>}
+    {status?.connected && !hasReplayStatus && <p className="replay-help" role="status">El servidor o el puente de casa necesita actualizarse para informar las repeticiones. Si usas localhost, reinicia el backend con la versión actual.</p>}
+    {status?.connected && replay.bufferAvailable === false && <p className="replay-help">Habilita el búfer de repetición en Ajustes → Salida de OBS. La duración se configura allí; recomendamos 20 segundos.</p>}
     <div className="replay-actions"><button disabled={locked || !ready || !replay.bufferActive || Boolean(replay.playingClipId)} onClick={() => send('save')}>Guardar jugada</button><button className="outline" disabled={locked || !ready || Boolean(replay.playingClipId)} onClick={() => send(replay.bufferActive ? 'stop_buffer' : 'start')}>{replay.bufferActive ? 'Detener captura' : 'Iniciar captura'}</button><button className="outline replay-return" disabled={locked || !replay.playingClipId} onClick={() => send('stop')}>Volver al directo</button></div>
     {replay.pending && <p className="replay-help" role="status">Orden enviada · esperando confirmación de casa…</p>}
     <p className="replay-help">Guarda los últimos segundos de la salida de OBS. Reproduce una jugada cuando quieras; vuelve al directo automáticamente al terminar.</p>

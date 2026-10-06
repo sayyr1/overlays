@@ -18,7 +18,12 @@ export class ReplayControl {
     const video = await this.call('GetVideoSettings');
     await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId, sceneItemTransform: { positionX: 0, positionY: 0, boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: video.baseWidth, boundsHeight: video.baseHeight, boundsAlignment: 5, alignment: 5 } });
     const label = `WEB_REPLAY_LABEL_${this.state.suffix}`;
-    if (!inputs.some(i => i.inputName === label)) await this.call('CreateInput', { sceneName: this.scene, inputName: label, inputKind: 'text_gdiplus_v2', inputSettings: { text: 'REPETICIÓN', font: { face: 'Segoe UI', size: 36, flags: 1 }, color: 0xffffffff, bk_color: 0xff101c2a, bk_opacity: 100 }, sceneItemEnabled: true });
+    if (!inputs.some(i => i.inputName === label)) {
+      const { inputKinds } = await this.call('GetInputKindList');
+      const textKind = inputKinds.find(kind => kind.startsWith('text_gdiplus')) || inputKinds.find(kind => kind.startsWith('text_ft2'));
+      if (!textKind) throw new Error('OBS no tiene una fuente de texto para el rótulo de repetición.');
+      await this.call('CreateInput', { sceneName: this.scene, inputName: label, inputKind: textKind, inputSettings: { text: 'REPETICIÓN', font: { face: 'Segoe UI', size: 36, flags: 1 }, color: 0xffffffff, bk_color: 0xff101c2a, bk_opacity: 100 }, sceneItemEnabled: true });
+    }
     const tag = await this.call('GetSceneItemId', { sceneName: this.scene, sourceName: label });
     await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId: tag.sceneItemId, sceneItemTransform: { positionX: video.baseWidth - 360, positionY: 64 } });
   }

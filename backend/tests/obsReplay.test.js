@@ -12,6 +12,7 @@ function fixture(state = {}) {
     calls.push({ name, args });
     if (name === 'GetSceneList') return { scenes: [] };
     if (name === 'GetInputList') return { inputs: [] };
+    if (name === 'GetInputKindList') return { inputKinds: ['text_gdiplus_v3', 'ffmpeg_source'] };
     if (name === 'GetSceneItemId') return { sceneItemId: 1 };
     if (name === 'GetVideoSettings') return { baseWidth: 1920, baseHeight: 1080 };
     if (name === 'GetCurrentProgramScene') return { currentProgramSceneName: scene };

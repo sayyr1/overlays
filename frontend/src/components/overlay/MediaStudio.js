@@ -11,7 +11,7 @@ const layouts = {
   logo: { label: 'Logo superior', x: 1520, y: 64, width: 300, height: 160, zIndex: 30 },
 };
 
-export default function MediaStudio({ tournament, snapshot, api, onSnapshot, sponsors = [], onSaved, preview }) {
+export default function MediaStudio({ tournament, snapshot, api, onSnapshot, sponsors = [], preview, initiallyOpen = false }) {
   const [assets, setAssets] = useState([]);
   const [filter, setFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -60,7 +60,7 @@ export default function MediaStudio({ tournament, snapshot, api, onSnapshot, spo
     const timing = mediaTiming(layer, now);
     return !timing.expired && !(layer.playing !== false && timing.ended && layer.config.endBehavior === 'hide');
   };
-  return <details className="media-studio">
+  return <details className="media-studio" open={initiallyOpen || undefined}>
     <summary>Media y motion graphics · Biblioteca, capas y auspiciantes</summary>
     <header className="media-heading"><div><span className="eyebrow">COMPOSITOR · MEDIA</span><h2>Biblioteca y capas</h2><p>Los mismos recursos para deportes, podcast, IRL y eventos.</p></div><span className="media-count">{assets.length} recursos</span></header>
     {message && <p role="status" className="media-message">{message}</p>}
@@ -82,18 +82,20 @@ export default function MediaStudio({ tournament, snapshot, api, onSnapshot, spo
         <div className="media-actions"><button disabled={!assetId} onClick={() => control('take')}>Mostrar / PLAY en capa {Number(slot) + 1}</button><button className="outline" disabled={!assetId || assets.find(a => a._id === assetId)?.builtin} onClick={() => run(async () => { await api(`/media/${assetId}`, { method: 'DELETE' }); setAssets(list => list.filter(a => a._id !== assetId)); setAssetId(''); setMessage('Retirado de la biblioteca. Las capas emitidas conservan el archivo.'); })}>Quitar de biblioteca</button></div>
       </div>
       <div className="media-layer-list">{Object.entries(snapshot?.mediaLayers || {}).filter(([, layer]) => layer.config).map(([key, layer]) => <div key={key} className={active(layer) ? 'media-layer on-air' : 'media-layer'}><div><small>CAPA {Number(key) + 1} · {active(layer) ? layer.playing === false ? 'DETENIDO' : 'EN AIRE' : 'OCULTA'}</small><strong>{layer.name}</strong></div><div className="media-actions"><button className="outline" onClick={() => control('play', key)}>PLAY</button><button className="outline" onClick={() => control('stop', key)}>STOP</button><button className="outline" onClick={() => control('restart', key)}>RESTART</button><button className="outline" onClick={() => control('hide', key)}>HIDE</button></div></div>)}</div>
-      <SponsorMedia sponsors={sponsors} assets={assets} api={api} onSaved={onSaved} run={run} control={control} />
+      {sponsors.length > 0 && <SponsorMedia sponsors={sponsors} control={control} />}
     </fieldset>
     <div className="media-live-preview">{preview}</div>
   </details>;
 }
 
-function SponsorMedia({ sponsors, assets, api, onSaved, run, control }) {
+function SponsorMedia({ sponsors, control }) {
   const [sponsorId, setSponsorId] = useState('');
   const [duration, setDuration] = useState(10);
-  const sponsor = sponsors.find(s => s._id === sponsorId);
-  return <section className="media-sponsors"><h3>Auspiciantes · emisión directa</h3><div className="media-fields"><label>Auspiciante<select value={sponsorId} onChange={e => setSponsorId(e.target.value)}><option value="">Selecciona un auspiciante</option>{sponsors.filter(s => s.active !== false).map(s => <option key={s._id} value={s._id}>{s.name}</option>)}</select></label><label>Duración<select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[5, 10, 15, 0].map(s => <option key={s} value={s}>{s ? `${s} s` : 'Manual'}</option>)}</select></label></div>
-    {sponsor && <div className="media-fields">{[['mediaLogo', 'LOGO', 'image'], ['mediaMotion', 'ANIMACIÓN', 'webm'], ['mediaVideo', 'VIDEO', 'video']].map(([field, label, kind]) => <div key={field}><label>{label}<select value={sponsor[field] || ''} onChange={e => { const value = e.target.value; run(async () => { await api(`/sponsors/${sponsor._id}`, { method: 'PUT', body: JSON.stringify({ [field]: value || null }) }); await onSaved(); }); }}><option value="">Asignar desde biblioteca</option>{assets.filter(a => kind === 'webm' ? a.format === 'webm' : a.kind === kind).map(a => <option key={a._id} value={a._id}>{a.name}</option>)}</select></label><button disabled={!sponsor[field] && !(field === 'mediaLogo' && sponsor.logo?.secureUrl)} onClick={() => control('take', '15', { sponsorId: sponsor._id, variant: field, config: { ...defaults, ...(kind === 'image' ? layouts.logo : layouts.full), duration, title: '', zIndex: 60 } })}>Mostrar {label}</button></div>)}</div>}
+  const [muted, setMuted] = useState(false);
+  const sponsor = sponsors.find(s => s._id === sponsorId && s.active !== false && s.confirmed !== false);
+  return <section className="media-sponsors"><h3>Auspiciantes · emisión directa</h3><div className="media-fields"><label>Auspiciante<select value={sponsorId} onChange={e => { const selected = sponsors.find(s => s._id === e.target.value); setSponsorId(e.target.value); setMuted(selected?.videoMuted === true); setDuration(selected?.durationSeconds || 10); }}><option value="">Selecciona un auspiciante</option>{sponsors.filter(s => s.active !== false && s.confirmed !== false).map(s => <option key={s._id} value={s._id}>{s.name}</option>)}</select></label><label>Duración<select value={duration} onChange={e => setDuration(Number(e.target.value))}>{[...new Set([5, 10, 15, 0, sponsor?.durationSeconds || 10])].map(s => <option key={s} value={s}>{s ? `${s} s` : 'Manual'}</option>)}</select></label></div>
+    {sponsor && <div className="media-fields">{[['mediaLogo', 'LOGO', 'image'], ['mediaMotion', 'ANIMACIÓN', 'webm'], ['mediaVideo', 'VIDEO', 'video']].map(([field, label, kind]) => <div key={field}><button disabled={!sponsor[field] && !(field === 'mediaLogo' && sponsor.logo?.secureUrl)} onClick={() => control('take', '15', { sponsorId: sponsor._id, variant: field, config: { ...defaults, ...(kind === 'image' ? layouts.logo : layouts.full), duration, muted: kind === 'image' || muted, title: '', zIndex: 60 } })}>Mostrar {label}</button></div>)}</div>}
+    {sponsor && <label><input type="checkbox" checked={muted} onChange={e => setMuted(e.target.checked)} />Silenciar video en esta emisión</label>}
     <button className="outline" onClick={() => control('hide', '15')}>HIDE SPONSOR</button>
   </section>;
 }

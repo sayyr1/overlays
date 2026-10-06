@@ -35,3 +35,14 @@ test('existing sponsor logos can be emitted without uploading again', async () =
   const call = api.mock.calls.find(([path]) => path.endsWith('/control'));
   expect(JSON.parse(call[1].body)).toMatchObject({ action: 'take', slot: '15', sponsorId: 'sponsor', variant: 'mediaLogo', config: { duration: 10 } });
 });
+
+test('sponsor video emits with audio and pending sponsors cannot be selected', async () => {
+ const { api } = setup({ sponsors: [{ _id: 'sponsor', name: 'Marca', mediaVideo: 'asset', confirmed: true, videoMuted: false }, { _id: 'pending', name: 'Pendiente', confirmed: false }] });
+ await screen.findByRole('button', { name: /Frame invitado/ });
+ expect(screen.queryByRole('option', { name: 'Pendiente' })).toBeNull();
+ fireEvent.change(screen.getByLabelText('Auspiciante'), { target: { value: 'sponsor' } });
+ fireEvent.click(screen.getByRole('button', { name: 'Mostrar VIDEO' }));
+ await waitFor(() => expect(api.mock.calls.some(([path]) => path.endsWith('/control'))).toBe(true));
+ const call = api.mock.calls.find(([path]) => path.endsWith('/control'));
+ expect(JSON.parse(call[1].body)).toMatchObject({ variant: 'mediaVideo', config: { muted: false } });
+});

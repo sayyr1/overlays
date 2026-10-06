@@ -2,8 +2,13 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import Pusher from "pusher-js";
 import "./App.css";
 import MediaStudio from "./components/overlay/MediaStudio";
+import { SponsorLibrary, EventSponsors } from "./components/overlay/SponsorWorkspace";
+import SponsorDeck from './components/overlay/SponsorDeck';
+import ObsAudioPanel from './components/overlay/ObsAudioPanel';
+import { sponsorPlayback } from './utils/sponsorPlayback';
 import OverlayComposition from "./components/overlay/OverlayComposition";
 import { BroadcastControls, BroadcastEditor, TransmissionFields } from "./components/overlay/BroadcastStudio";
+import './mobile.css';
 
 const API = String(
   process.env.REACT_APP_API_URL ||
@@ -17,8 +22,15 @@ const api = async (path, options = {}) => {
   });
   if (response.status === 204) return null;
   const data = await response.json().catch(() => ({}));
-  if (!response.ok)
-    throw new Error(data.message || "No se pudo completar la acción.");
+  if (!response.ok) {
+    const deletingEvent = options.method === 'DELETE' && path.startsWith('/tournaments/');
+    const fallback = deletingEvent && [404, 405].includes(response.status)
+      ? 'El servidor no reconoce la ruta para eliminar eventos. Comprueba que el backend actualizado esté publicado y que esta aplicación apunte a él.'
+      : [502, 503, 504].includes(response.status)
+        ? 'El servidor no está disponible o tardó demasiado en responder. Intenta nuevamente.'
+        : 'El servidor devolvió una respuesta sin detalles del error.';
+    throw new Error(`${data.message || fallback} (HTTP ${response.status})`);
+  }
   return data;
 };
 const remoteApi = async (slug, token, suffix = "", options = {}) => {
@@ -582,7 +594,13 @@ function StatsControl({ snapshot, control, disabled }) {
 }
 
 function Dashboard({ admin, setAdmin }) {
-  const [tab, setTab] = useState("live");
+  const [tab, setTab] = useState("events");
+  const [mobileLiveScreen, setMobileLiveScreen] = useState('match');
+  const [setupSection, setSetupSection] = useState('sponsors');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [broadcastBusy, setBroadcastBusy] = useState(false);
   const [createdLink, setCreatedLink] = useState('');
@@ -593,6 +611,7 @@ function Dashboard({ admin, setAdmin }) {
   const [players, setPlayers] = useState([]);
   const [matches, setMatches] = useState([]);
   const [sponsors, setSponsors] = useState([]);
+  const [sponsorEventId, setSponsorEventId] = useState('');
   const [snapshot, setSnapshot] = useState(null);
   const [events, setEvents] = useState([]);
   const [notice, setNotice] = useState("");
@@ -610,12 +629,13 @@ function Dashboard({ admin, setAdmin }) {
   const general = selected?.mode && selected.mode !== 'sports';
   const activeMatch = matches.find((m) => m._id === selected?.activeMatch?._id);
   const graphics = useMemo(() => snapshot?.graphics || {}, [snapshot]);
+  const sponsorOnAir = sponsorPlayback(snapshot?.sponsorDeck, Date.now()).active;
   const onAirLayers = [
     graphics.scoreboardVisible && { type: "Marcador" },
     graphics.main,
     graphics.temporary,
     graphics.lowerThird,
-    graphics.sponsorBugVisible && { type: "Auspiciantes" },
+    (graphics.sponsorBugVisible || sponsorOnAir) && { type: "Auspiciantes" },
   ].filter(Boolean);
   const onAirLabel = onAirLayers[0]?.type?.replace(/_/g, " ") || "Sin grafico";
   const overlaySeenAt = snapshot?.overlayLastSeenAt
@@ -673,7 +693,7 @@ function Dashboard({ admin, setAdmin }) {
       const ts = await api("/tournaments");
       if (sequence !== loadSequence.current) return;
       setTournaments(ts);
-      const id = selectedId || ts[0]?._id;
+      const id = ts.some(t => t._id === selectedId) ? selectedId : ts[0]?._id;
       if (!id) return;
       const isGeneral = ts.find(t => t._id === id)?.mode && ts.find(t => t._id === id).mode !== 'sports';
       const [teamData, matchData, state, playerData, sponsorData] =
@@ -690,6 +710,7 @@ function Dashboard({ admin, setAdmin }) {
       setSnapshot(state);
       setPlayers(playerData);
       setSponsors(sponsorData);
+      setSponsorEventId(id);
       const active = ts.find((t) => t._id === id)?.activeMatch?._id;
       const history = active ? await api(`/matches/${active}/events`) : [];
       if (sequence === loadSequence.current) setEvents(history);
@@ -732,6 +753,10 @@ function Dashboard({ admin, setAdmin }) {
     };
   }, []);
   const control = async (action, extra = {}) => {
+    if (action === 'layer' && extra.field === 'sponsorBugVisible') {
+      try { const result = await api(`/tournaments/${selected._id}/sponsors/control`, { method: 'POST', body: JSON.stringify({ action: extra.visible ? 'logos' : 'stop' }) }); setSnapshot(result.snapshot); } catch (e) { say(e.message); }
+      return;
+    }
     const id = selected?.activeMatch?._id;
     if (!id) return say("Selecciona primero el partido activo.");
     try {
@@ -773,7 +798,7 @@ function Dashboard({ admin, setAdmin }) {
     const [type, label, layer] = item;
     if (type === "scoreboard" && graphics.scoreboardVisible)
       return control("scoreboard", { visible: false });
-    if (type === "sponsors" && graphics.sponsorBugVisible)
+    if (type === "sponsors" && (graphics.sponsorBugVisible || sponsorOnAir))
       return control("layer", { field: "sponsorBugVisible", visible: false });
     const current =
       layer === "main"
@@ -879,12 +904,26 @@ function Dashboard({ admin, setAdmin }) {
       });
       e.target.reset();
       setSelectedId(result.tournament._id);
+      setTab('setup');
       setCreatedLink(`${window.location.origin}${result.overlayUrl}`);
       await load();
       say("Transmisión creada. Tu enlace de OBS está disponible en el panel.");
     } catch (err) {
       say(err.message);
     }
+  };
+  const deleteTournament = async () => {
+    if (deleteBusy || deleteConfirmation.trim() !== selected.name) return;
+    setDeleteBusy(true); setDeleteError('');
+    try {
+      await api(`/tournaments/${selected._id}`, { method: 'DELETE', body: JSON.stringify({ confirmation: deleteConfirmation.trim() }) });
+      const remaining = tournaments.filter(t => t._id !== selected._id);
+      ++loadSequence.current;
+      setTournaments(remaining); setSelectedId(remaining[0]?._id || '');
+      setSnapshot(null); setSponsors([]); setDeleteOpen(false); setDeleteConfirmation(''); setTab('events');
+      say('Evento eliminado.');
+    } catch (e) { setDeleteError(e.message); }
+    finally { setDeleteBusy(false); }
   };
   const sendBroadcast = async (action, extra = {}) => {
     if (broadcastBusy || !selected) return;
@@ -982,7 +1021,7 @@ function Dashboard({ admin, setAdmin }) {
   };
   useEffect(() => {
     const handler = (e) => {
-      if (general) return;
+      if (general || tab !== 'live') return;
       if (isInput(e.target)) return;
       const map = {
         " ": () =>
@@ -1002,47 +1041,61 @@ function Dashboard({ admin, setAdmin }) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   });
-  if (!selected)
+  const sponsorDeckPanel = selected ? <><ObsAudioPanel key={`audio-${selected._id}`} tournament={selected} api={api} /><SponsorDeck key={`deck-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} loading={sponsorEventId !== selected._id} api={api} onSnapshot={next => setSnapshot(previous => !previous || previous.tournamentId !== next.tournamentId || next.revision >= previous.revision ? next : previous)} onConfigure={() => { setSetupSection('sponsors'); setTab('setup'); }} /></> : null;
+  if (tab === 'sponsors' || tab === 'events' || !selected)
     return (
-      <main className="app-shell">
+      <main className="app-shell global-workspace">
         <aside>
           <div className="brand">
             IMBABURA <i>EN VIVO</i>
           </div>
+          <small>{admin.name}</small>
+          <span className="navigation-label">ORGANIZACIÓN</span>
+          <button data-section="events" aria-current={tab !== 'sponsors' ? 'page' : undefined} className={`sidebar-nav ${tab !== 'sponsors' ? 'nav-active' : 'outline'}`} onClick={() => setTab('events')}>Eventos</button>
+          <button data-section="sponsors" aria-current={tab === 'sponsors' ? 'page' : undefined} className={`sidebar-nav ${tab === 'sponsors' ? 'nav-active' : 'outline'}`} onClick={() => setTab('sponsors')}>Auspiciantes</button>
+          <button className="outline sidebar-exit" onClick={async () => { await api('/auth/logout', { method: 'POST' }); setAdmin(null); }}>Cerrar sesión</button>
         </aside>
         <section className="workspace">
-          <Config title="Crear primera transmisión" onSubmit={createTournament}>
-            <TransmissionFields />
-          </Config>
+          {notice && <div className="toast" role="status">{notice}</div>}
+          <header><div><span className="eyebrow">CENTRO DE PRODUCCIÓN</span><h1>{tab === 'sponsors' ? 'Auspiciantes' : 'Eventos y campeonatos'}</h1></div><div className="workspace-tools">{apiOnline === false && <span className="status status-offline" role="status">Sin conexión</span>}<button className="outline mobile-menu-toggle" aria-expanded={menuOpen} aria-controls="global-session-menu" onClick={() => setMenuOpen(!menuOpen)}>Más</button></div></header>
+          {menuOpen && <section id="global-session-menu" className="workspace-menu" aria-label="Cuenta y sesión"><strong>{admin.name}</strong><button className="outline" onClick={async () => { await api('/auth/logout', { method: 'POST' }); setAdmin(null); }}>Cerrar sesión</button></section>}
+          {tab === 'sponsors' ? <SponsorLibrary api={api} apiBase={API} onSaved={load} /> : <>
+            <div className="section-heading"><div><h2>Organiza tu próxima transmisión</h2><p>Configura cada evento, elige sus auspiciantes y abre el control cuando estés listo para emitir.</p></div><span className="brand-count">{tournaments.length} eventos</span></div>
+            {tournaments.length ? <div className="event-card-grid">{tournaments.map(event => <article className="event-card" key={event._id}><span className="eyebrow">{!event.mode || event.mode === 'sports' ? 'CAMPEONATO' : 'EVENTO'}</span><h2>{event.name}</h2><p>{event.season || 'Producción independiente'}</p><div className="event-card-actions"><button onClick={() => { setSelectedId(event._id); setTab('setup'); }}>Configurar evento</button><button className="outline" onClick={() => { setSelectedId(event._id); setTab('live'); }}>Control en vivo</button></div></article>)}</div> : <div className="brand-empty"><h3>Crea tu primer evento</h3><p>Puedes preparar tus marcas en Auspiciantes antes de organizar una transmisión.</p></div>}
+            <details className="event-create" open={!tournaments.length || undefined}><summary>+ Crear evento o campeonato</summary><Config title="Nuevo evento" onSubmit={createTournament}><TransmissionFields /></Config></details>
+          </>}
         </section>
       </main>
     );
   return (
-    <main className="app-shell">
+    <main className="app-shell" data-mobile-live-screen={tab === 'live' ? mobileLiveScreen : undefined}>
       <aside>
         <div className="brand">
           IMBABURA <i>EN VIVO</i>
         </div>
         <small>{admin.name}</small>
+        <span className="navigation-label">ORGANIZACIÓN</span>
+        <button data-section="events" className="sidebar-nav outline" onClick={() => setTab('events')}>Eventos</button>
+        <button data-section="sponsors" className="sidebar-nav outline" onClick={() => setTab('sponsors')}>Auspiciantes</button>
+        <span className="navigation-label">EVENTO SELECCIONADO</span>
         <button
+          data-section="live"
+          aria-current={tab === 'live' ? 'page' : undefined}
           className={`sidebar-nav ${tab === "live" ? "nav-active" : "outline"}`}
           onClick={() => setTab("live")}
         >
           ◉ Control en vivo
         </button>
         <button
-          className={`sidebar-nav ${tab === "setup" ? "nav-active" : "outline"}`}
+          data-section="setup"
+          aria-current={['setup', 'theme'].includes(tab) ? 'page' : undefined}
+          className={`sidebar-nav ${['setup', 'theme'].includes(tab) ? "nav-active" : "outline"}`}
           onClick={() => setTab("setup")}
         >
-          ⚙ Configuración previa
+          Configurar evento
         </button>
         <button
-          className={`sidebar-nav ${tab === "sponsors" ? "nav-active" : "outline"}`}
-          onClick={() => setTab("sponsors")}
-        >
-          Auspiciantes
-        </button>
-        <button
+          data-section="theme"
           className={`sidebar-nav ${tab === "theme" ? "nav-active" : "outline"}`}
           onClick={() => setTab("theme")}
         >
@@ -1078,6 +1131,7 @@ function Dashboard({ admin, setAdmin }) {
       </aside>
       <section className="workspace">
         {notice && <div className="toast" role="status">{notice}</div>}
+        <nav className="workspace-breadcrumb" aria-label="Ubicación"><button className="link" onClick={() => setTab('events')}>Eventos</button><span>/</span><span>{selected.name}</span><span>/</span><span>{tab === 'live' ? 'Control en vivo' : tab === 'theme' ? 'Marca y tema' : 'Configuración'}</span></nav>
         {createdLink && <section className="workspace-menu" aria-label="Enlace de la nueva transmisión">
           <strong>Guarda el enlace de OBS de tu nueva transmisión</strong>
           <input aria-label="Enlace OBS" readOnly value={createdLink} onFocus={event => event.target.select()} />
@@ -1110,11 +1164,11 @@ function Dashboard({ admin, setAdmin }) {
           <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
           <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
         </section>}
-        {["live", "sponsors"].includes(tab) && <MediaStudio key={selected._id} tournament={selected} snapshot={snapshot} api={api} sponsors={sponsors} onSaved={load} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={next => setSnapshot(previous => !previous || next.revision >= previous.revision ? next : previous)} />}
+        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['match', general ? 'Evento' : 'Partido'], ['graphics', 'Gráficos'], ['ads', 'Publicidad'], ['output', 'Salida']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={event => { setMobileLiveScreen(screen); event.currentTarget.parentElement.scrollIntoView?.({ block: 'start', behavior: 'auto' }); }}>{label}{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
         {tab === "live" && general ? (
           <section className="live-layout">
             <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>
-            <div className="preview-panel"><h2>Salida de la transmisión</h2><ResponsivePreview snapshot={snapshot} className="preview-frame" /><p>Vista previa de la misma composición de OBS.</p></div>
+            <div className="live-monitor-column"><div className="preview-panel"><h2>Salida de la transmisión</h2><ResponsivePreview snapshot={snapshot} className="preview-frame" /><p>Vista previa de la misma composición de OBS.</p></div>{sponsorDeckPanel}</div>
           </section>
         ) : tab === "live" ? (
           <>
@@ -1269,7 +1323,7 @@ function Dashboard({ admin, setAdmin }) {
                           : layer === "event"
                             ? graphics.temporary
                             : layer === "sponsors"
-                              ? graphics.sponsorBugVisible
+                              ? graphics.sponsorBugVisible || sponsorOnAir
                                 ? { type: "sponsors" }
                                 : null
                               : graphics.scoreboardVisible
@@ -1350,7 +1404,7 @@ function Dashboard({ admin, setAdmin }) {
                   </div>
                 </section>
               </div>
-              <div className="preview-panel">
+              <div className="live-monitor-column"><div className="preview-panel">
                 <h2>Vista previa · misma composición OBS</h2>
                 <div className="cue-preview-header">
                   <span>PREVISUALIZACION · SIGUIENTE</span>
@@ -1398,7 +1452,7 @@ function Dashboard({ admin, setAdmin }) {
                     : "Sin partido activo"}{" "}
                   · {snapshot?.generatedAt ? "Estado recibido a las " + new Date(snapshot.generatedAt).toLocaleTimeString() : "Esperando estado"}
                 </p>
-              </div>
+              </div>{sponsorDeckPanel}</div>
             </section>
             <section className="history">
               <div className="history-heading">
@@ -1424,21 +1478,13 @@ function Dashboard({ admin, setAdmin }) {
               </div>
             </section>
           </>
-        ) : tab === "sponsors" ? (
-          <SponsorManager
-            tournament={selected}
-            sponsors={sponsors}
-            onSaved={load}
-            say={say}
-          />
         ) : tab === "theme" ? (
           <ThemeManager key={selected._id} tournament={selected} onSaved={load} say={say} />
         ) : (
-          <section className="setup-grid">
-            <Config title="Nueva transmisión" onSubmit={createTournament}>
-              <TransmissionFields />
-            </Config>
-            {general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
+          <section className="event-configuration">
+            <nav className="configuration-tabs" aria-label="Configuración del evento"><button aria-pressed={setupSection === 'sponsors'} className={setupSection === 'sponsors' ? '' : 'outline'} onClick={() => setSetupSection('sponsors')}>Auspiciantes del evento</button><button aria-pressed={setupSection === 'production'} className={setupSection === 'production' ? '' : 'outline'} onClick={() => setSetupSection('production')}>{general ? 'Gráficos del evento' : 'Equipos y partidos'}</button><button aria-pressed={setupSection === 'media'} className={setupSection === 'media' ? '' : 'outline'} onClick={() => setSetupSection('media')}>Archivos y capas</button><button className="outline" onClick={() => setTab('theme')}>Marca y tema</button></nav>
+            <section className="setup-grid">
+            {setupSection === 'media' ? <MediaStudio initiallyOpen key={selected._id} tournament={selected} snapshot={snapshot} api={api} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={setSnapshot} /> : setupSection === 'sponsors' ? <EventSponsors key={selected._id} tournament={selected} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSaved={load} onOpenLibrary={() => setTab('sponsors')} /> : general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
             <Config title="Equipos" onSubmit={(e) => create(e, "teams")}>
               <input name="name" placeholder="Nombre" required />
               <input name="shortName" placeholder="Nombre corto" required />
@@ -1505,9 +1551,12 @@ function Dashboard({ admin, setAdmin }) {
               )}
             />
             </>}
+            </section>
+            <details className="event-danger-zone"><summary>Eliminar este evento</summary><p>Se eliminarán sus equipos, jugadores, partidos e historial. Las marcas de tu biblioteca y los archivos compartidos se conservan.</p><button className="outline danger-link" onClick={() => { setDeleteOpen(true); setDeleteConfirmation(''); setDeleteError(''); }}>Eliminar {selected.name}</button></details>
           </section>
         )}
       </section>
+      {deleteOpen && <div className="delete-event-backdrop"><section className="delete-event-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-event-title"><h2 id="delete-event-title">Eliminar {selected.name}</h2><p>Esta acción es irreversible. Se borrarán los equipos, jugadores, partidos e historial del evento. Los auspiciantes y archivos compartidos se conservarán.</p><form onSubmit={event => { event.preventDefault(); deleteTournament(); }}><label>Escribe el nombre del evento para confirmar<input autoFocus value={deleteConfirmation} disabled={deleteBusy} onChange={event => setDeleteConfirmation(event.target.value)} autoComplete="off" /></label><p className="delete-event-name">{selected.name}</p>{deleteError && <p className="brand-error" role="alert">{deleteError}</p>}<div className="delete-event-actions"><button type="button" className="outline" disabled={deleteBusy} onClick={() => setDeleteOpen(false)}>Cancelar</button><button type="submit" className="danger" disabled={deleteBusy || deleteConfirmation.trim() !== selected.name}>{deleteBusy ? 'Eliminando…' : 'Eliminar definitivamente'}</button></div></form></section></div>}
       {previewOpen && (
         <div className="preview-modal" onClick={() => setPreviewOpen(false)}>
           <section onClick={(event) => event.stopPropagation()}>
@@ -1678,255 +1727,6 @@ function ThemeManager({ tournament, onSaved, say }) {
           <p>Previsualización de contraste y márgenes seguros para la fuente de navegador de OBS.</p>
         </section>
       </form>
-    </section>
-  );
-}
-
-function SponsorManager({ tournament, sponsors, onSaved, say }) {
-  const [editing, setEditing] = useState(null);
-  const save = async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.target);
-    try {
-      let logo = editing?.logo;
-      const file = form.get("logo");
-      if (file instanceof File && file.size) {
-        const upload = new FormData();
-        upload.append("file", file);
-        upload.append("folder", `auspiciantes-${tournament.slug}`);
-        const response = await fetch(`${API}/api/sports/upload`, {
-          method: "POST",
-          credentials: "include",
-          body: upload,
-        });
-        const result = await response.json().catch(() => ({}));
-        if (!response.ok)
-          throw new Error(result.message || "No se pudo subir el logo.");
-        logo = result;
-      }
-      const body = {
-        tournament: tournament._id,
-        name: form.get("name"),
-        category: form.get("category"),
-        headline: form.get("headline"),
-        description: form.get("description"),
-        location: form.get("location"),
-        phone: form.get("phone"),
-        url: form.get("url"),
-        backgroundColor: form.get("backgroundColor"),
-        textColor: form.get("textColor"),
-        accentColor: form.get("accentColor"),
-        durationSeconds: Number(form.get("durationSeconds")) || 10,
-        order: Number(form.get("order")) || 0,
-        active: form.get("active") === "on",
-        logo,
-      };
-      await api(editing ? `/sponsors/${editing._id}` : "/sponsors", {
-        method: editing ? "PUT" : "POST",
-        body: JSON.stringify(body),
-      });
-      setEditing(null);
-      await onSaved();
-      say("Auspiciante guardado y sincronizado con OBS.");
-    } catch (error) {
-      say(error.message);
-    }
-  };
-  const remove = async (sponsor) => {
-    if (!window.confirm(`Eliminar a ${sponsor.name}?`)) return;
-    try {
-      await api(`/sponsors/${sponsor._id}`, { method: "DELETE" });
-      if (editing?._id === sponsor._id) setEditing(null);
-      await onSaved();
-      say("Auspiciante eliminado.");
-    } catch (error) {
-      say(error.message);
-    }
-  };
-  return (
-    <section className="sponsor-manager">
-      <div className="sponsor-intro">
-        <span>PAUTA COMERCIAL</span>
-        <h2>Rotador de auspiciantes</h2>
-        <p>
-          Cada pieza se muestra en la misma fuente de OBS y cambia al siguiente
-          auspiciante según sus segundos configurados.
-        </p>
-      </div>
-      <div className="sponsor-admin-grid">
-        <Config
-          key={editing?._id || "new-sponsor"}
-          title={editing ? `Editar: ${editing.name}` : "Nuevo auspiciante"}
-          onSubmit={save}
-        >
-          <input
-            name="name"
-            placeholder="Nombre comercial"
-            defaultValue={editing?.name}
-            required
-          />
-          <input
-            name="category"
-            placeholder="Etiqueta (ej. Tienda oficial)"
-            defaultValue={editing?.category}
-          />
-          <input
-            name="headline"
-            placeholder="Titular / propuesta de valor"
-            defaultValue={editing?.headline}
-          />
-          <textarea
-            name="description"
-            placeholder="Mensaje comercial"
-            defaultValue={editing?.description}
-          />
-          <input
-            name="location"
-            placeholder="Dirección / locales"
-            defaultValue={editing?.location}
-          />
-          <input
-            name="phone"
-            placeholder="Teléfono o WhatsApp"
-            defaultValue={editing?.phone}
-          />
-          <input
-            name="url"
-            placeholder="Web o red social"
-            defaultValue={editing?.url}
-          />
-          <label className="file-field">
-            Logo (PNG, JPG, WebP o SVG)
-            <input
-              name="logo"
-              type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
-            />
-          </label>
-          {editing?.logo?.secureUrl && (
-            <img
-              className="sponsor-form-logo"
-              src={editing.logo.secureUrl}
-              alt="Logo actual"
-            />
-          )}
-          <div className="sponsor-options">
-            <label>
-              Fondo
-              <input
-                name="backgroundColor"
-                type="color"
-                defaultValue={editing?.backgroundColor || "#101720"}
-              />
-            </label>
-            <label>
-              Texto
-              <input
-                name="textColor"
-                type="color"
-                defaultValue={editing?.textColor || "#ffffff"}
-              />
-            </label>
-            <label>
-              Acento
-              <input
-                name="accentColor"
-                type="color"
-                defaultValue={editing?.accentColor || "#e0b84d"}
-              />
-            </label>
-          </div>
-          <div className="sponsor-options sponsor-numbers">
-            <label>
-              Duración (seg)
-              <input
-                name="durationSeconds"
-                type="number"
-                min="3"
-                max="120"
-                defaultValue={editing?.durationSeconds || 10}
-                required
-              />
-            </label>
-            <label>
-              Orden
-              <input
-                name="order"
-                type="number"
-                min="0"
-                defaultValue={editing?.order || 0}
-              />
-            </label>
-            <label className="check-field">
-              <input
-                name="active"
-                type="checkbox"
-                defaultChecked={editing?.active ?? true}
-              />{" "}
-              Activo en rotación
-            </label>
-          </div>
-          <div className="modal-actions">
-            {editing && (
-              <button
-                type="button"
-                className="outline"
-                onClick={() => setEditing(null)}
-              >
-                Cancelar edición
-              </button>
-            )}
-            <button>
-              {editing ? "Guardar cambios" : "Agregar a rotación"}
-            </button>
-          </div>
-        </Config>
-        <section className="sponsor-list">
-          <h2>Rotación actual</h2>
-          <p className="sponsor-list-hint">
-            El orden menor aparece primero. Solo los activos llegan a OBS.
-          </p>
-          {sponsors.length ? (
-            sponsors.map((sponsor) => (
-              <article
-                key={sponsor._id}
-                style={{ "--card-accent": sponsor.accentColor || "#e0b84d" }}
-              >
-                <div className="sponsor-list-logo">
-                  {sponsor.logo?.secureUrl ? (
-                    <img src={sponsor.logo.secureUrl} alt="" />
-                  ) : (
-                    <b>{sponsor.name.slice(0, 2).toUpperCase()}</b>
-                  )}
-                </div>
-                <div>
-                  <strong>{sponsor.name}</strong>
-                  <span>
-                    {sponsor.active
-                      ? `${sponsor.durationSeconds || 10}s · orden ${sponsor.order || 0}`
-                      : "Inactivo"}
-                  </span>
-                </div>
-                <div className="sponsor-row-actions">
-                  <button className="link" onClick={() => setEditing(sponsor)}>
-                    Editar
-                  </button>
-                  <button
-                    className="link danger-link"
-                    onClick={() => remove(sponsor)}
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </article>
-            ))
-          ) : (
-            <p className="empty-sponsors">
-              Aún no hay auspiciantes. Crea el primero para empezar la rotación.
-            </p>
-          )}
-        </section>
-      </div>
     </section>
   );
 }

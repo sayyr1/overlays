@@ -1,0 +1,33 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import router from '../routes/obsBridge.js';
+import ObsBridge from '../models/ObsBridge.js';
+import { bridgeTokenHash } from '../services/remoteObsAudio.js';
+
+test('the bridge key grants only polling, and reports and acknowledgements are bounded', async t => {
+  const token = 'a'.repeat(43);
+  const bridge = { _id: 'bridge', key: 'home', tokenHash: bridgeTokenHash(token), inputName: 'BELABOX_SRT', commands: [], revision: 1 };
+  t.mock.method(ObsBridge, 'findOne', filter => ({ select: () => ({ lean: async () => filter.tokenHash === bridge.tokenHash ? bridge : null }) }));
+  let stored;
+  t.mock.method(ObsBridge, 'findOneAndUpdate', (filter, update) => { stored = update; return { lean: async () => bridge }; });
+  const app = express(); app.use(express.json()); app.use(router);
+  app.use((error, req, res, next) => res.status(error.status || 500).json({ message: error.message }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/obs/bridge`;
+  assert.equal((await fetch(`${base}/pair`, { method: 'POST' })).status, 401);
+  assert.equal((await fetch(`${base}/poll`, { method: 'POST' })).status, 401);
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  assert.equal((await fetch(`${base}/pair`, { method: 'POST', headers })).status, 401);
+  assert.equal((await fetch(`${base}/poll`, { method: 'POST', headers, body: JSON.stringify({ agentId: 'bad', acknowledged: [] }) })).status, 400);
+  const body = { agentId: '01234567-0123-0123-0123-012345678901', acknowledged: [], status: { connected: true, inputName: 'BELABOX_SRT', volumePercent: 80, password: 'must-not-be-stored', secret: 'ignored' } };
+  const response = await fetch(`${base}/poll`, { method: 'POST', headers, body: JSON.stringify(body) });
+  assert.equal(response.status, 200);
+  const payload = await response.json();
+  assert.equal(payload.settings.inputName, 'BELABOX_SRT');
+  assert.equal('tokenHash' in payload, false);
+  assert.equal('password' in stored.$set.status, false);
+  assert.equal('secret' in stored.$set.status, false);
+});

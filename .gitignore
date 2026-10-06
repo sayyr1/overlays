@@ -26,3 +26,6 @@ Thumbs.db
 # ⚙️ Editor/IDE
 .vscode/
 .idea/
+
+# OBS bridge credentials and recovery state stay on the home computer.
+backend/.obs-bridge*

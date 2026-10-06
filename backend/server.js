@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import sportsRoutes from './routes/sports.js';
+import { obsAudio } from './services/obsAudioService.js';
 
 dotenv.config();
 const app = express();
@@ -44,6 +45,7 @@ const initializeServer = async () => {
     if (!mongoUri) throw new Error('MONGODB_URI no está configurada');
     if (mongoose.connection.readyState === 0) await mongoose.connect(mongoUri);
     else if (mongoose.connection.readyState === 2) await mongoose.connection.asPromise();
+    if (!isVercelRuntime) await obsAudio.load();
     return mongoose.connection;
   })().catch(error => { initializationPromise = null; throw error; });
   return initializationPromise;

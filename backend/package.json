@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "obs-bridge": "node scripts/obsBridge.js",
     "build": "cd ..\\frontend; npm install; npm run build",
     "set-user-role": "node scripts/setUserRole.js",
     "reset-user-access": "node scripts/resetUserAccess.js",
@@ -24,6 +25,7 @@
     "mongoose": "^9.6.3",
     "multer": "^2.1.1",
     "multer-storage-cloudinary": "^4.0.0",
+    "obs-websocket-js": "^5.0.8",
     "pusher": "^5.3.4"
   },
   "devDependencies": {

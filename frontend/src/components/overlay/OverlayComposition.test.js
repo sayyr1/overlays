@@ -28,3 +28,11 @@ test('el marcador usa tiempo real y los eventos conviven con un rótulo', () => 
   expect(screen.getByText('Equipo de transmisión')).toBeInTheDocument();
   expect(container.querySelector('.tv-with-sponsor')).not.toBeNull();
 });
+
+test('la publicidad ocupa la franja inferior y conserva marcador y reloj', () => {
+  const { container } = render(<OverlayComposition preview snapshot={{ ...previewSnapshot, sponsorDeck: { logos: { id: 'logo', startedAt: new Date().toISOString(), duration: 10, items: [{ name: 'Marca de prueba', kind: 'logo', secureUrl: '/logo.png', duration: 10 }] } }, graphics: { ...previewSnapshot.graphics, scoreboardVisible: true, clockVisible: true, lowerThird: { id: 'lower', type: 'narradores', data: { name: 'Narrador' } } } }} />);
+  expect(container.querySelector('.tv-ad-active')).not.toBeNull();
+  expect(container.querySelector('.tv-ad-logo')).toHaveTextContent('Marca de prueba');
+  expect(container.querySelector('.tv-scorebug')).not.toBeNull();
+  expect(container.querySelector('.tv-clock')).not.toBeNull();
+});

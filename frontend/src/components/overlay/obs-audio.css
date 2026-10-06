@@ -1,0 +1,22 @@
+.obs-audio-panel { padding:18px; border:1px solid #36546a; border-radius:14px; background:#102333; }
+.obs-audio-panel header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.obs-audio-panel h2 { font-size:18px; margin:6px 0 0; }
+.obs-audio-signal { color:#e6c4a1; font-size:11px; white-space:nowrap; }
+.obs-audio-signal.is-connected { color:#79e6bc; }
+.obs-audio-main { display:grid; grid-template-columns:1fr 1fr; align-items:center; gap:18px; margin-top:18px; }
+.obs-audio-mute { min-height:48px; font-size:13px; }
+.obs-audio-mute.is-muted { background:#712a39; border-color:#c76b7e; color:#fff; }
+.obs-audio-panel label { font-size:13px; line-height:1.5; }
+.obs-audio-volume label,.obs-audio-settings > label:first-of-type { display:flex; justify-content:space-between; gap:10px; }
+.obs-audio-panel input[type=range] { display:block; width:100%; min-height:44px; padding:0; margin:0; accent-color:#e6bb51; cursor:pointer; touch-action:pan-y; }
+.obs-audio-auto { display:flex; align-items:flex-start; gap:12px; padding:16px 0; margin-top:12px; border-top:1px solid #2d465a; cursor:pointer; }
+.obs-audio-auto input { width:20px; height:20px; flex-shrink:0; margin:0; accent-color:#e6bb51; }
+.obs-audio-auto small { display:block; color:#9eb6c9; font-size:12px; margin-top:4px; }
+.obs-audio-state { padding:10px 12px; margin:0; background:#091b29; border-left:3px solid #79e6bc; font-size:12px; color:#bdd5e5; }
+.obs-audio-state.is-ducking { border-color:#e6bb51; color:#ffe4a1; }
+.obs-audio-settings { margin-top:14px; border-top:1px solid #2d465a; }
+.obs-audio-settings summary { cursor:pointer; min-height:44px; padding:14px 0; font-size:13px; font-weight:700; }
+.obs-audio-settings select { display:block; width:100%; min-height:44px; margin-top:6px; }
+.obs-audio-help p,.obs-audio-settings p,.obs-audio-note { color:#acc0d2; font-size:12px; line-height:1.6; }
+.obs-audio-help .outline { min-height:44px; }
+@media(max-width:760px) { .obs-audio-panel { padding:16px; } .obs-audio-main { grid-template-columns:1fr; gap:12px; } .app-shell[data-mobile-live-screen="output"] .obs-audio-panel { display:none; } }

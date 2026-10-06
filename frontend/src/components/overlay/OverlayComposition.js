@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import "./broadcast.css";
 import MediaComposition from "./MediaComposition";
+import { sponsorPlayback } from '../../utils/sponsorPlayback';
+import './sponsor-deck.css';
 
 const seconds = (clock, now) =>
   (clock?.elapsedSeconds || 0) +
@@ -18,7 +20,7 @@ const clockText = (clock, now) => {
 export default function OverlayComposition({ snapshot, preview = false }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
+    const id = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(id);
   }, []);
   const match = snapshot?.match;
@@ -26,16 +28,19 @@ export default function OverlayComposition({ snapshot, preview = false }) {
   const live = graphic => graphic?.expiresAt && new Date(graphic.expiresAt).getTime() <= now ? null : graphic;
   const graphics = { ...snapshot?.graphics, main: live(snapshot?.graphics?.main), temporary: live(snapshot?.graphics?.temporary), lowerThird: live(snapshot?.graphics?.lowerThird) };
   const colors = snapshot?.tournament?.colors || {};
+  const advertising = sponsorPlayback(snapshot?.sponsorDeck, now);
+  const adOutput = advertising.active && (advertising.item.kind === 'video' ? <MediaComposition layers={{ ad: advertising.layer }} now={now} preview={preview} /> : <div className="tv-ad-logo" style={{ '--ad-bg': advertising.item.backgroundColor, '--ad-text': advertising.item.textColor }}><img src={advertising.item.secureUrl} alt="" /><div><strong>{advertising.item.name}</strong>{advertising.item.headline && <span>{advertising.item.headline}</span>}</div></div>);
   if (!match && !general)
     return (
       <div className={`tv-overlay-root ${preview ? "tv-overlay-preview" : ""}`}>
-        {preview && !Object.values(snapshot?.mediaLayers || {}).some(layer => layer.visible) && <div className="tv-overlay-empty">Esperando partido activo</div>}
+        {preview && !advertising.active && !Object.values(snapshot?.mediaLayers || {}).some(layer => layer.visible) && <div className="tv-overlay-empty">Esperando partido activo</div>}
         <MediaComposition layers={snapshot?.mediaLayers} now={now} preview={preview} />
+        {adOutput}
       </div>
     );
   return (
     <div
-      className={`tv-overlay-root ${preview ? "tv-overlay-preview" : ""} ${graphics.sponsorBugVisible && snapshot?.sponsors?.length ? "tv-with-sponsor" : ""}`}
+      className={`tv-overlay-root ${preview ? "tv-overlay-preview" : ""} ${advertising.active ? 'tv-ad-active' : ''} ${graphics.sponsorBugVisible && snapshot?.sponsors?.length ? "tv-with-sponsor" : ""}`}
       style={{
         "--primary": colors.primary,
         "--secondary": colors.secondary,
@@ -45,6 +50,7 @@ export default function OverlayComposition({ snapshot, preview = false }) {
       }}
     >
       <MediaComposition layers={snapshot?.mediaLayers} now={now} preview={preview} />
+      {adOutput}
       {!general && graphics.scoreboardVisible && (
         <div className="tv-scorebug">
           {snapshot.tournament?.logo?.secureUrl && (
@@ -90,7 +96,7 @@ export default function OverlayComposition({ snapshot, preview = false }) {
           <b>EN VIVO</b>
         </div>
       )}
-      {graphics.sponsorBugVisible && (
+      {graphics.sponsorBugVisible && !advertising.active && (
         <SponsorRibbon sponsors={snapshot?.sponsors || []} now={now} />
       )}
       {general && ['main', 'temporary', 'lowerThird'].map(layer => graphics[layer] && <BroadcastGraphic key={graphics[layer].id} graphic={graphics[layer]} now={now} tournament={snapshot.tournament} />)}
@@ -418,6 +424,7 @@ function Graphic({ graphic, match, tournament, kind }) {
             tournament?.name}
         </h1>
       )}
+      {!full && graphic.data?.teamName && graphic.data.teamName !== (graphic.data?.playerName || graphic.data?.name || graphic.data?.message || graphic.data?.teamName || tournament?.name) && <p className="tv-graphic-detail">{graphic.data.teamName}</p>}
       <div className="tv-graphic-bar" />
     </section>
   );

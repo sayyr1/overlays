@@ -17,8 +17,105 @@ beforeEach(() => {
 });
 afterEach(() => { jest.restoreAllMocks(); });
 
+test('el control móvil cambia de pantalla sin perder el evento activo', async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));
+  expect(screen.getByRole('button', { name: 'Partido' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Publicidad' }));
+  expect(screen.getByRole('button', { name: 'Publicidad' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('region', { name: 'Control de publicidad' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Salida' }));
+  expect(screen.getByRole('button', { name: 'Salida' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('heading', { name: 'Copa de prueba' })).toBeInTheDocument();
+});
+
+test('media se prepara en configuración y no ocupa el control en vivo', async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));
+  expect(screen.getByRole('region', { name: 'Control de publicidad' })).toBeInTheDocument();
+  expect(screen.queryByText(/Media y motion graphics/)).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Configurar evento' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Archivos y capas' }));
+  expect(await screen.findByText(/Media y motion graphics/)).toBeInTheDocument();
+  expect(screen.getByText(/Media y motion graphics/).parentElement).toHaveAttribute('open');
+  expect(screen.queryByRole('region', { name: 'Control de publicidad' })).not.toBeInTheDocument();
+});
+
+test('el evento se elimina con confirmación visible y desaparece del listado', async () => {
+  let deleted = false;
+  const original = global.fetch;
+  global.fetch = jest.fn(async (url, options) => {
+    if (url.endsWith('/tournaments/cup') && options?.method === 'DELETE') { deleted = true; return { ok: true, status: 204 }; }
+    if (url.endsWith('/tournaments') && deleted) return { ok: true, status: 200, json: async () => [] };
+    return original(url, options);
+  });
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Configurar evento' }));
+  fireEvent.click(screen.getByText('Eliminar este evento'));
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar Copa de prueba' }));
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Eliminar definitivamente' })).toBeDisabled();
+  fireEvent.change(screen.getByLabelText('Escribe el nombre del evento para confirmar'), { target: { value: 'Copa de prueba' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }));
+  expect(await screen.findByText('Evento eliminado.')).toBeInTheDocument();
+  expect(screen.queryByRole('heading', { name: 'Copa de prueba' })).not.toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+});
+
+test('los errores de eliminación permanecen visibles y permiten reintentar', async () => {
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => url.endsWith('/tournaments/cup') && options?.method === 'DELETE' ? Promise.resolve({ ok: false, status: 500, json: async () => ({ message: 'No se pudo eliminar el evento' }) }) : original(url, options));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Configurar evento' }));
+  fireEvent.click(screen.getByText('Eliminar este evento'));
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar Copa de prueba' }));
+  fireEvent.change(screen.getByLabelText('Escribe el nombre del evento para confirmar'), { target: { value: 'Copa de prueba' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('No se pudo eliminar el evento');
+  expect(screen.getByRole('dialog')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Eliminar definitivamente' })).toBeEnabled();
+});
+
+test('un backend sin la ruta de eliminación informa el problema en lugar de un error genérico', async () => {
+  const original = global.fetch;
+  global.fetch = jest.fn((url, options) => url.endsWith('/tournaments/cup') && options?.method === 'DELETE' ? Promise.resolve({ ok: false, status: 404, json: async () => { throw new Error('Respuesta HTML'); } }) : original(url, options));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Configurar evento' }));
+  fireEvent.click(screen.getByText('Eliminar este evento'));
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar Copa de prueba' }));
+  fireEvent.change(screen.getByLabelText('Escribe el nombre del evento para confirmar'), { target: { value: 'Copa de prueba' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar definitivamente' }));
+  const error = await screen.findByRole('alert');
+  expect(error).toHaveTextContent('El servidor no reconoce la ruta para eliminar eventos');
+  expect(error).toHaveTextContent('HTTP 404');
+});
+
+test('la biblioteca de auspiciantes funciona sin tener eventos creados', async () => {
+  const original = global.fetch;
+  global.fetch = jest.fn(url => url.endsWith('/tournaments') ? Promise.resolve({ ok: true, status: 200, json: async () => [] }) : original(url));
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Auspiciantes' }));
+  expect(await screen.findByText('Tu biblioteca empieza aquí')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: '+ Nuevo auspiciante' }));
+  expect(screen.getByLabelText('Nombre comercial')).toBeInTheDocument();
+  expect(screen.queryByText(/Confirmado en/)).not.toBeInTheDocument();
+  expect(screen.queryByText(/Media y motion graphics/)).not.toBeInTheDocument();
+});
+
+test('la selección de auspiciantes pertenece a la configuración del evento', async () => {
+  render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Configurar evento' }));
+  expect(await screen.findByText('Auspiciantes de Copa de prueba')).toBeInTheDocument();
+  expect(screen.getByText('Elegir de la biblioteca')).toBeInTheDocument();
+  expect(screen.queryByText('Crear auspiciante')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Administrar biblioteca' }));
+  expect(await screen.findByText('Tus marcas, siempre disponibles')).toBeInTheDocument();
+  expect(screen.queryByText('Auspiciantes de Copa de prueba')).not.toBeInTheDocument();
+});
+
 test('el menú permite acceder a torneo, enlaces y cierre de sesión', async () => {
   render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));
   const more = await screen.findByRole('button', { name: 'Más' });
   expect(more).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(more);

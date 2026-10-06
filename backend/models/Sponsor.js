@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 const mediaSchema = new mongoose.Schema({ publicId: String, secureUrl: String, width: Number, height: Number, format: String }, { _id: false });
 const sponsorSchema = new mongoose.Schema({
-  tournament: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament', required: true, index: true },
+  tournament: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament', index: true },
+  assignments: [{ tournament: { type: mongoose.Schema.Types.ObjectId, ref: 'Tournament' }, confirmed: { type: Boolean, default: false }, active: { type: Boolean, default: true }, order: { type: Number, default: 0 }, durationSeconds: { type: Number, min: 3, max: 120, default: 10 } }],
+  videoMuted: { type: Boolean, default: false },
   name: { type: String, required: true, trim: true, maxlength: 90 },
   headline: { type: String, trim: true, maxlength: 150, default: '' },
   description: { type: String, trim: true, maxlength: 260, default: '' },

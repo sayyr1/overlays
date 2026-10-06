@@ -11,7 +11,10 @@ import SportsMatch from '../models/SportsMatch.js';
 import SportsEvent from '../models/SportsEvent.js';
 import OverlayState from '../models/OverlayState.js';
 import Sponsor from '../models/Sponsor.js';
+import { tournamentSponsors } from '../services/sponsorAssignments.js';
 import mediaRouter from './media.js';
+import obsAudioRouter from './obsAudio.js';
+import obsBridgeRouter from './obsBridge.js';
 import { requireSportsAdmin, createSportsSession, sportsCookieOptions } from '../middleware/sportsAuth.js';
 import { currentElapsedSeconds, pauseClock, startClock } from '../services/sportsClock.js';
 import { authenticateOverlayChannel, overlayChannel } from '../services/sportsRealtime.js';
@@ -94,7 +97,87 @@ router.get('/players/by-tournament/:tournamentId', requireSportsAdmin, asyncRout
   res.json(await SportsPlayer.find({ team: { $in: teamIds } }).sort({ fullName: 1 }));
 }));
 crud('/players', SportsPlayer, ['team', 'fullName', 'sportsName', 'number', 'position', 'photo', 'starter', 'captain', 'goalkeeper', 'active'], req => req.query.team ? { team: req.query.team } : {});
-crud('/sponsors', Sponsor, ['tournament', 'name', 'headline', 'description', 'location', 'phone', 'url', 'category', 'backgroundColor', 'textColor', 'accentColor', 'durationSeconds', 'order', 'active', 'primary', 'showBug', 'logo', 'mediaLogo', 'mediaMotion', 'mediaVideo'], req => req.query.tournament ? { tournament: req.query.tournament } : {}, async (sponsor, req) => updateOverlayState(sponsor.tournament, {}, req.sportsAdmin._id), { order: 1, createdAt: 1 });
+const sponsorFields = ['name', 'headline', 'description', 'location', 'phone', 'url', 'category', 'backgroundColor', 'textColor', 'accentColor', 'active', 'logo', 'mediaLogo', 'mediaMotion', 'mediaVideo', 'videoMuted'];
+router.get('/sponsors', requireSportsAdmin, asyncRoute(async (req, res) => {
+ if (req.query.tournament && invalidId(res, req.query.tournament)) return;
+ res.json(req.query.tournament ? await tournamentSponsors(req.query.tournament) : await Sponsor.find().sort({ name: 1 }).lean());
+}));
+const saveSponsor = async (req, res) => {
+ if (req.params.id && invalidId(res, req.params.id)) return;
+ if (req.body.tournament) return res.status(400).json({ message: 'Crea la marca en la biblioteca y asígnala desde la configuración del evento.' });
+ const sponsor = req.params.id ? await Sponsor.findById(req.params.id) : new Sponsor();
+ if (!sponsor) return res.status(404).json({ message: 'Auspiciante no encontrado.' });
+ if (sponsor.tournament && !sponsor.assignments.some(a => String(a.tournament) === String(sponsor.tournament))) { sponsor.assignments.push({ tournament: sponsor.tournament, confirmed: true, active: sponsor.active, order: sponsor.order, durationSeconds: sponsor.durationSeconds }); sponsor.active = true; }
+ Object.assign(sponsor, pick(req.body, sponsorFields));
+ await sponsor.save();
+ for (const id of new Set([sponsor.tournament, ...sponsor.assignments.map(a => a.tournament)].filter(Boolean).map(String))) if (await Tournament.exists({ _id: id })) await updateOverlayState(id, {}, req.sportsAdmin._id);
+ res.status(req.params.id ? 200 : 201).json(sponsor);
+};
+router.post('/sponsors', requireSportsAdmin, asyncRoute(saveSponsor));
+router.put('/sponsors/:id', requireSportsAdmin, asyncRoute(saveSponsor));
+// Event participation is managed separately from shared brand data.
+const migrateSponsorAssignments = sponsor => {
+ if (sponsor.tournament && !sponsor.assignments.some(a => String(a.tournament) === String(sponsor.tournament))) {
+  sponsor.assignments.push({ tournament: sponsor.tournament, confirmed: true, active: sponsor.active, order: sponsor.order, durationSeconds: sponsor.durationSeconds });
+  sponsor.active = true;
+ }
+};
+router.post('/tournaments/:id/sponsors', requireSportsAdmin, asyncRoute(async (req, res) => {
+ if (invalidId(res, req.params.id)) return;
+ if (!await Tournament.exists({ _id: req.params.id })) return res.status(404).json({ message: 'Evento no encontrado.' });
+ const ids = req.body?.sponsorIds;
+ if (!Array.isArray(ids) || !ids.length || ids.length > 100 || ids.some(id => !safeId(id))) return res.status(400).json({ message: 'Selecciona entre 1 y 100 auspiciantes válidos.' });
+ const uniqueIds = [...new Set(ids)];
+ const brands = await Sponsor.find({ _id: { $in: uniqueIds } });
+ if (brands.length !== uniqueIds.length) return res.status(404).json({ message: 'Una de las marcas ya no está disponible.' });
+ for (const brand of brands) {
+  migrateSponsorAssignments(brand);
+  if (!brand.assignments.some(a => String(a.tournament) === req.params.id)) brand.assignments.push({ tournament: req.params.id, confirmed: true, active: true });
+  await brand.save();
+ }
+ await updateOverlayState(req.params.id, {}, req.sportsAdmin._id);
+ res.json(await tournamentSponsors(req.params.id));
+}));
+router.put('/tournaments/:id/sponsors/:sponsorId', requireSportsAdmin, asyncRoute(async (req, res) => {
+ if (invalidId(res, req.params.id) || invalidId(res, req.params.sponsorId)) return;
+ if (!await Tournament.exists({ _id: req.params.id })) return res.status(404).json({ message: 'Evento no encontrado.' });
+ const sponsor = await Sponsor.findById(req.params.sponsorId);
+ if (!sponsor) return res.status(404).json({ message: 'Auspiciante no encontrado.' });
+ migrateSponsorAssignments(sponsor);
+ const assignment = sponsor.assignments.find(a => String(a.tournament) === req.params.id);
+ if (!assignment) return res.status(404).json({ message: 'Esta marca no está asignada al evento.' });
+ const values = pick(req.body || {}, ['confirmed', 'active', 'order', 'durationSeconds']);
+ if (['confirmed', 'active'].some(key => values[key] !== undefined && typeof values[key] !== 'boolean') || ['order', 'durationSeconds'].some(key => values[key] !== undefined && (!Number.isInteger(values[key]) || values[key] < (key === 'order' ? 0 : 3) || (key === 'durationSeconds' && values[key] > 120)))) return res.status(400).json({ message: 'Revisa la confirmación, el orden y la duración (3 a 120 segundos).' });
+ Object.assign(assignment, values);
+ await sponsor.save();
+ await updateOverlayState(req.params.id, {}, req.sportsAdmin._id);
+ res.json(assignment);
+}));
+router.delete('/sponsors/:id/assignments/:tournament', requireSportsAdmin, asyncRoute(async (req, res) => {
+ if (invalidId(res, req.params.id) || invalidId(res, req.params.tournament)) return;
+ await Sponsor.updateOne({ _id: req.params.id }, { $pull: { assignments: { tournament: req.params.tournament } } });
+ await Sponsor.updateOne({ _id: req.params.id, tournament: req.params.tournament }, { $unset: { tournament: 1 } });
+ await updateOverlayState(req.params.tournament, {}, req.sportsAdmin._id);
+ res.status(204).end();
+}));
+router.delete('/tournaments/:id', requireSportsAdmin, asyncRoute(async (req, res) => {
+ if (invalidId(res, req.params.id)) return;
+ const tournament = await Tournament.findById(req.params.id);
+ if (!tournament) return res.status(404).json({ message: 'Transmisión no encontrada.' });
+ if (typeof req.body?.confirmation !== 'string' || req.body.confirmation.trim() !== tournament.name) return res.status(400).json({ message: 'Escribe el nombre del evento para confirmar.' });
+ // A stale match or unavailable overlay must not prevent deletion of the event.
+ await updateOverlayState(tournament._id, { mainGraphic: null, temporaryGraphic: null, lowerThird: null, scoreboardVisible: false, channelBugVisible: false, clockVisible: false, sponsorBugVisible: false }, req.sportsAdmin._id).catch(error => console.warn('No se pudo limpiar la salida antes de eliminar el evento:', error.message));
+ const teamIds = await SportsTeam.find({ tournament: tournament._id }).distinct('_id');
+ await SportsPlayer.deleteMany({ team: { $in: teamIds } });
+ await SportsEvent.deleteMany({ tournament: tournament._id });
+ await SportsMatch.deleteMany({ tournament: tournament._id });
+ await SportsTeam.deleteMany({ tournament: tournament._id });
+ await Sponsor.updateMany({ tournament: tournament._id }, { $unset: { tournament: 1 } });
+ await Sponsor.updateMany({ 'assignments.tournament': tournament._id }, { $pull: { assignments: { tournament: tournament._id } } });
+ await OverlayState.deleteMany({ tournament: tournament._id });
+ await tournament.deleteOne();
+ res.status(204).end();
+}));
 
 router.get('/matches', requireSportsAdmin, asyncRoute(async (req, res) => res.json(await SportsMatch.find(req.query.tournament ? { tournament: req.query.tournament } : {}).populate('homeTeam awayTeam').sort({ scheduledAt: 1 }))));
 router.post('/matches', requireSportsAdmin, asyncRoute(async (req, res) => { if (String(req.body?.homeTeam) === String(req.body?.awayTeam)) return res.status(400).json({ message: 'El equipo local y visitante deben ser diferentes.' }); const match = await SportsMatch.create(pick(req.body || {}, ['tournament', 'homeTeam', 'awayTeam', 'scheduledAt', 'stadium', 'round', 'status', 'lineups'])); res.status(201).json(match); }));
@@ -155,7 +238,10 @@ router.get('/overlay/tournaments/:slug', asyncRoute(async (req, res) => { const 
 router.post('/overlay/tournaments/:slug/heartbeat', asyncRoute(async (req, res) => { const tournament = await findTournamentByOverlayToken(req.params.slug, req.query.token || req.body?.token); if (!tournament) return res.status(403).json({ message: 'El enlace del overlay no es válido.' }); await recordOverlayHeartbeat(tournament._id); res.status(204).end(); }));
 router.post('/overlay/auth', asyncRoute(async (req, res) => { const slug = req.body?.slug || req.query?.slug; const token = req.body?.token || req.query?.token; const tournament = await findTournamentByOverlayToken(slug, token); const expected = tournament && overlayChannel(tournament._id); if (!tournament || req.body?.channel_name !== expected || !req.body?.socket_id) return res.status(403).json({ message: 'No autorizado.' }); res.json(authenticateOverlayChannel(req.body.socket_id, req.body.channel_name)); }));
 
+router.use(obsBridgeRouter);
+router.use(obsAudioRouter);
 router.use(mediaRouter);
+router.use((req, res) => res.status(404).json({ message: `Ruta no disponible: ${req.method} ${req.path}. Comprueba la versión del backend.` }));
 
 router.use((error, req, res, next) => { if (error?.status) return res.status(error.status).json({ message: error.message }); if (error?.code === 11000) return res.status(409).json({ message: 'Ya existe un registro con ese dato.' }); if (error?.name === 'ValidationError') return res.status(400).json({ message: Object.values(error.errors)[0]?.message || 'Datos no válidos.' }); if (error?.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: 'La imagen excede el límite de 5 MB.' }); console.error('Error en API deportiva:', error.message); return res.status(500).json({ message: error.message || 'Error interno del servidor.' }); });
 

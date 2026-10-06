@@ -66,6 +66,8 @@ La API `POST /api/sports/upload` valida imágenes de máximo 5 MB y sube PNG, JP
 
 ## OBS
 
+Para operar el audio de BELABOX desde la app de Vercel estando fuera de casa, consulta la [configuración del puente remoto de OBS](docs/obs-bridge.md).
+
 Agrega una **Fuente de navegador** con la URL segura que entrega el torneo:
 
 - Ancho: `1920`

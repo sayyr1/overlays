@@ -16,6 +16,9 @@ function MediaLayer({ layer, now, preview }) {
   useEffect(() => {
     const video = ref.current;
     if (!video) return undefined;
+    video.muted = Boolean(preview || c.muted);
+    video.defaultMuted = Boolean(preview || c.muted);
+    video.volume = 1;
     const sync = () => {
       if (!Number.isFinite(video.duration) || video.duration <= 0) return;
       const elapsed = Math.max(0, (Date.now() - new Date(layer.activatedAt).getTime()) / 1000);
@@ -28,7 +31,7 @@ function MediaLayer({ layer, now, preview }) {
     sync();
     const timer = setInterval(sync, 2000);
     return () => { clearInterval(timer); video.removeEventListener('loadedmetadata', sync); video.pause(); };
-  }, [layer.id, layer.activatedAt, layer.playing, c.loop]);
+  }, [layer.id, layer.secureUrl, layer.activatedAt, layer.playing, c.loop, c.muted, preview]);
   const finished = layer.playing !== false && (ended || timing.ended);
   if (timing.expired || (finished && c.endBehavior === 'hide')) return null;
   return <div className="tv-media-layer" data-slot={layer.slot} style={{ left: c.x, top: c.y, width: c.width, height: c.height, opacity: c.opacity, zIndex: c.zIndex }}>

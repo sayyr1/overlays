@@ -42,3 +42,24 @@ test('a reconnect seeks to elapsed time; STOP returns to frame zero and pauses',
   expect(video.currentTime).toBe(0);
   expect(video.pause).toHaveBeenCalled();
 });
+
+test('OBS output applies audio before playback and updates when mute changes', () => {
+  const playing = { ...layer, kind: 'video', mediaDuration: 20, config: { ...layer.config, muted: false } };
+  const { container, rerender } = render(<MediaComposition layers={{ 0: playing }} now={start} />);
+  const video = container.querySelector('video');
+  Object.defineProperty(video, 'duration', { configurable: true, value: 20 });
+  video.play.mockImplementation(() => {
+    expect(video.muted).toBe(false);
+    expect(video.volume).toBe(1);
+    return Promise.resolve();
+  });
+  fireEvent.loadedMetadata(video);
+  expect(video.play).toHaveBeenCalled();
+  video.play.mockResolvedValue();
+  rerender(<MediaComposition layers={{ 0: { ...playing, config: { ...playing.config, muted: true } } }} now={start} />);
+  expect(video.muted).toBe(true);
+  rerender(<MediaComposition layers={{ 0: playing }} now={start} preview />);
+  expect(video.muted).toBe(true);
+  rerender(<MediaComposition layers={{ 0: playing }} now={start} />);
+  expect(video.muted).toBe(false);
+});

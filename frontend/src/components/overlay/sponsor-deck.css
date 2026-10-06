@@ -1,0 +1,48 @@
+.sponsor-deck { padding:22px; margin:20px 0; border:1px solid #36546a; border-radius:14px; background:#102333; }
+.sponsor-deck header { display:flex; justify-content:space-between; gap:18px; align-items:start; }
+.sponsor-deck h2 { margin:8px 0; font-size:21px; }
+.sponsor-deck p { color:#acc0d2; line-height:1.6; }
+.sponsor-deck fieldset { border:0; padding:0; margin:0; min-width:0; }
+.sponsor-deck-status { display:grid; gap:7px; padding:16px; margin:18px 0; background:#071727; border-left:3px solid #e6bb51; border-radius:8px; }
+.sponsor-deck-status span,.sponsor-deck-status small { color:#b6cddd; }
+.sponsor-deck-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.sponsor-deck-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:20px; }
+.sponsor-deck-brand { padding:16px; border:1px solid #36546a; border-radius:10px; }
+.sponsor-deck-brand.is-on-air { border-color:#e6bb51; background:#e6bb510a; }
+.sponsor-deck-brand-heading { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.sponsor-deck-brand-heading img { width:48px; height:48px; object-fit:contain; }
+.sponsor-deck-brand-heading div { min-width:0; }
+.sponsor-deck-brand h3 { margin:0 0 6px; font-size:16px; overflow-wrap:anywhere; }
+.sponsor-deck-brand small { color:#acc0d2; }
+.sponsor-deck-brand > div:last-child { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.tv-ad-logo { position:absolute; left:96px; bottom:64px; width:1728px; height:152px; z-index:60; display:flex; align-items:center; justify-content:center; gap:40px; padding:16px 48px; background:var(--ad-bg,#101720); color:var(--ad-text,#fff); border-top:3px solid var(--accent-tv,#e6bb51); box-shadow:0 8px 28px #0005; }
+.tv-ad-logo img { width:260px; height:116px; object-fit:contain; }
+.tv-ad-logo > div { min-width:0; max-width:1200px; }
+.tv-ad-logo strong { display:block; font-size:36px; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tv-ad-logo span { display:block; font-size:23px; margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tv-ad-active > .tv-graphic:not(.tv-graphic-full),.tv-ad-active > .tv-broadcast-lower,.tv-ad-active > .tv-broadcast-notice { visibility:hidden; }
+@media(max-width:760px) { .sponsor-deck { padding:16px; } .sponsor-deck header { flex-direction:column; } .sponsor-deck header button { width:100%; } .sponsor-deck-actions,.sponsor-deck-grid { grid-template-columns:minmax(0,1fr); } .sponsor-deck-brand > div:last-child { grid-template-columns:minmax(0,1fr); } }
+.live-monitor-column { min-width:0; display:flex; flex-direction:column; gap:16px; align-self:start; position:sticky; top:16px; }
+.live-monitor-column .preview-panel { position:static; }
+.live-monitor-column .sponsor-deck { margin:0; padding:18px; }
+.sponsor-deck header { align-items:center; }
+.sponsor-deck header .outline { font-size:12px; min-height:40px; padding:8px 12px; flex-shrink:0; }
+.sponsor-deck h2 { font-size:18px; margin:6px 0 0; line-height:1.4; }
+.sponsor-deck-status { margin:14px 0; padding:12px; font-size:13px; }
+.sponsor-deck-actions { grid-template-columns:1fr 1fr; }
+.sponsor-deck-actions button { min-height:50px; font-size:13px; line-height:1.4; }
+.sponsor-deck-actions button:last-child { grid-column:1/-1; color:#ffc4c4; border-color:#784e58; background:#8a293012; }
+.sponsor-deck-grid { grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-top:12px; }
+.sponsor-deck-brand { padding:12px; background:#091b29; }
+.sponsor-deck-brand-heading { gap:10px; min-height:48px; margin-bottom:12px; }
+.sponsor-deck-brand h3 { font-size:14px; line-height:1.45; }
+.sponsor-deck-brand-heading img { width:40px; height:40px; padding:4px; background:#ffffff0a; border-radius:8px; }
+.sponsor-deck-brand button { font-size:12px; min-height:44px; line-height:1.4; padding:8px; }
+.sponsor-manual-controls { margin-top:18px; border-top:1px solid #2d465a; }
+.sponsor-manual-controls summary { padding:14px 0; min-height:44px; cursor:pointer; font-weight:700; font-size:13px; }
+.sponsor-manual-controls summary span { float:right; font-weight:400; color:#96aec2; }
+.deck > h2::before { width:8px; height:8px; border-radius:50%; }
+.preview-panel > h2 { font-size:16px; line-height:1.4; }
+.event-configuration .media-studio { grid-column:1/-1; margin-top:0; }
+@media(max-width:1200px) { .live-monitor-column { position:static; } }
+@media(max-width:760px) { .live-monitor-column { gap:12px; } .sponsor-deck header { flex-direction:row; align-items:center; } .sponsor-deck header button { width:auto; } .sponsor-deck-actions { grid-template-columns:1fr; } .sponsor-deck-grid { grid-template-columns:1fr; } }

@@ -3,8 +3,9 @@ import fsSync from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { OBSWebSocket } from 'obs-websocket-js';
+import { OBSWebSocket, EventSubscription } from 'obs-websocket-js';
 import { ObsBridgeRuntime } from '../services/obsBridgeRuntime.js';
+import { ReplayControl } from '../services/obsReplay.js';
 
 const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configArg = process.argv.indexOf('--config');
@@ -58,11 +59,22 @@ async function main() {
     }
     if (!process.env.OBS_WEBSOCKET_URL && local.server_enabled === false) throw new Error('Activa el servidor WebSocket en OBS → Herramientas.');
     try {
-      await deadline(obs.connect(process.env.OBS_WEBSOCKET_URL || `ws://127.0.0.1:${local.server_port || 4455}`, process.env.OBS_WEBSOCKET_PASSWORD ?? (local.auth_required ? local.server_password : undefined), { rpcVersion: 1, eventSubscriptions: 0 }));
+      await deadline(obs.connect(process.env.OBS_WEBSOCKET_URL || `ws://127.0.0.1:${local.server_port || 4455}`, process.env.OBS_WEBSOCKET_PASSWORD ?? (local.auth_required ? local.server_password : undefined), { rpcVersion: 1, eventSubscriptions: EventSubscription.Outputs }));
       connected = true;
     } catch { await obs.disconnect().catch(() => {}); throw new Error('OBS desconectado. Revisa el servidor WebSocket local.'); }
   };
-  const runtime = new ObsBridgeRuntime((name, args) => deadline(obs.call(name, args)), save, persisted);
+  let replay;
+  const runtime = new ObsBridgeRuntime((name, args) => deadline(obs.call(name, args)), save, persisted, command => replay.handle(command));
+  replay = new ReplayControl((name, args) => deadline(obs.call(name, args)), state => runtime.persist({ replay: state }), persisted.replay, () => {
+    let timer, resolve, reject;
+    const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+    // Avoid an unhandled rejection if the Save request itself fails.
+    promise.catch(() => {});
+    const handler = data => { clearTimeout(timer); resolve(data.savedReplayPath); };
+    obs.once('ReplayBufferSaved', handler);
+    timer = setTimeout(() => reject(new Error('OBS tardó demasiado en guardar la jugada.')), 12000);
+    return { promise, cancel: () => { clearTimeout(timer); obs.off('ReplayBufferSaved', handler); } };
+  });
   // A previous pairing may have been replaced; restore first instead of applying
   // a cached advertisement from that pairing to a different production.
   const pairing = crypto.createHash('sha256').update(config.token).digest('hex');
@@ -74,18 +86,18 @@ async function main() {
       const { inputs } = await deadline(obs.call('GetInputList'));
       try {
         const [volume, mute] = await Promise.all([deadline(obs.call('GetInputVolume', { inputName: runtime.state.inputName })), deadline(obs.call('GetInputMute', { inputName: runtime.state.inputName }))]);
-        return { connected: true, sourceAvailable: true, inputName: runtime.state.inputName, inputs: inputs.map(input => input.inputName), muted: mute.inputMuted, volumePercent: Math.round((runtime.state.restoreVolume ?? volume.inputVolumeMul) * 100), outputPercent: Math.round(volume.inputVolumeMul * 100), ducking: runtime.ducking() && runtime.state.restoreVolume != null, message };
+        return { connected: true, sourceAvailable: true, inputName: runtime.state.inputName, inputs: inputs.map(input => input.inputName), muted: mute.inputMuted, volumePercent: Math.round((runtime.state.restoreVolume ?? volume.inputVolumeMul) * 100), outputPercent: Math.round(volume.inputVolumeMul * 100), ducking: runtime.ducking() && runtime.state.restoreVolume != null, message, replay: await replay.report() };
       } catch { return { connected: true, sourceAvailable: false, inputName: runtime.state.inputName, inputs: inputs.map(input => input.inputName), message: `No se encontró la fuente ${runtime.state.inputName}. Selecciónala desde la app.` }; }
     } catch (error) { return { connected: false, inputName: runtime.state.inputName, message: error.message }; }
   };
   const timer = setInterval(() => serial(async () => {
-    try { await connect(); await runtime.reconcile(); }
+    try { await connect(); await runtime.reconcile(); await replay.tick(); }
     catch (error) { message = error.message; }
   }), 500);
   const shutdown = async () => {
     if (stopping) return;
     stopping = true; clearInterval(timer);
-    try { await serial(async () => { await connect(); await runtime.restore(); }); }
+    try { await serial(async () => { await connect(); await replay.finish(); await runtime.restore(); }); }
     catch { log('No se pudo restaurar ahora. El nivel anterior quedó guardado para el siguiente inicio.'); }
     await obs.disconnect().catch(() => {});
   };

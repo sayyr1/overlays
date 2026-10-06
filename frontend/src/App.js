@@ -5,6 +5,7 @@ import MediaStudio from "./components/overlay/MediaStudio";
 import { SponsorLibrary, EventSponsors } from "./components/overlay/SponsorWorkspace";
 import SponsorDeck from './components/overlay/SponsorDeck';
 import ObsAudioPanel from './components/overlay/ObsAudioPanel';
+import ReplayPanel from './components/overlay/ReplayPanel';
 import { sponsorPlayback } from './utils/sponsorPlayback';
 import OverlayComposition from "./components/overlay/OverlayComposition";
 import { BroadcastControls, BroadcastEditor, TransmissionFields } from "./components/overlay/BroadcastStudio";
@@ -1041,7 +1042,7 @@ function Dashboard({ admin, setAdmin }) {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   });
-  const sponsorDeckPanel = selected ? <><ObsAudioPanel key={`audio-${selected._id}`} tournament={selected} api={api} /><SponsorDeck key={`deck-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} loading={sponsorEventId !== selected._id} api={api} onSnapshot={next => setSnapshot(previous => !previous || previous.tournamentId !== next.tournamentId || next.revision >= previous.revision ? next : previous)} onConfigure={() => { setSetupSection('sponsors'); setTab('setup'); }} /></> : null;
+  const sponsorDeckPanel = selected ? <><ReplayPanel key={`replay-${selected._id}`} tournament={selected} api={api} /><ObsAudioPanel key={`audio-${selected._id}`} tournament={selected} api={api} /><SponsorDeck key={`deck-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} loading={sponsorEventId !== selected._id} api={api} onSnapshot={next => setSnapshot(previous => !previous || previous.tournamentId !== next.tournamentId || next.revision >= previous.revision ? next : previous)} onConfigure={() => { setSetupSection('sponsors'); setTab('setup'); }} /></> : null;
   if (tab === 'sponsors' || tab === 'events' || !selected)
     return (
       <main className="app-shell global-workspace">
@@ -1164,7 +1165,7 @@ function Dashboard({ admin, setAdmin }) {
           <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
           <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
         </section>}
-        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['match', general ? 'Evento' : 'Partido'], ['graphics', 'Gráficos'], ['ads', 'Publicidad'], ['output', 'Salida']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={event => { setMobileLiveScreen(screen); event.currentTarget.parentElement.scrollIntoView?.({ block: 'start', behavior: 'auto' }); }}>{label}{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
+        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['match', general ? 'Evento' : 'Partido'], ['graphics', 'Gráficos'], ['ads', 'Publicidad'], ['replay', 'Repeticiones'], ['output', 'Salida']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={event => { setMobileLiveScreen(screen); event.currentTarget.parentElement.scrollIntoView?.({ block: 'start', behavior: 'auto' }); }}>{label}{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
         {tab === "live" && general ? (
           <section className="live-layout">
             <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>

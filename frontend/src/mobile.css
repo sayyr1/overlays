@@ -11,8 +11,8 @@
 .delete-event-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px; }
 
 @media (max-width: 760px) {
-  .mobile-live-navigation { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px; position:sticky; top:0; z-index:20; margin:12px -12px 16px; padding:10px 12px; background:#071727f5; border-bottom:1px solid #2e485b; backdrop-filter:blur(14px); }
-  .mobile-live-navigation button { min-height:48px; min-width:0; background:transparent; color:#a6bdce; border:1px solid transparent; padding:8px 4px; font-size:12px; position:relative; }
+  .mobile-live-navigation { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; position:sticky; top:0; z-index:20; margin:12px -12px 16px; padding:10px 12px; background:#071727f5; border-bottom:1px solid #2e485b; backdrop-filter:blur(14px); }
+  .mobile-live-navigation button { min-height:48px; min-width:0; background:transparent; color:#a6bdce; border:1px solid transparent; padding:8px 4px; font-size:11px; position:relative; }
   .mobile-live-navigation .mobile-live-active { background:#19364b; color:#ffe095; border-color:#527085; }
   .mobile-live-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:#f06975; margin-left:5px; }
   .app-shell[data-mobile-live-screen] .workspace-breadcrumb { display:none; }

@@ -8,7 +8,7 @@ Celular → app en Vercel → órdenes guardadas en MongoDB
                   puente en la PC de casa → OBS local
 ```
 
-El puente consulta las órdenes por HTTPS cada 1,5 segundos, además del tiempo de respuesta. No necesita abrir puertos del router. La contraseña del WebSocket de OBS se lee localmente en Windows y no se envía a Vercel. El archivo de vinculación contiene una clave que solo permite consultar órdenes de audio y reportar su estado, sin acceso de administrador.
+El puente consulta las órdenes por HTTPS cada 1,5 segundos, además del tiempo de respuesta. No necesita abrir puertos del router. La contraseña del WebSocket de OBS se lee localmente en Windows y no se envía a Vercel. El archivo de vinculación contiene una clave que permite consultar órdenes de audio y repeticiones y reportar su estado, sin acceso de administrador.
 
 ## Preparar una vez
 
@@ -46,3 +46,11 @@ El puente y OBS deben estar funcionando cuando salgas. La aplicación del celula
 Solo debe ejecutarse una instancia del puente. Una vinculación nueva invalida el archivo anterior. Descarga el nuevo archivo y reinicia el proceso para reemplazarlo. El estado de recuperación queda en `backend/.obs-bridge-state.json`; está excluido de Git, al igual que los archivos `.obs-bridge*.json` de esa carpeta.
 
 En otras plataformas, o si OBS usa una configuración portable, define `OBS_WEBSOCKET_URL` y `OBS_WEBSOCKET_PASSWORD` **en la computadora del puente**, no en el frontend.
+
+## Repeticiones
+
+En OBS habilita **Ajustes → Salida → Búfer de repetición**, configura la duración (por ejemplo, 20 segundos) y aplica. En la pestaña **Repeticiones** de la web, pulsa **Iniciar captura**. Después de una acción, **Guardar jugada** conserva los últimos segundos en la carpeta de grabaciones de OBS. Los archivos permanecen en la PC y la web muestra hasta 50 clips identificados por evento y hora; no se suben a Vercel ni se eliminan al salir del panel.
+
+**Reproducir** cambia a una escena propia del puente, ajusta el clip al lienzo de OBS y muestra «REPETICIÓN». Conserva el audio original del clip. El puente vuelve a la escena anterior al terminar o al pulsar **Volver al directo**, incluso sin nuevos mensajes de Vercel. Si cambias manualmente a otra escena en OBS, respeta esa elección. No permite guardar mientras reproduce para evitar capturar la misma repetición.
+
+El búfer de OBS graba la salida del programa, incluidos los gráficos y anuncios visibles en ese momento. No es una grabación aislada de BELABOX. La web no sirve una vista previa de los archivos locales; permite elegirlos por evento y hora. Actualiza y reinicia el puente al instalar esta función; conserva su archivo de vinculación.

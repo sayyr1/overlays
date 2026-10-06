@@ -19,7 +19,8 @@ export function remoteAudioView(bridge, now = Date.now()) {
     outputPercent: fresh && sameSource ? report.outputPercent : undefined,
     ducking: fresh && sameSource && report.ducking === true,
     inputs: fresh ? report.inputs || [] : [],
-    pending: (bridge.commands || []).some(command => new Date(command.expiresAt).getTime() > now),
+    pending: (bridge.commands || []).some(command => command.kind !== 'replay' && new Date(command.expiresAt).getTime() > now),
+    replay: { ...(fresh ? report.replay || {} : {}), pending: (bridge.commands || []).some(command => command.kind === 'replay' && new Date(command.expiresAt).getTime() > now) },
     message: !fresh ? bridge.tokenHash ? 'El puente de casa está desconectado. Inícialo en la computadora donde está OBS.' : 'Vincula la computadora de casa para controlar OBS desde Internet.' : !sameSource ? 'Aplicando la fuente seleccionada en OBS…' : report.message || '',
   };
 }

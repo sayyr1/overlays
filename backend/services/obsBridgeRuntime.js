@@ -3,8 +3,9 @@ import { AmbientControl, audibleCommercial } from './obsAmbient.js';
 // No database or network dependency: the advertisement timeline and recovery
 // baseline live on the OBS computer, independently of the phone and Vercel.
 export class ObsBridgeRuntime {
-  constructor(call, save, state = {}) {
+  constructor(call, save, state = {}, replayCommand) {
     this.call = call; this.save = save;
+    this.replayCommand = replayCommand;
     this.state = { inputName: 'BELABOX_SRT', tournamentId: null, duckEnabled: false, ambientPercent: 15, restoreVolume: null, appliedVolume: null, deck: {}, clockOffset: 0, completed: [], ...state };
     this.control = new AmbientControl(call, async changes => {
       const next = { ...this.state, ...changes };
@@ -26,11 +27,16 @@ export class ObsBridgeRuntime {
     for (const command of payload.commands || []) {
       if (this.state.completed.includes(command.id)) continue;
       if (new Date(command.expiresAt).getTime() > this.now()) {
+        if (command.kind === 'replay') {
+          if (!this.replayCommand) throw new Error('Actualiza el puente de casa para habilitar repeticiones.');
+          await this.replayCommand(command);
+        } else {
         // Commands are bound to the source selected when the operator sent them.
         if (command.muted !== undefined) await this.call('SetInputMute', { inputName: command.inputName, inputMuted: command.muted });
         if (command.volumePercent !== undefined) {
           if (command.inputName === this.state.inputName) await this.control.manualVolume(command.volumePercent, this.ducking());
           else await this.call('SetInputVolume', { inputName: command.inputName, inputVolumeMul: command.volumePercent / 100 });
+        }
         }
       }
       await this.persist({ completed: [...this.state.completed, command.id].slice(-100) });

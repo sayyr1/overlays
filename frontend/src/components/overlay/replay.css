@@ -1,0 +1,18 @@
+.replay-panel { padding:18px; border:1px solid #36546a; border-radius:14px; background:#102333; }
+.replay-panel header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.replay-panel h2 { font-size:18px; margin:6px 0 0; }
+.replay-signal { font-size:11px; color:#a9bed1; }
+.replay-signal.is-active { color:#79e6bc; }
+.replay-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0 12px; }
+.replay-actions button { min-height:50px; font-size:13px; }
+.replay-return { grid-column:1/-1; }
+.replay-help { color:#a9bed1; font-size:12px; line-height:1.6; }
+.replay-list { display:grid; gap:10px; max-height:360px; overflow:auto; }
+.replay-list article { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; border:1px solid #2d465a; border-radius:10px; background:#091b29; }
+.replay-list article.is-on-air { border-color:#e6bb51; }
+.replay-list strong,.replay-list small { display:block; font-size:13px; }
+.replay-list small { color:#9cb2c5; margin-top:6px; }
+.replay-list button { min-height:44px; font-size:12px; }
+.replay-empty { color:#c3d7e5; padding:18px 0; font-size:13px; }
+.replay-empty span { display:block; color:#9cb2c5; font-size:12px; margin-top:8px; }
+@media(max-width:760px) { .replay-panel { padding:16px; } .mobile-live-navigation { grid-template-columns:repeat(5,minmax(0,1fr)); } .mobile-live-navigation button { font-size:11px; } .app-shell[data-mobile-live-screen]:not([data-mobile-live-screen="replay"]) .replay-panel { display:none; } .app-shell[data-mobile-live-screen="replay"] .live-layout > .deck,.app-shell[data-mobile-live-screen="replay"] .preview-panel,.app-shell[data-mobile-live-screen="replay"] .sponsor-deck,.app-shell[data-mobile-live-screen="replay"] .obs-audio-panel { display:none; } }

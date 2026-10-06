@@ -15,6 +15,7 @@ import { tournamentSponsors } from '../services/sponsorAssignments.js';
 import mediaRouter from './media.js';
 import obsAudioRouter from './obsAudio.js';
 import obsBridgeRouter from './obsBridge.js';
+import obsReplayRouter from './obsReplay.js';
 import { requireSportsAdmin, createSportsSession, sportsCookieOptions } from '../middleware/sportsAuth.js';
 import { currentElapsedSeconds, pauseClock, startClock } from '../services/sportsClock.js';
 import { authenticateOverlayChannel, overlayChannel } from '../services/sportsRealtime.js';
@@ -239,6 +240,7 @@ router.post('/overlay/tournaments/:slug/heartbeat', asyncRoute(async (req, res) 
 router.post('/overlay/auth', asyncRoute(async (req, res) => { const slug = req.body?.slug || req.query?.slug; const token = req.body?.token || req.query?.token; const tournament = await findTournamentByOverlayToken(slug, token); const expected = tournament && overlayChannel(tournament._id); if (!tournament || req.body?.channel_name !== expected || !req.body?.socket_id) return res.status(403).json({ message: 'No autorizado.' }); res.json(authenticateOverlayChannel(req.body.socket_id, req.body.channel_name)); }));
 
 router.use(obsBridgeRouter);
+router.use(obsReplayRouter);
 router.use(obsAudioRouter);
 router.use(mediaRouter);
 router.use((req, res) => res.status(404).json({ message: `Ruta no disponible: ${req.method} ${req.path}. Comprueba la versión del backend.` }));

@@ -16,6 +16,10 @@ Para revisar composiciones sin servicios externos, ejecuta `node scripts/preview
 
 Aplicación MERN interna de CODEBRIQ Media para operar gráficos de fútbol y emitirlos por OBS. MongoDB es la fuente de verdad; Pusher Channels solo distribuye las actualizaciones posteriores a cada guardado.
 
+## Media y motion graphics
+
+El panel incorpora biblioteca compartida, 16 capas de media, presets, reproducci?n de WebM/MP4 y emisi?n directa de auspiciantes. Incluye dos dise?os SVG listos para usar. Abre **Media y motion graphics** en Control en vivo o Auspiciantes. Consulta la [gu?a de Fase 1](docs/media-phase-1.md).
+
 ## Arquitectura
 
 - `frontend/`: panel React y overlay transparente de 1920 × 1080.

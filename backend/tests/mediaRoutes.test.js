@@ -1,0 +1,35 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import router from '../routes/media.js';
+import SportsAdmin from '../models/SportsAdmin.js';
+import MediaAsset from '../models/MediaAsset.js';
+import cloudinary from '../utils/cloudinary.js';
+
+test('media endpoints require admin auth and registration trusts provider metadata, not client URLs', async t => {
+  const previous = process.env.JWT_SECRET;
+  process.env.JWT_SECRET = 'local-media-route-test';
+  t.after(() => { if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous; });
+  t.mock.method(SportsAdmin, 'findById', async () => ({ _id: '012345678901234567890123', active: true }));
+  t.mock.method(MediaAsset, 'findOne', async () => null);
+  let created;
+  t.mock.method(MediaAsset, 'create', async data => { created = data; return { _id: 'asset', ...data }; });
+  t.mock.method(cloudinary.api, 'resource', async () => ({ secure_url: 'https://res.cloudinary.com/test/original.webm', format: 'webm', bytes: 1024, width: 1920, height: 1080, duration: 5 }));
+  const app = express(); app.use(express.json()); app.use(router);
+  app.use((error, req, res, next) => res.status(error.status || 500).json({ message: error.message }));
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  assert.equal((await fetch(`${base}/media`)).status, 401);
+  assert.equal((await fetch(`${base}/media/sign`, { method: 'POST' })).status, 401);
+  const token = jwt.sign({ sub: '012345678901234567890123' }, process.env.JWT_SECRET);
+  const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  const response = await fetch(`${base}/media`, { method: 'POST', headers, body: JSON.stringify({ name: 'Motion', category: 'motion', kind: 'video', publicId: 'imbabura-en-vivo/library/12345678-1234-1234-1234-123456789012', secureUrl: 'https://untrusted.example/clip.mp4' }) });
+  assert.equal(response.status, 201);
+  assert.equal(created.secureUrl, 'https://res.cloudinary.com/test/original.webm');
+  assert.equal(created.duration, 5);
+  const invalid = await fetch(`${base}/media`, { method: 'POST', headers, body: JSON.stringify({ kind: 'video', publicId: 'outside-library/file' }) });
+  assert.equal(invalid.status, 400);
+});

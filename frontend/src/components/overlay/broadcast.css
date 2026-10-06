@@ -130,3 +130,13 @@ body:has(.tv-overlay-root:not(.tv-overlay-preview)) { background: transparent; }
 .tv-broadcast-notice h1 { font-size: 31px; }
 .tv-broadcast-notice p { font-size: 22px; }
 .tv-with-sponsor > .tv-broadcast-lower { bottom: 258px; }
+
+/* Shared media canvas: media 0?100; existing dynamic graphics sit at level 10. */
+.tv-overlay-root { isolation: isolate; }
+.tv-overlay-root > :not(.tv-media-layer) { z-index: 10; }
+.tv-media-layer { position: absolute; background: transparent; overflow: hidden; }
+.tv-media-layer > img, .tv-media-layer > video { display: block; width: 100%; height: 100%; background: transparent; }
+.tv-media-copy { position: absolute; right: 20px; color: white; text-shadow: 0 2px 8px #0009; line-height: 1.15; overflow-wrap: anywhere; }
+.tv-media-copy strong, .tv-media-copy span { display: block; }
+.tv-media-copy span { margin-top: 8px; font-size: .55em; font-weight: 500; }
+.tv-media-error { position: absolute; top: 0; left: 0; background: #8c2233; color: white; padding: 16px; font-size: 24px; }

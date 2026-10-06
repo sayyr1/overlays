@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import "./broadcast.css";
+import MediaComposition from "./MediaComposition";
 
 const seconds = (clock, now) =>
   (clock?.elapsedSeconds || 0) +
@@ -28,7 +29,8 @@ export default function OverlayComposition({ snapshot, preview = false }) {
   if (!match && !general)
     return (
       <div className={`tv-overlay-root ${preview ? "tv-overlay-preview" : ""}`}>
-        {preview && <div className="tv-overlay-empty">Esperando partido activo</div>}
+        {preview && !Object.values(snapshot?.mediaLayers || {}).some(layer => layer.visible) && <div className="tv-overlay-empty">Esperando partido activo</div>}
+        <MediaComposition layers={snapshot?.mediaLayers} now={now} preview={preview} />
       </div>
     );
   return (
@@ -42,6 +44,7 @@ export default function OverlayComposition({ snapshot, preview = false }) {
         "--background": colors.background,
       }}
     >
+      <MediaComposition layers={snapshot?.mediaLayers} now={now} preview={preview} />
       {!general && graphics.scoreboardVisible && (
         <div className="tv-scorebug">
           {snapshot.tournament?.logo?.secureUrl && (

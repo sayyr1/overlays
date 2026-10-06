@@ -11,6 +11,7 @@ import SportsMatch from '../models/SportsMatch.js';
 import SportsEvent from '../models/SportsEvent.js';
 import OverlayState from '../models/OverlayState.js';
 import Sponsor from '../models/Sponsor.js';
+import mediaRouter from './media.js';
 import { requireSportsAdmin, createSportsSession, sportsCookieOptions } from '../middleware/sportsAuth.js';
 import { currentElapsedSeconds, pauseClock, startClock } from '../services/sportsClock.js';
 import { authenticateOverlayChannel, overlayChannel } from '../services/sportsRealtime.js';
@@ -93,7 +94,7 @@ router.get('/players/by-tournament/:tournamentId', requireSportsAdmin, asyncRout
   res.json(await SportsPlayer.find({ team: { $in: teamIds } }).sort({ fullName: 1 }));
 }));
 crud('/players', SportsPlayer, ['team', 'fullName', 'sportsName', 'number', 'position', 'photo', 'starter', 'captain', 'goalkeeper', 'active'], req => req.query.team ? { team: req.query.team } : {});
-crud('/sponsors', Sponsor, ['tournament', 'name', 'headline', 'description', 'location', 'phone', 'url', 'category', 'backgroundColor', 'textColor', 'accentColor', 'durationSeconds', 'order', 'active', 'primary', 'showBug', 'logo'], req => req.query.tournament ? { tournament: req.query.tournament } : {}, async (sponsor, req) => updateOverlayState(sponsor.tournament, {}, req.sportsAdmin._id), { order: 1, createdAt: 1 });
+crud('/sponsors', Sponsor, ['tournament', 'name', 'headline', 'description', 'location', 'phone', 'url', 'category', 'backgroundColor', 'textColor', 'accentColor', 'durationSeconds', 'order', 'active', 'primary', 'showBug', 'logo', 'mediaLogo', 'mediaMotion', 'mediaVideo'], req => req.query.tournament ? { tournament: req.query.tournament } : {}, async (sponsor, req) => updateOverlayState(sponsor.tournament, {}, req.sportsAdmin._id), { order: 1, createdAt: 1 });
 
 router.get('/matches', requireSportsAdmin, asyncRoute(async (req, res) => res.json(await SportsMatch.find(req.query.tournament ? { tournament: req.query.tournament } : {}).populate('homeTeam awayTeam').sort({ scheduledAt: 1 }))));
 router.post('/matches', requireSportsAdmin, asyncRoute(async (req, res) => { if (String(req.body?.homeTeam) === String(req.body?.awayTeam)) return res.status(400).json({ message: 'El equipo local y visitante deben ser diferentes.' }); const match = await SportsMatch.create(pick(req.body || {}, ['tournament', 'homeTeam', 'awayTeam', 'scheduledAt', 'stadium', 'round', 'status', 'lineups'])); res.status(201).json(match); }));
@@ -153,6 +154,8 @@ router.post('/remote/tournaments/:slug/control', asyncRoute(async (req, res) => 
 router.get('/overlay/tournaments/:slug', asyncRoute(async (req, res) => { const tournament = await findTournamentByOverlayToken(req.params.slug, req.query.token); if (!tournament) return res.status(403).json({ message: 'El enlace del overlay no es válido.' }); res.json(await getOverlaySnapshot(tournament._id)); }));
 router.post('/overlay/tournaments/:slug/heartbeat', asyncRoute(async (req, res) => { const tournament = await findTournamentByOverlayToken(req.params.slug, req.query.token || req.body?.token); if (!tournament) return res.status(403).json({ message: 'El enlace del overlay no es válido.' }); await recordOverlayHeartbeat(tournament._id); res.status(204).end(); }));
 router.post('/overlay/auth', asyncRoute(async (req, res) => { const slug = req.body?.slug || req.query?.slug; const token = req.body?.token || req.query?.token; const tournament = await findTournamentByOverlayToken(slug, token); const expected = tournament && overlayChannel(tournament._id); if (!tournament || req.body?.channel_name !== expected || !req.body?.socket_id) return res.status(403).json({ message: 'No autorizado.' }); res.json(authenticateOverlayChannel(req.body.socket_id, req.body.channel_name)); }));
+
+router.use(mediaRouter);
 
 router.use((error, req, res, next) => { if (error?.status) return res.status(error.status).json({ message: error.message }); if (error?.code === 11000) return res.status(409).json({ message: 'Ya existe un registro con ese dato.' }); if (error?.name === 'ValidationError') return res.status(400).json({ message: Object.values(error.errors)[0]?.message || 'Datos no válidos.' }); if (error?.code === 'LIMIT_FILE_SIZE') return res.status(400).json({ message: 'La imagen excede el límite de 5 MB.' }); console.error('Error en API deportiva:', error.message); return res.status(500).json({ message: error.message || 'Error interno del servidor.' }); });
 

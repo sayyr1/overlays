@@ -15,6 +15,7 @@ const overlayStateSchema = new mongoose.Schema({
   mainGraphic: { type: graphicSchema, default: null },
   temporaryGraphic: { type: graphicSchema, default: null },
   lowerThird: { type: graphicSchema, default: null },
+  mediaLayers: { type: mongoose.Schema.Types.Mixed, default: {} },
   overlayLastSeenAt: { type: Date, default: null },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'SportsAdmin' }
 }, { timestamps: true });

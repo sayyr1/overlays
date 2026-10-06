@@ -18,7 +18,7 @@ const load = relative => {
   const compiled = new Module(filename, module);
   compiled.filename = filename;
   compiled.paths = Module._nodeModulePaths(path.dirname(filename));
-  compiled.require = name => name.endsWith('.css') ? {} : frontendRequire(name);
+  compiled.require = name => name.endsWith('.css') ? {} : name.startsWith('.') ? load(path.relative(root, path.resolve(path.dirname(filename), name + '.js'))) : frontendRequire(name);
   compiled._compile(code, filename);
   return compiled.exports;
 };
@@ -36,8 +36,14 @@ const scenes = [
   ['09 / IRL: lugar y aviso', { lowerThird: { id: 'place', type: 'broadcast_location', data: { title: 'Recorriendo el centro histórico', subtitle: 'En directo desde Ibarra' } }, temporary: { id: 'notice', type: 'broadcast_announcement', data: { title: 'Volvemos en un momento', subtitle: 'Estamos recuperando la conexión' } } }, 'irl'],
   ['10 / Cuenta regresiva', { main: { id: 'countdown', type: 'broadcast_countdown', activatedAt: new Date().toISOString(), data: { title: 'En unos momentos comenzamos', subtitle: 'Gracias por acompañarnos', seconds: 300 } } }, 'general'],
 ];
+const bundled = file => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(root, 'frontend/public/media', file)).toString('base64');
+const mediaBase = { kind: 'image', visible: true, activatedAt: new Date(Date.now() - 10000).toISOString(), config: { x: 0, y: 0, width: 1920, height: 1080, opacity: 1, zIndex: 1, fit: 'contain', textDelay: 0 } };
+scenes.push(['11 / Composici?n h?brida: SVG + datos HTML', { ...base.graphics }, 'sports', {
+  0: { ...mediaBase, id: 'frame', slot: '0', secureUrl: bundled('studio-frame.svg') },
+  1: { ...mediaBase, id: 'speaker', slot: '1', secureUrl: bundled('studio-lower-third.svg'), config: { ...mediaBase.config, x: 96, y: 820, width: 1100, height: 180, zIndex: 20, title: 'JUAN P?REZ', subtitle: 'COMENTARISTA ? EN DIRECTO', textX: 40, textY: 35, fontSize: 46 } }
+}]);
 const css = fs.readFileSync(path.join(root, 'frontend/src/components/overlay/broadcast.css'), 'utf8');
-const cards = scenes.map(([title, graphics, mode = 'sports']) => `<article><h2>${title}</h2><div class="frame"><div class="canvas">${renderToStaticMarkup(React.createElement(Overlay, { preview: true, snapshot: { ...base, mode, match: mode === 'sports' ? base.match : null, graphics } }))}</div></div></article>`).join('');
+const cards = scenes.map(([title, graphics, mode = 'sports', mediaLayers = {}]) => `<article><h2>${title}</h2><div class="frame"><div class="canvas">${renderToStaticMarkup(React.createElement(Overlay, { preview: true, snapshot: { ...base, mode, mediaLayers, match: mode === 'sports' ? base.match : null, graphics } }))}</div></div></article>`).join('');
 const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Imbabura en Vivo · Paquete de emisión</title><style>${css}
 body{margin:0;padding:32px;background:#080f18;color:#e9eef4;font-family:Segoe UI,Arial,sans-serif}main{max-width:1400px;margin:auto}h1{font-size:30px;font-weight:600}p{color:#acbbca;line-height:1.6}h2{font-size:15px;font-weight:500;letter-spacing:.08em;margin:28px 0 12px}.frame{position:relative;aspect-ratio:16/9;overflow:hidden;background:repeating-linear-gradient(90deg,#25443a 0 10%,#294a3f 10% 20%);border:1px solid #344550}.canvas{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:top left}button{padding:10px 18px;color:#e9eef4;background:#243447;border:1px solid #526579;border-radius:5px;cursor:pointer}.neutral .frame{background:repeating-conic-gradient(#25313c 0 25%,#1b2631 0 50%) 0/32px 32px}</style><main><h1>Imbabura en Vivo</h1><p>Paquete de emisión · Composiciones reales a 1920 × 1080.<br>Datos y escudos ficticios. El fondo de prueba no forma parte de la salida de OBS.</p><button onclick="document.body.classList.toggle('neutral')">Cambiar fondo de prueba</button>${cards}</main><script>const observer=new ResizeObserver(entries=>entries.forEach(e=>e.target.firstElementChild.style.transform='scale('+e.contentRect.width/1920+')'));document.querySelectorAll('.frame').forEach(el=>observer.observe(el));</script></html>`;
 const target = path.join(root, 'docs/overlay-preview.html');

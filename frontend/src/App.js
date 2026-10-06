@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
 import "./App.css";
+import MediaStudio from "./components/overlay/MediaStudio";
 import OverlayComposition from "./components/overlay/OverlayComposition";
 import { BroadcastControls, BroadcastEditor, TransmissionFields } from "./components/overlay/BroadcastStudio";
 
@@ -116,11 +117,12 @@ function Overlay() {
     const channel = pusher.subscribe(
       `private-overlay-${snapshot.tournamentId}`,
     );
+    channel.bind("overlay-invalidated", refresh);
     channel.bind("overlay-state", (next) =>
       setSnapshot((old) => (!old || next.revision > old.revision ? next : old)),
     );
     return () => pusher.disconnect();
-  }, [snapshot?.tournamentId, slug, token]);
+  }, [snapshot?.tournamentId, slug, token, refresh]);
   return error && !snapshot ? (
     <div className="overlay-error">Enlace del overlay no válido.</div>
   ) : (
@@ -1108,6 +1110,7 @@ function Dashboard({ admin, setAdmin }) {
           <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
           <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
         </section>}
+        {["live", "sponsors"].includes(tab) && <MediaStudio key={selected._id} tournament={selected} snapshot={snapshot} api={api} sponsors={sponsors} onSaved={load} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={next => setSnapshot(previous => !previous || next.revision >= previous.revision ? next : previous)} />}
         {tab === "live" && general ? (
           <section className="live-layout">
             <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>

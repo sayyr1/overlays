@@ -17,6 +17,9 @@ const sponsorSchema = new mongoose.Schema({
   active: { type: Boolean, default: true },
   primary: { type: Boolean, default: false },
   showBug: { type: Boolean, default: false },
+  mediaLogo: { type: String },
+  mediaMotion: { type: String },
+  mediaVideo: { type: String },
   logo: mediaSchema
 }, { timestamps: true });
 export default mongoose.models.Sponsor || mongoose.model('Sponsor', sponsorSchema);

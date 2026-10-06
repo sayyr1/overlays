@@ -13,7 +13,11 @@ export const overlayChannel = tournamentId => `private-overlay-${tournamentId}`;
 export const publishOverlayState = async (state) => {
   const pusher = getClient();
   if (!pusher) return false;
-  await pusher.trigger(overlayChannel(state.tournamentId), 'overlay-state', state);
+  if (Buffer.byteLength(JSON.stringify(state), 'utf8') > 9000) {
+    await pusher.trigger(overlayChannel(state.tournamentId), 'overlay-invalidated', { revision: state.revision });
+  } else {
+    await pusher.trigger(overlayChannel(state.tournamentId), 'overlay-state', state);
+  }
   return true;
 };
 export const authenticateOverlayChannel = (socketId, channelName) => {

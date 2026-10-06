@@ -33,11 +33,15 @@ export const getOverlaySnapshot = async tournamentId => {
     tournament: { id: tournament._id, name: tournament.name, season: tournament.season, logo: tournament.logo, colors: tournament.colors, branding: tournament.branding, slug: tournament.slug },
     match: match && { id: match._id, status: match.status, stadium: match.stadium, round: match.round, scheduledAt: match.scheduledAt, score: match.score, discipline: match.discipline, stats: match.stats, lineups: match.lineups, officials: match.officials, broadcastTeam: match.broadcastTeam, clock: match.clock, homeTeam: serializeTeam(match.homeTeam), awayTeam: serializeTeam(match.awayTeam) },
     sponsors: sponsors.map(sponsor => ({ id: String(sponsor._id), name: sponsor.name, headline: sponsor.headline, description: sponsor.description, location: sponsor.location, phone: sponsor.phone, url: sponsor.url, category: sponsor.category, backgroundColor: sponsor.backgroundColor, textColor: sponsor.textColor, accentColor: sponsor.accentColor, durationSeconds: sponsor.durationSeconds, logo: sponsor.logo })),
+    mediaLayers: state.mediaLayers || {},
     graphics: { scoreboardVisible: state.scoreboardVisible, clockVisible: state.clockVisible, channelBugVisible: state.channelBugVisible, sponsorBugVisible: state.sponsorBugVisible, main: activeGraphic(state.mainGraphic), temporary: activeGraphic(state.temporaryGraphic), lowerThird: activeGraphic(state.lowerThird) }
   };
 };
 
 export const updateOverlayState = async (tournamentId, changes, actorId) => {
+  if (changes.mainGraphic === null && changes.temporaryGraphic === null && changes.lowerThird === null && changes.scoreboardVisible === false && changes.channelBugVisible === false) {
+    changes = { ...changes, ...Object.fromEntries(Array.from({ length: 16 }, (_, slot) => [`mediaLayers.${slot}.visible`, false])) };
+  }
   const state = await OverlayState.findOneAndUpdate(
     { tournament: tournamentId }, { $set: { ...changes, updatedBy: actorId }, $inc: { revision: 1 }, $setOnInsert: { tournament: tournamentId } }, { upsert: true, new: true }
   );

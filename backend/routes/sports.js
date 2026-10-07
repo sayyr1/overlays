@@ -6,6 +6,8 @@ import cloudinary from '../utils/cloudinary.js';
 import SportsAdmin from '../models/SportsAdmin.js';
 import Tournament from '../models/Tournament.js';
 import SportsTeam from '../models/SportsTeam.js';
+import teamsRouter from './teams.js';
+import { teamFilter } from '../services/teamLibrary.js';
 import SportsPlayer from '../models/SportsPlayer.js';
 import SportsMatch from '../models/SportsMatch.js';
 import SportsEvent from '../models/SportsEvent.js';
@@ -56,11 +58,16 @@ router.get('/auth/me', requireSportsAdmin, (req, res) => res.json({ admin: admin
 
 router.get('/tournaments', requireSportsAdmin, asyncRoute(async (req, res) => res.json(await Tournament.find().sort({ createdAt: -1 }).populate('activeMatch'))));
 router.post('/tournaments', requireSportsAdmin, asyncRoute(async (req, res) => {
+  const teamIds = req.body?.teamIds || [];
+  if (!Array.isArray(teamIds) || teamIds.length > 100 || teamIds.some(id => !safeId(id))) return res.status(400).json({ message: 'Selecciona equipos válidos de la biblioteca.' });
+  const uniqueTeams = [...new Set(teamIds)];
+  if (await SportsTeam.countDocuments({ _id: { $in: uniqueTeams }, active: true }) !== uniqueTeams.length) return res.status(400).json({ message: 'Uno de los equipos no está disponible.' });
   requireText(req.body?.name, 'El nombre'); const slug = slugify(req.body?.slug || req.body?.name); requireText(slug, 'El slug');
   const token = issueOverlayToken();
   const mode = req.body?.mode || 'sports';
   const tournament = await Tournament.create({ ...pick(req.body || {}, ['name', 'season', 'startDate', 'endDate', 'logo', 'active', 'colors', 'branding']), mode, broadcast: req.body?.broadcast || { scenes: defaultBroadcastScenes(mode, req.body.name) }, slug, overlayTokenHash: hashOverlayToken(token), overlayTokenPrefix: token.slice(0, 8) });
   await OverlayState.create({ tournament: tournament._id, scoreboardVisible: mode === 'sports', clockVisible: mode === 'sports' });
+  if (uniqueTeams.length) await SportsTeam.updateMany({ _id: { $in: uniqueTeams } }, { $addToSet: { tournaments: tournament._id } });
   const output = await getOutput();
   res.status(201).json({ tournament, overlayToken: token, overlayUrl: `/overlay/programa?token=${output.token}`, legacyOverlayUrl: `/overlay/torneo/${slug}?token=${token}` });
 }));
@@ -94,10 +101,10 @@ const crud = (basePath, Model, fields, filter = () => ({}), onChanged, sort = { 
   router.put(`${basePath}/:id`, requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const item = await Model.findByIdAndUpdate(req.params.id, pick(req.body || {}, fields), { new: true, runValidators: true }); if (!item) return res.status(404).json({ message: 'Registro no encontrado.' }); if (onChanged) await onChanged(item, req); res.json(item); }));
   router.delete(`${basePath}/:id`, requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const item = await Model.findByIdAndDelete(req.params.id); if (!item) return res.status(404).json({ message: 'Registro no encontrado.' }); if (onChanged) await onChanged(item, req); res.status(204).end(); }));
 };
-crud('/teams', SportsTeam, ['tournament', 'name', 'shortName', 'code', 'crest', 'city', 'coach', 'primaryColor', 'secondaryColor', 'active'], req => req.query.tournament ? { tournament: req.query.tournament } : {});
+router.use(teamsRouter);
 router.get('/players/by-tournament/:tournamentId', requireSportsAdmin, asyncRoute(async (req, res) => {
   if (invalidId(res, req.params.tournamentId)) return;
-  const teamIds = await SportsTeam.find({ tournament: req.params.tournamentId }).distinct('_id');
+  const teamIds = await SportsTeam.find(teamFilter(req.params.tournamentId)).distinct('_id');
   res.json(await SportsPlayer.find({ team: { $in: teamIds } }).sort({ fullName: 1 }));
 }));
 crud('/players', SportsPlayer, ['team', 'fullName', 'sportsName', 'number', 'position', 'photo', 'starter', 'captain', 'goalkeeper', 'active'], req => req.query.team ? { team: req.query.team } : {});
@@ -171,11 +178,10 @@ router.delete('/tournaments/:id', requireSportsAdmin, asyncRoute(async (req, res
  if (typeof req.body?.confirmation !== 'string' || req.body.confirmation.trim() !== tournament.name) return res.status(400).json({ message: 'Escribe el nombre del evento para confirmar.' });
  // A stale match or unavailable overlay must not prevent deletion of the event.
  await updateOverlayState(tournament._id, { mainGraphic: null, temporaryGraphic: null, lowerThird: null, scoreboardVisible: false, channelBugVisible: false, clockVisible: false, sponsorBugVisible: false }, req.sportsAdmin._id).catch(error => console.warn('No se pudo limpiar la salida antes de eliminar el evento:', error.message));
- const teamIds = await SportsTeam.find({ tournament: tournament._id }).distinct('_id');
- await SportsPlayer.deleteMany({ team: { $in: teamIds } });
  await SportsEvent.deleteMany({ tournament: tournament._id });
  await SportsMatch.deleteMany({ tournament: tournament._id });
- await SportsTeam.deleteMany({ tournament: tournament._id });
+ await SportsTeam.updateMany({ tournament: tournament._id }, { $unset: { tournament: 1 } });
+ await SportsTeam.updateMany({ tournaments: tournament._id }, { $pull: { tournaments: tournament._id } });
  await Sponsor.updateMany({ tournament: tournament._id }, { $unset: { tournament: 1 } });
  await Sponsor.updateMany({ 'assignments.tournament': tournament._id }, { $pull: { assignments: { tournament: tournament._id } } });
  await OverlayState.deleteMany({ tournament: tournament._id });
@@ -184,7 +190,18 @@ router.delete('/tournaments/:id', requireSportsAdmin, asyncRoute(async (req, res
 }));
 
 router.get('/matches', requireSportsAdmin, asyncRoute(async (req, res) => res.json(await SportsMatch.find(req.query.tournament ? { tournament: req.query.tournament } : {}).populate('homeTeam awayTeam').sort({ scheduledAt: 1 }))));
-router.post('/matches', requireSportsAdmin, asyncRoute(async (req, res) => { if (String(req.body?.homeTeam) === String(req.body?.awayTeam)) return res.status(400).json({ message: 'El equipo local y visitante deben ser diferentes.' }); const match = await SportsMatch.create(pick(req.body || {}, ['tournament', 'homeTeam', 'awayTeam', 'scheduledAt', 'stadium', 'round', 'status', 'lineups'])); res.status(201).json(match); }));
+router.put('/matches/:id', requireSportsAdmin, async (req, res, next) => {
+  try {
+    if (!req.body?.homeTeam && !req.body?.awayTeam) return next();
+    if (invalidId(res, req.params.id)) return;
+    const existing = await SportsMatch.findById(req.params.id);
+    if (!existing) return res.status(404).json({ message: 'Partido no encontrado.' });
+    const home = req.body.homeTeam ?? existing.homeTeam, away = req.body.awayTeam ?? existing.awayTeam;
+    if (!safeId(home) || !safeId(away) || String(home) === String(away) || await SportsTeam.countDocuments({ ...teamFilter(existing.tournament), _id: { $in: [home, away] } }) !== 2) return res.status(400).json({ message: 'Elige dos equipos diferentes asignados a este evento.' });
+    next();
+  } catch (error) { next(error); }
+});
+router.post('/matches', requireSportsAdmin, asyncRoute(async (req, res) => { if (String(req.body?.homeTeam) === String(req.body?.awayTeam)) return res.status(400).json({ message: 'El equipo local y visitante deben ser diferentes.' }); if (!safeId(req.body?.tournament) || !safeId(req.body?.homeTeam) || !safeId(req.body?.awayTeam) || await SportsTeam.countDocuments({ ...teamFilter(req.body.tournament), _id: { $in: [req.body.homeTeam, req.body.awayTeam] } }) !== 2) return res.status(400).json({ message: 'Asigna ambos equipos al evento antes de crear el partido.' }); const match = await SportsMatch.create(pick(req.body || {}, ['tournament', 'homeTeam', 'awayTeam', 'scheduledAt', 'stadium', 'round', 'status', 'lineups'])); res.status(201).json(match); }));
 router.put('/matches/:id', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; if (req.body?.homeTeam && String(req.body.homeTeam) === String(req.body.awayTeam)) return res.status(400).json({ message: 'El equipo local y visitante deben ser diferentes.' }); const match = await SportsMatch.findByIdAndUpdate(req.params.id, pick(req.body || {}, ['homeTeam', 'awayTeam', 'scheduledAt', 'stadium', 'round', 'status', 'lineups', 'score', 'stats', 'officials', 'broadcastTeam']), { new: true, runValidators: true }); if (!match) return res.status(404).json({ message: 'Partido no encontrado.' }); await updateOverlayState(match.tournament, {}, req.sportsAdmin._id); res.json(match); }));
 router.get('/matches/:id/events', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; res.json(await SportsEvent.find({ match: req.params.id }).sort({ createdAt: -1 }).populate('team player playerIn playerOut')); }));
 

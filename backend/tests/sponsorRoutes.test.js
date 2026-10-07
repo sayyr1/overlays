@@ -45,7 +45,8 @@ test('event deletion survives overlay failures and preserves shared sponsors', a
   t.mock.method(Tournament, 'findById', async () => ({ _id: id, name: 'Festival', deleteOne: async () => actions.push('event') }));
   t.mock.method(OverlayState, 'findOneAndUpdate', async () => { throw new Error('Overlay no disponible'); });
   t.mock.method(console, 'warn', () => {});
-  t.mock.method(SportsTeam, 'find', () => ({ distinct: async () => [id] }));
+  const teamUpdates = [];
+  t.mock.method(SportsTeam, 'updateMany', async (filter, update) => teamUpdates.push({ filter, update }));
   for (const [Model, name] of [[SportsTeam, 'teams'], [SportsPlayer, 'players'], [SportsMatch, 'matches'], [SportsEvent, 'history'], [OverlayState, 'state']]) t.mock.method(Model, 'deleteMany', async () => actions.push(name));
   const updates = [];
   t.mock.method(Sponsor, 'updateMany', async (filter, update) => updates.push({ filter, update }));
@@ -59,7 +60,9 @@ test('event deletion survives overlay failures and preserves shared sponsors', a
   assert.equal((await fetch(url, { method: 'DELETE', headers, body: JSON.stringify({ confirmation: 'Wrong name' }) })).status, 400);
   assert.deepEqual(actions, []);
   assert.equal((await fetch(url, { method: 'DELETE', headers, body: JSON.stringify({ confirmation: ' Festival ' }) })).status, 204);
-  assert.deepEqual(actions, ['players', 'history', 'matches', 'teams', 'state', 'event']);
+  assert.deepEqual(actions, ['history', 'matches', 'state', 'event']);
+  assert.equal(teamUpdates.length, 2);
+  assert.deepEqual(teamUpdates[1].update, { $pull: { tournaments: id } });
   assert.equal(updates.length, 2);
   assert.deepEqual(updates[1].update, { $pull: { assignments: { tournament: id } } });
 });

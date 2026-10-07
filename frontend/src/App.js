@@ -1,3 +1,4 @@
+import { TeamLibrary, EventTeams, TeamSelection } from './components/overlay/TeamWorkspace';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Pusher from "pusher-js";
 import "./App.css";
@@ -718,7 +719,7 @@ function Dashboard({ admin, setAdmin }) {
       const isGeneral = ts.find(t => t._id === id)?.mode && ts.find(t => t._id === id).mode !== 'sports';
       const [teamData, matchData, state, playerData, sponsorData] =
         await Promise.all([
-          isGeneral ? Promise.resolve([]) : api(`/teams?tournament=${id}`),
+          api(`/teams?tournament=${id}`),
           isGeneral ? Promise.resolve([]) : api(`/matches?tournament=${id}`),
           api(`/tournaments/${id}/overlay-state`),
           isGeneral ? Promise.resolve([]) : api(`/players/by-tournament/${id}`),
@@ -920,6 +921,7 @@ function Dashboard({ admin, setAdmin }) {
           mode: form.get("mode") || 'sports',
           season: form.get("season"),
           slug: form.get("slug"),
+          teamIds: form.getAll('teamIds'),
         }),
       });
       e.target.reset();
@@ -1059,7 +1061,7 @@ function Dashboard({ admin, setAdmin }) {
     return () => window.removeEventListener("keydown", handler);
   });
   const sponsorDeckPanel = selected ? <><ReplayPanel key={`replay-${selected._id}`} tournament={selected} api={api} onConfigure={() => { setSetupSection('replay'); setTab('setup'); }} /><ObsAudioPanel key={`audio-${selected._id}`} tournament={selected} api={api} /><SponsorDeck key={`deck-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} loading={sponsorEventId !== selected._id} api={api} onSnapshot={next => setSnapshot(previous => !previous || previous.tournamentId !== next.tournamentId || next.revision >= previous.revision ? next : previous)} onConfigure={() => { setSetupSection('sponsors'); setTab('setup'); }} /></> : null;
-  if (tab === 'sponsors' || tab === 'events' || !selected)
+  if (tab === 'teams' || tab === 'sponsors' || tab === 'events' || !selected)
     return (
       <main className="app-shell global-workspace">
         <aside>
@@ -1068,18 +1070,19 @@ function Dashboard({ admin, setAdmin }) {
           </div>
           <small>{admin.name}</small>
           <span className="navigation-label">ORGANIZACIÓN</span>
-          <button data-section="events" aria-current={tab !== 'sponsors' ? 'page' : undefined} className={`sidebar-nav ${tab !== 'sponsors' ? 'nav-active' : 'outline'}`} onClick={() => setTab('events')}>Eventos</button>
+          <button data-section="events" aria-current={!['sponsors', 'teams'].includes(tab) ? 'page' : undefined} className={`sidebar-nav ${!['sponsors', 'teams'].includes(tab) ? 'nav-active' : 'outline'}`} onClick={() => setTab('events')}>Eventos</button>
           <button data-section="sponsors" aria-current={tab === 'sponsors' ? 'page' : undefined} className={`sidebar-nav ${tab === 'sponsors' ? 'nav-active' : 'outline'}`} onClick={() => setTab('sponsors')}>Auspiciantes</button>
+          <button data-section="teams" aria-current={tab === 'teams' ? 'page' : undefined} className={`sidebar-nav ${tab === 'teams' ? 'nav-active' : 'outline'}`} onClick={() => setTab('teams')}>Equipos</button>
           <button className="outline sidebar-exit" onClick={async () => { await api('/auth/logout', { method: 'POST' }); setAdmin(null); }}>Cerrar sesión</button>
         </aside>
         <section className="workspace">
           {notice && <div className="toast" role="status">{notice}</div>}
-          <header><div><span className="eyebrow">CENTRO DE PRODUCCIÓN</span><h1>{tab === 'sponsors' ? 'Auspiciantes' : 'Eventos y campeonatos'}</h1></div><div className="workspace-tools">{apiOnline === false && <span className="status status-offline" role="status">Sin conexión</span>}<button className="outline mobile-menu-toggle" aria-expanded={menuOpen} aria-controls="global-session-menu" onClick={() => setMenuOpen(!menuOpen)}>Más</button></div></header>
+          <header><div><span className="eyebrow">CENTRO DE PRODUCCIÓN</span><h1>{tab === 'teams' ? 'Equipos' : tab === 'sponsors' ? 'Auspiciantes' : 'Eventos y campeonatos'}</h1></div><div className="workspace-tools">{apiOnline === false && <span className="status status-offline" role="status">Sin conexión</span>}<button className="outline mobile-menu-toggle" aria-expanded={menuOpen} aria-controls="global-session-menu" onClick={() => setMenuOpen(!menuOpen)}>Más</button></div></header>
           {menuOpen && <section id="global-session-menu" className="workspace-menu" aria-label="Cuenta y sesión"><strong>{admin.name}</strong><button className="outline" onClick={async () => { await api('/auth/logout', { method: 'POST' }); setAdmin(null); }}>Cerrar sesión</button></section>}
-          {tab === 'sponsors' ? <SponsorLibrary api={api} apiBase={API} onSaved={load} /> : <>
+          {tab === 'teams' ? <TeamLibrary api={api} apiBase={API} onSaved={load} /> : tab === 'sponsors' ? <SponsorLibrary api={api} apiBase={API} onSaved={load} /> : <>
             <div className="section-heading"><div><h2>Organiza tu próxima transmisión</h2><p>Configura cada evento, elige sus auspiciantes y abre el control cuando estés listo para emitir.</p></div><span className="brand-count">{tournaments.length} eventos</span></div>
             {tournaments.length ? <div className="event-card-grid">{tournaments.map(event => <article className="event-card" key={event._id}><span className="eyebrow">{!event.mode || event.mode === 'sports' ? 'CAMPEONATO' : 'EVENTO'}</span><h2>{event.name}</h2><p>{event.season || 'Producción independiente'}</p><div className="event-card-actions"><button onClick={() => { setSelectedId(event._id); setTab('setup'); }}>Configurar evento</button><button className="outline" onClick={() => { setSelectedId(event._id); setTab('live'); }}>Control en vivo</button></div></article>)}</div> : <div className="brand-empty"><h3>Crea tu primer evento</h3><p>Puedes preparar tus marcas en Auspiciantes antes de organizar una transmisión.</p></div>}
-            <details className="event-create" open={!tournaments.length || undefined}><summary>+ Crear evento o campeonato</summary><Config title="Nuevo evento" onSubmit={createTournament}><TransmissionFields /></Config></details>
+            <details className="event-create" open={!tournaments.length || undefined}><summary>+ Crear evento o campeonato</summary><Config title="Nuevo evento" onSubmit={createTournament}><TransmissionFields /><TeamSelection api={api} /></Config></details>
           </>}
         </section>
       </main>
@@ -1094,6 +1097,7 @@ function Dashboard({ admin, setAdmin }) {
         <span className="navigation-label">ORGANIZACIÓN</span>
         <button data-section="events" className="sidebar-nav outline" onClick={() => setTab('events')}>Eventos</button>
         <button data-section="sponsors" className="sidebar-nav outline" onClick={() => setTab('sponsors')}>Auspiciantes</button>
+          <button data-section="teams" aria-current={tab === 'teams' ? 'page' : undefined} className={`sidebar-nav ${tab === 'teams' ? 'nav-active' : 'outline'}`} onClick={() => setTab('teams')}>Equipos</button>
         <span className="navigation-label">EVENTO SELECCIONADO</span>
         <button
           data-section="live"
@@ -1172,7 +1176,7 @@ function Dashboard({ admin, setAdmin }) {
           </div>
         </header>
         {menuOpen && <section id="workspace-menu" className="workspace-menu" aria-label={general ? "Transmisión y sesión" : "Torneo y sesión"}>
-          <div className="mobile-workspace-links"><button className="outline" onClick={() => { setTab('events'); setMenuOpen(false); }}>Eventos</button><button className="outline" onClick={() => { setTab('setup'); setMenuOpen(false); }}>Configurar evento</button><button className="outline" onClick={() => { setTab('sponsors'); setMenuOpen(false); }}>Auspiciantes</button></div><label htmlFor="mobile-tournament">{general ? "Transmisión activa" : "Torneo activo"}</label>
+          <div className="mobile-workspace-links"><button className="outline" onClick={() => { setTab('teams'); setMenuOpen(false); }}>Equipos</button><button className="outline" onClick={() => { setTab('events'); setMenuOpen(false); }}>Eventos</button><button className="outline" onClick={() => { setTab('setup'); setMenuOpen(false); }}>Configurar evento</button><button className="outline" onClick={() => { setTab('sponsors'); setMenuOpen(false); }}>Auspiciantes</button></div><label htmlFor="mobile-tournament">{general ? "Transmisión activa" : "Torneo activo"}</label>
           <select id="mobile-tournament" value={selected._id} onChange={event => { setSelectedId(event.target.value); setMenuOpen(false); }}>
             {tournaments.map(t => <option key={t._id} value={t._id}>{t.name} {t.season}</option>)}
           </select>
@@ -1501,19 +1505,9 @@ function Dashboard({ admin, setAdmin }) {
           <ThemeManager key={selected._id} tournament={selected} onSaved={load} say={say} />
         ) : (
           <section className="event-configuration">
-            <nav className="configuration-tabs" aria-label="Configuración del evento"><button aria-pressed={setupSection === 'sponsors'} className={setupSection === 'sponsors' ? '' : 'outline'} onClick={() => setSetupSection('sponsors')}>Auspiciantes del evento</button><button aria-pressed={setupSection === 'production'} className={setupSection === 'production' ? '' : 'outline'} onClick={() => setSetupSection('production')}>{general ? 'Gráficos del evento' : 'Equipos y partidos'}</button><button aria-pressed={setupSection === 'media'} className={setupSection === 'media' ? '' : 'outline'} onClick={() => setSetupSection('media')}>Archivos y capas</button><button aria-pressed={setupSection === 'replay'} className={setupSection === 'replay' ? '' : 'outline'} onClick={() => setSetupSection('replay')}>Repeticiones</button><button aria-pressed={setupSection === 'output'} className={setupSection === 'output' ? '' : 'outline'} onClick={() => setSetupSection('output')}>Salida OBS</button><button className="outline" onClick={() => setTab('theme')}>Marca y tema</button></nav>
+            <nav className="configuration-tabs" aria-label="Configuración del evento"><button aria-pressed={setupSection === 'sponsors'} className={setupSection === 'sponsors' ? '' : 'outline'} onClick={() => setSetupSection('sponsors')}>Auspiciantes del evento</button><button aria-pressed={setupSection === 'teams'} className={setupSection === 'teams' ? '' : 'outline'} onClick={() => setSetupSection('teams')}>Equipos del evento</button><button aria-pressed={setupSection === 'production'} className={setupSection === 'production' ? '' : 'outline'} onClick={() => setSetupSection('production')}>{general ? 'Gráficos del evento' : 'Equipos y partidos'}</button><button aria-pressed={setupSection === 'media'} className={setupSection === 'media' ? '' : 'outline'} onClick={() => setSetupSection('media')}>Archivos y capas</button><button aria-pressed={setupSection === 'replay'} className={setupSection === 'replay' ? '' : 'outline'} onClick={() => setSetupSection('replay')}>Repeticiones</button><button aria-pressed={setupSection === 'output'} className={setupSection === 'output' ? '' : 'outline'} onClick={() => setSetupSection('output')}>Salida OBS</button><button className="outline" onClick={() => setTab('theme')}>Marca y tema</button></nav>
             <section className="setup-grid">
-            {setupSection === 'output' ? <OutputSettings api={api} /> : setupSection === 'replay' ? <ReplayBranding key={selected._id} tournament={selected} api={api} /> : setupSection === 'media' ? <MediaStudio initiallyOpen key={selected._id} tournament={selected} snapshot={snapshot} api={api} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={setSnapshot} /> : setupSection === 'sponsors' ? <EventSponsors key={selected._id} tournament={selected} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSaved={load} onOpenLibrary={() => setTab('sponsors')} /> : general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
-            <Config title="Equipos" onSubmit={(e) => create(e, "teams")}>
-              <input name="name" placeholder="Nombre" required />
-              <input name="shortName" placeholder="Nombre corto" required />
-              <input name="code" placeholder="SIG" maxLength="3" required />
-            </Config>
-            <Records
-              title="Equipos registrados"
-              items={teams}
-              text={(item) => `${item.name} · ${item.code}`}
-            />
+            {setupSection === 'teams' ? <EventTeams key={selected._id} tournament={selected} teams={sponsorEventId === selected._id ? teams : []} api={api} onSaved={load} onOpenLibrary={() => setTab('teams')} /> : setupSection === 'output' ? <OutputSettings api={api} /> : setupSection === 'replay' ? <ReplayBranding key={selected._id} tournament={selected} api={api} /> : setupSection === 'media' ? <MediaStudio initiallyOpen key={selected._id} tournament={selected} snapshot={snapshot} api={api} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={setSnapshot} /> : setupSection === 'sponsors' ? <EventSponsors key={selected._id} tournament={selected} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSaved={load} onOpenLibrary={() => setTab('sponsors')} /> : general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
             <Config title="Jugadores" onSubmit={(e) => create(e, "players")}>
               <select name="team" required>
                 <option value="">Equipo</option>
@@ -1571,11 +1565,11 @@ function Dashboard({ admin, setAdmin }) {
             />
             </>}
             </section>
-            <details className="event-danger-zone"><summary>Eliminar este evento</summary><p>Se eliminarán sus equipos, jugadores, partidos e historial. Las marcas de tu biblioteca y los archivos compartidos se conservan.</p><button className="outline danger-link" onClick={() => { setDeleteOpen(true); setDeleteConfirmation(''); setDeleteError(''); }}>Eliminar {selected.name}</button></details>
+            <details className="event-danger-zone"><summary>Eliminar este evento</summary><p>Se eliminarán los partidos e historial del evento. Tus equipos, jugadores, auspiciantes y archivos compartidos se conservan en sus bibliotecas.</p><button className="outline danger-link" onClick={() => { setDeleteOpen(true); setDeleteConfirmation(''); setDeleteError(''); }}>Eliminar {selected.name}</button></details>
           </section>
         )}
       </section>
-      {deleteOpen && <div className="delete-event-backdrop"><section className="delete-event-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-event-title"><h2 id="delete-event-title">Eliminar {selected.name}</h2><p>Esta acción es irreversible. Se borrarán los equipos, jugadores, partidos e historial del evento. Los auspiciantes y archivos compartidos se conservarán.</p><form onSubmit={event => { event.preventDefault(); deleteTournament(); }}><label>Escribe el nombre del evento para confirmar<input autoFocus value={deleteConfirmation} disabled={deleteBusy} onChange={event => setDeleteConfirmation(event.target.value)} autoComplete="off" /></label><p className="delete-event-name">{selected.name}</p>{deleteError && <p className="brand-error" role="alert">{deleteError}</p>}<div className="delete-event-actions"><button type="button" className="outline" disabled={deleteBusy} onClick={() => setDeleteOpen(false)}>Cancelar</button><button type="submit" className="danger" disabled={deleteBusy || deleteConfirmation.trim() !== selected.name}>{deleteBusy ? 'Eliminando…' : 'Eliminar definitivamente'}</button></div></form></section></div>}
+      {deleteOpen && <div className="delete-event-backdrop"><section className="delete-event-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-event-title"><h2 id="delete-event-title">Eliminar {selected.name}</h2><p>Esta acción es irreversible. Se eliminaran los partidos e historial del evento. Tus equipos, jugadores, auspiciantes y archivos compartidos se conservan.</p><form onSubmit={event => { event.preventDefault(); deleteTournament(); }}><label>Escribe el nombre del evento para confirmar<input autoFocus value={deleteConfirmation} disabled={deleteBusy} onChange={event => setDeleteConfirmation(event.target.value)} autoComplete="off" /></label><p className="delete-event-name">{selected.name}</p>{deleteError && <p className="brand-error" role="alert">{deleteError}</p>}<div className="delete-event-actions"><button type="button" className="outline" disabled={deleteBusy} onClick={() => setDeleteOpen(false)}>Cancelar</button><button type="submit" className="danger" disabled={deleteBusy || deleteConfirmation.trim() !== selected.name}>{deleteBusy ? 'Eliminando…' : 'Eliminar definitivamente'}</button></div></form></section></div>}
       {previewOpen && (
         <div className="preview-modal" onClick={() => setPreviewOpen(false)}>
           <section onClick={(event) => event.stopPropagation()}>

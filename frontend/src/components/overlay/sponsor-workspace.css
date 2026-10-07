@@ -14,6 +14,13 @@
 .brand-avatar { width:72px; height:72px; border-radius:14px; background:#ffffff0c; border:1px solid #ffffff12; display:grid; place-items:center; flex-shrink:0; overflow:hidden; }
 .brand-avatar img { width:100%; height:100%; object-fit:contain; padding:9px; }
 .brand-avatar span { font-size:24px; color:#e6bb51; }
+.team-avatar img { width:100%; height:100%; object-fit:contain; }
+.team-create-choice { display:flex; align-items:center; gap:12px; border:1px solid #304759; padding:12px; border-radius:10px; min-height:64px; }
+.team-create-choice input { width:20px; height:20px; flex-shrink:0; }
+.team-create-choice .team-avatar { width:40px; height:44px; flex-shrink:0; }
+.team-create-selection { grid-column:1/-1; }
+.team-create-selection summary { cursor:pointer; padding:12px 0; }
+.team-create-selection p { color:#a9bdcf; font-size:13px; line-height:1.5; }
 .brand-tags { display:flex; flex-wrap:wrap; gap:7px; }
 .brand-tags span,.brand-count { font-size:11px; padding:6px 9px; border-radius:20px; background:#24394b; color:#c2d6e6; }
 .brand-editor { padding:26px; border:1px solid #304759; border-radius:16px; background:#0e2030; }

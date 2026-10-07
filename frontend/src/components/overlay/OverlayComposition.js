@@ -1,3 +1,4 @@
+import { teamCrest } from './TeamBadge';
 import React, { useEffect, useState } from "react";
 import "./broadcast.css";
 import MediaComposition from "./MediaComposition";
@@ -61,8 +62,8 @@ export default function OverlayComposition({ snapshot, preview = false }) {
             />
           )}
           <div className="tv-team-side">
-            {match.homeTeam?.crest?.secureUrl && (
-              <img src={match.homeTeam.crest.secureUrl} alt="" />
+            {match.homeTeam && (
+              <img src={teamCrest(match.homeTeam)} alt="" />
             )}
             <b>{match.homeTeam?.code || match.homeTeam?.shortName || "LOC"}</b>
           </div>
@@ -71,8 +72,8 @@ export default function OverlayComposition({ snapshot, preview = false }) {
           </strong>
           <div className="tv-team-side tv-right">
             <b>{match.awayTeam?.code || match.awayTeam?.shortName || "VIS"}</b>
-            {match.awayTeam?.crest?.secureUrl && (
-              <img src={match.awayTeam.crest.secureUrl} alt="" />
+            {match.awayTeam && (
+              <img src={teamCrest(match.awayTeam)} alt="" />
             )}
           </div>
           {graphics.clockVisible && (
@@ -279,8 +280,8 @@ function RenderGraphic(props) {
         <p>{props.tournament?.name || "FUTBOL EN VIVO"}</p>
         <div className="tv-opening-matchup">
           <div>
-            {match.homeTeam?.crest?.secureUrl ? (
-              <img src={match.homeTeam.crest.secureUrl} alt="" />
+            {match.homeTeam ? (
+              <img src={teamCrest(match.homeTeam)} alt="" />
             ) : null}
             <b>
               {match.homeTeam?.shortName || match.homeTeam?.name || "Local"}
@@ -288,8 +289,8 @@ function RenderGraphic(props) {
           </div>
           <strong>VS</strong>
           <div>
-            {match.awayTeam?.crest?.secureUrl ? (
-              <img src={match.awayTeam.crest.secureUrl} alt="" />
+            {match.awayTeam ? (
+              <img src={teamCrest(match.awayTeam)} alt="" />
             ) : null}
             <b>
               {match.awayTeam?.shortName || match.awayTeam?.name || "Visitante"}
@@ -310,8 +311,8 @@ function MatchScoreCard({ match, tournament, final }) {
   const Team = ({ team, fallback }) => (
     <div className="tv-match-showcase-team">
       <div className="tv-match-showcase-crest">
-        {team?.crest?.secureUrl ? (
-          <img src={team.crest.secureUrl} alt="" />
+        {team ? (
+          <img src={teamCrest(team)} alt="" />
         ) : (
           <span>{team?.code || fallback}</span>
         )}

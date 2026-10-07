@@ -1,0 +1,200 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Revisión de overlays</title><style>/* Broadcast package. Fixed 1080p canvas, independent from operator UI styles. */
+.tv-overlay-root {
+  --ink: var(--background, #101c2a);
+  --paper: #f4f6f8;
+  --surface-tv: linear-gradient(115deg, var(--ink) 55%, var(--brand-tv));
+  --muted-tv: #b8c4d1;
+  --brand-tv: var(--primary, #0b2e59);
+  --accent-tv: var(--accent, #f2b705);
+  position: relative; width: 1920px; height: 1080px; overflow: hidden;
+  background: transparent; color: var(--paper); pointer-events: none;
+  font-family: 'Segoe UI', Arial, sans-serif; font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased; line-height: 1.2; user-select: none;
+}
+.tv-overlay-root *, .tv-overlay-root *::before, .tv-overlay-root *::after { box-sizing: border-box; }
+body:has(.tv-overlay-root:not(.tv-overlay-preview)) { background: transparent; }
+.tv-overlay-root h1, .tv-overlay-root p, .tv-overlay-root header, .tv-overlay-root footer { margin: 0; padding: 0; }
+.tv-overlay-root h1 { max-width: none; white-space: normal; text-overflow: clip; overflow: visible; }
+.tv-overlay-root img { object-fit: contain; }
+.tv-overlay-empty { position: absolute; inset: 0; display: grid; place-items: center; color: #b8c4d1; font-size: 36px; }
+/* Compact score strip: competition mark, teams, score, clock. */
+.tv-scorebug {
+  position: absolute; top: 64px; left: 96px; display: flex; align-items: stretch;
+  height: 66px; background: var(--ink); box-shadow: 0 6px 20px #0005;
+  border-bottom: 3px solid var(--accent-tv); animation: tv-enter 280ms ease-out both;
+}
+.tv-scorebug-brand { width: 58px; padding: 10px; background: var(--paper); }
+.tv-team-side { display: flex; align-items: center; justify-content: center; gap: 12px; width: 142px; padding: 0 14px; background: var(--brand-tv); box-shadow: inset 0 1px #ffffff15; }
+.tv-team-side b { font-size: 26px; font-weight: 700; letter-spacing: .04em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-team-side img { width: 30px; height: 34px; }
+.tv-scorebug > strong { display: flex; align-items: center; justify-content: center; gap: 14px; min-width: 116px; padding: 0 18px; color: #101c2a; background: var(--paper); font-size: 36px; font-weight: 800; }
+.tv-scorebug > strong i { font-style: normal; font-size: 20px; color: #718093; }
+.tv-clock { display: flex; align-items: center; gap: 12px; padding: 0 18px; }
+.tv-clock > b { font-size: 28px; font-weight: 600; }
+.tv-clock small { font-size: 15px; color: var(--paper); max-width: 150px; padding: 6px 8px; background: #ffffff12; font-weight: 700; }
+.tv-clock em { padding: 5px 7px; color: var(--ink); background: var(--accent-tv); font-size: 18px; font-style: normal; font-weight: 700; }
+.tv-standalone-clock { position: absolute; top: 64px; left: 96px; background: var(--ink); padding: 16px 24px; border-left: 4px solid var(--accent-tv); font-size: 26px; }
+.tv-channel-bug { position: absolute; right: 96px; top: 64px; border-left: 3px solid var(--accent-tv); padding: 10px 14px; background: #101c2ad9; font-size: 19px; font-weight: 800; letter-spacing: .12em; text-shadow: 0 2px 5px #0008; }
+.tv-channel-bug b { font-size: 12px; font-weight: 600; letter-spacing: .28em; }
+/* Shared presentation and result plates. */
+.tv-opening-card, .tv-match-showcase-card, .tv-graphic-full {
+  position: absolute; left: 280px; top: 260px; width: 1360px;
+  color: var(--paper); background: var(--surface-tv); border: 1px solid #ffffff18;
+  border-top: 4px solid var(--accent-tv); box-shadow: 0 18px 54px #0006;
+  animation: tv-enter 320ms ease-out both;
+}
+.tv-match-showcase-header { display: grid; grid-template-columns: minmax(0, 1fr) 56px minmax(0, 1fr); align-items: center; gap: 28px; height: 88px; padding: 0 48px !important; border-bottom: 1px solid #ffffff20; }
+.tv-match-showcase-header > span { font-size: 21px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.tv-match-showcase-header img { grid-column: 2; width: 48px; height: 48px; }
+.tv-match-showcase-header > strong { grid-column: 3; justify-self: end; color: #101c2a; background: var(--accent-tv); padding: 12px 18px; font-size: 17px; letter-spacing: .1em; }
+.tv-match-showcase-body { display: grid; grid-template-columns: minmax(0, 1fr) 360px minmax(0, 1fr); gap: 36px; align-items: center; min-height: 320px; padding: 38px 52px; }
+.tv-match-showcase-team { display: grid; justify-items: center; gap: 20px; min-width: 0; }
+.tv-match-showcase-crest { display: grid; place-items: center; width: 144px; height: 144px; background: #ffffff06; border: 1px solid #ffffff12; border-radius: 50%; }
+.tv-match-showcase-crest img { width: 118px; height: 118px; }
+.tv-match-showcase-crest span { display: grid; place-items: center; width: 110px; height: 110px; background: var(--brand-tv); border-bottom: 3px solid var(--accent-tv); font-size: 34px; font-weight: 700; }
+.tv-match-showcase-team > b { font-size: 29px; font-weight: 650; text-align: center; text-transform: uppercase; overflow-wrap: anywhere; }
+.tv-match-showcase-score { display: grid; grid-template-columns: 1fr 48px 1fr; align-items: center; text-align: center; }
+.tv-match-showcase-score > strong { font-size: 124px; line-height: 1; font-weight: 800; letter-spacing: -.055em; }
+.tv-match-showcase-divider i { color: #748398; font-size: 36px; font-style: normal; }
+.tv-match-showcase-divider b { display: none; }
+.tv-match-showcase-score > span { grid-column: 1 / -1; margin-top: 22px; padding-top: 15px; border-top: 1px solid #ffffff25; color: var(--muted-tv); font-size: 13px; letter-spacing: .16em; }
+.tv-match-showcase-footer { display: flex; justify-content: space-between; align-items: center; gap: 28px; min-height: 58px; padding: 16px 48px !important; background: #00000024; border-top: 1px solid #ffffff18; color: var(--paper); font-size: 16px; letter-spacing: .06em; text-transform: uppercase; }
+.tv-match-showcase-footer b { font-weight: 500; }
+.tv-opening-card { text-align: center; padding-top: 32px; }
+.tv-opening-kicker { display: inline-block; padding: 9px 20px; font-size: 16px; color: #101c2a; background: var(--accent-tv); font-weight: 800; letter-spacing: .18em; text-transform: uppercase; }
+.tv-opening-card > p { margin-top: 12px; font-size: 25px; font-weight: 500; }
+.tv-opening-matchup { display: grid; grid-template-columns: 1fr 120px 1fr; align-items: center; gap: 24px; padding: 36px 80px; }
+.tv-opening-matchup > div { display: grid; justify-items: center; gap: 20px; min-width: 0; }
+.tv-opening-matchup img { width: 124px; height: 124px; }
+.tv-opening-matchup b { font-size: 32px; font-weight: 650; text-transform: uppercase; overflow-wrap: anywhere; }
+.tv-opening-matchup > strong { display: grid; place-items: center; height: 80px; border: 1px solid #ffffff20; font-size: 28px; font-weight: 800; color: var(--accent-tv); letter-spacing: .1em; }
+.tv-opening-card footer { padding: 18px 40px; background: var(--brand-tv); font-size: 17px; letter-spacing: .1em; text-transform: uppercase; }
+/* Event and identification straps: information first, one color accent. */
+.tv-graphic { position: absolute; left: 96px; bottom: 96px; width: 800px; padding: 24px 32px 28px; background: var(--surface-tv); border-left: 5px solid var(--accent-tv); box-shadow: 0 8px 25px #0005, inset 0 1px #ffffff15; animation: tv-enter 280ms ease-out both; }
+.tv-graphic-kicker { display: block; font-size: 17px; font-weight: 700; letter-spacing: .16em; color: var(--accent-tv); }
+.tv-graphic h1 { margin: 12px 0 0; font-size: 38px; font-weight: 750; line-height: 1.15; overflow-wrap: anywhere; }
+.tv-graphic h1 em { font-style: normal; font-weight: 400; color: var(--muted-tv); }
+.tv-graphic p { margin-top: 18px; font-size: 23px; color: var(--muted-tv); }
+.tv-graphic .tv-graphic-detail { margin-top: 10px; font-size: 22px; }
+.tv-graphic-bar { display: none; }
+.tv-graphic[data-event='yellow_card'] { border-color: #f4d44b; }
+.tv-graphic[data-event='red_card'] { border-color: #f35462; }
+.tv-graphic[data-event='yellow_card'] .tv-graphic-kicker::before,
+.tv-graphic[data-event='red_card'] .tv-graphic-kicker::before { content: ''; display: inline-block; width: 14px; height: 21px; margin-right: 12px; vertical-align: -4px; background: #f4d44b; border-radius: 2px; }
+.tv-graphic[data-event='red_card'] .tv-graphic-kicker::before { background: #f35462; }
+.tv-graphic[data-event='gol'] { border-left-width: 8px; }
+.tv-graphic[data-event='gol'] .tv-graphic-kicker { font-size: 28px; letter-spacing: .12em; }
+.tv-graphic-lower { left: 1024px; width: 800px; }
+.tv-with-sponsor > .tv-graphic:not(.tv-graphic-full) { bottom: 258px; }
+.tv-graphic.tv-graphic-full { left: 340px; top: 218px; bottom: auto; width: 1240px; padding: 36px 52px; border-left: 0; border-top: 4px solid var(--accent-tv); }
+.tv-graphic-full h1 { font-size: 36px; margin-bottom: 26px; }
+.tv-stat-board { display: grid; }
+.tv-stat-board p { display: grid; grid-template-columns: 140px 1fr 140px; align-items: center; margin: 0; min-height: 72px; border-top: 1px solid #ffffff18; text-align: center; }
+.tv-stat-board p:nth-child(odd) { background: #ffffff04; }
+.tv-stat-board b { font-size: 30px; font-weight: 650; color: var(--paper); }
+.tv-stat-board span { font-size: 21px; color: var(--muted-tv); }
+.tv-lineup-list { display: grid; grid-auto-flow: column; grid-template-rows: repeat(6, auto); grid-template-columns: 1fr 1fr; column-gap: 40px; }
+.tv-lineup-list > span { display: flex; gap: 18px; align-items: center; padding: 12px 0; border-top: 1px solid #ffffff20; font-size: 23px; min-width: 0; }
+.tv-lineup-list > span > b { flex: 0 0 44px; padding: 6px 0; text-align: center; color: var(--accent-tv); background: #ffffff08; font-weight: 800; }
+.tv-lineup-list > span > span { overflow-wrap: anywhere; }
+/* Commercial ribbon remains inside title-safe margins. */
+.tv-sponsor-ribbon { position: absolute; left: 96px; bottom: 64px; width: 1728px; height: 152px; display: grid; grid-template-columns: 200px minmax(0, 1fr) 440px; align-items: center; background: var(--sponsor-bg, #101720); color: var(--sponsor-text, #fff); border-top: 3px solid var(--sponsor-accent, #e0b84d); box-shadow: 0 8px 25px #0003; animation: tv-enter 300ms ease-out both; }
+.tv-sponsor-logo { display: grid; place-items: center; padding: 16px 24px; height: 100%; border-right: 1px solid #ffffff25; }
+.tv-sponsor-logo img { width: 145px; height: 96px; }
+.tv-sponsor-logo b { font-size: 44px; font-weight: 650; }
+.tv-sponsor-copy { padding: 12px 28px; min-width: 0; }
+.tv-sponsor-copy > span { display: block; font-size: 12px; letter-spacing: .15em; color: var(--sponsor-accent, #e0b84d); }
+.tv-sponsor-copy strong { display: block; margin-top: 5px; font-size: 29px; font-weight: 650; }
+.tv-sponsor-copy b { display: block; margin-top: 4px; font-size: 20px; font-weight: 400; }
+.tv-sponsor-copy p { margin-top: 4px; font-size: 17px; }
+.tv-sponsor-copy strong, .tv-sponsor-copy b, .tv-sponsor-copy p { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tv-sponsor-details { display: grid; gap: 8px; border-left: 1px solid #ffffff25; padding: 12px 24px; }
+.tv-sponsor-detail { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 10px; align-items: center; }
+.tv-sponsor-detail span { font-size: 10px; letter-spacing: .08em; opacity: .7; }
+.tv-sponsor-detail b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 17px; font-weight: 500; }
+@keyframes tv-enter { from { opacity: 0; translate: 0 12px; } to { opacity: 1; translate: 0 0; } }
+.tv-overlay-preview *, .tv-overlay-preview *::before, .tv-overlay-preview *::after { animation: none !important; }
+@media (prefers-reduced-motion: reduce) { .tv-overlay-root * { animation: none !important; } }
+
+/* General transmissions share the same palette and safe margins as sports. */
+.tv-broadcast-card { position: absolute; left: 96px; bottom: 96px; width: 960px; padding: 28px 36px; border-left: 5px solid var(--accent-tv); background: var(--surface-tv); color: var(--paper); box-shadow: 0 10px 36px #0005, inset 0 1px #ffffff15; animation: tv-enter 280ms ease-out both; }
+.tv-broadcast-card h1 { margin: 12px 0 0; font-size: 42px; font-weight: 750; line-height: 1.2; overflow-wrap: anywhere; }
+.tv-broadcast-card p { margin: 12px 0 0; font-size: 25px; line-height: 1.4; color: var(--muted-tv); overflow-wrap: anywhere; }
+.tv-broadcast-card.tv-broadcast-full { left: 240px; top: 200px; bottom: auto; width: 1440px; min-height: 520px; padding: 40px 64px; border-left: 0; border-top: 4px solid var(--accent-tv); }
+.tv-broadcast-full h1 { font-size: 56px; margin-top: 18px; }
+.tv-broadcast-full p { font-size: 26px; max-width: 1160px; }
+.tv-broadcast-full h1, .tv-broadcast-full p { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.tv-broadcast-brand { display: flex; align-items: center; gap: 18px; margin-bottom: 28px; color: var(--muted-tv); font-size: 22px; letter-spacing: .05em; }
+.tv-broadcast-brand span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-broadcast-brand img { flex-shrink: 0; width: 44px; height: 44px; object-fit: contain; }
+.tv-broadcast-countdown { display: block; font-size: 88px; font-weight: 600; color: var(--accent-tv); line-height: 1.1; margin-top: 18px; }
+.tv-broadcast-notice { left: auto; right: 96px; bottom: auto; top: 64px; width: 650px; }
+.tv-broadcast-notice h1 { font-size: 31px; }
+.tv-broadcast-notice p { font-size: 22px; }
+.tv-with-sponsor > .tv-broadcast-lower { bottom: 258px; }
+
+/* Shared media canvas: media 0?100; existing dynamic graphics sit at level 10. */
+.tv-overlay-root { isolation: isolate; }
+.tv-overlay-root > :not(.tv-media-layer) { z-index: 10; }
+.tv-media-layer { position: absolute; background: transparent; overflow: hidden; }
+.tv-media-layer > img, .tv-media-layer > video { display: block; width: 100%; height: 100%; background: transparent; }
+.tv-media-copy { position: absolute; right: 20px; color: white; text-shadow: 0 2px 8px #0009; line-height: 1.15; overflow-wrap: anywhere; }
+.tv-media-copy strong, .tv-media-copy span { display: block; }
+.tv-media-copy span { margin-top: 8px; font-size: .55em; font-weight: 500; }
+.tv-media-error { position: absolute; top: 0; left: 0; background: #8c2233; color: white; padding: 16px; font-size: 24px; }
+
+.sponsor-deck { padding:22px; margin:20px 0; border:1px solid #36546a; border-radius:14px; background:#102333; }
+.sponsor-deck header { display:flex; justify-content:space-between; gap:18px; align-items:start; }
+.sponsor-deck h2 { margin:8px 0; font-size:21px; }
+.sponsor-deck p { color:#acc0d2; line-height:1.6; }
+.sponsor-deck fieldset { border:0; padding:0; margin:0; min-width:0; }
+.sponsor-deck-status { display:grid; gap:7px; padding:16px; margin:18px 0; background:#071727; border-left:3px solid #e6bb51; border-radius:8px; }
+.sponsor-deck-status span,.sponsor-deck-status small { color:#b6cddd; }
+.sponsor-deck-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.sponsor-deck-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:20px; }
+.sponsor-deck-brand { padding:16px; border:1px solid #36546a; border-radius:10px; }
+.sponsor-deck-brand.is-on-air { border-color:#e6bb51; background:#e6bb510a; }
+.sponsor-deck-brand-heading { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.sponsor-deck-brand-heading img { width:48px; height:48px; object-fit:contain; }
+.sponsor-deck-brand-heading div { min-width:0; }
+.sponsor-deck-brand h3 { margin:0 0 6px; font-size:16px; overflow-wrap:anywhere; }
+.sponsor-deck-brand small { color:#acc0d2; }
+.sponsor-deck-brand > div:last-child { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.tv-ad-logo { position:absolute; left:96px; bottom:64px; width:1728px; height:152px; z-index:60; display:flex; align-items:center; justify-content:center; gap:40px; padding:16px 48px; background:var(--ad-bg,#101720); color:var(--ad-text,#fff); border-top:3px solid var(--accent-tv,#e6bb51); box-shadow:0 8px 28px #0005; }
+.tv-ad-logo img { width:260px; height:116px; object-fit:contain; }
+.tv-ad-logo > div { min-width:0; max-width:1200px; }
+.tv-ad-logo strong { display:block; font-size:36px; font-weight:750; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tv-ad-logo span { display:block; font-size:23px; margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tv-ad-active > .tv-graphic:not(.tv-graphic-full),.tv-ad-active > .tv-broadcast-lower,.tv-ad-active > .tv-broadcast-notice { visibility:hidden; }
+@media(max-width:760px) { .sponsor-deck { padding:16px; } .sponsor-deck header { flex-direction:column; } .sponsor-deck header button { width:100%; } .sponsor-deck-actions,.sponsor-deck-grid { grid-template-columns:minmax(0,1fr); } .sponsor-deck-brand > div:last-child { grid-template-columns:minmax(0,1fr); } }
+.live-monitor-column { min-width:0; display:flex; flex-direction:column; gap:16px; align-self:start; position:sticky; top:16px; }
+.live-monitor-column .preview-panel { position:static; }
+.live-monitor-column .sponsor-deck { margin:0; padding:18px; }
+.sponsor-deck header { align-items:center; }
+.sponsor-deck header .outline { font-size:12px; min-height:40px; padding:8px 12px; flex-shrink:0; }
+.sponsor-deck h2 { font-size:18px; margin:6px 0 0; line-height:1.4; }
+.sponsor-deck-status { margin:14px 0; padding:12px; font-size:13px; }
+.sponsor-deck-actions { grid-template-columns:1fr 1fr; }
+.sponsor-deck-actions button { min-height:50px; font-size:13px; line-height:1.4; }
+.sponsor-deck-actions button:last-child { grid-column:1/-1; color:#ffc4c4; border-color:#784e58; background:#8a293012; }
+.sponsor-deck-grid { grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:10px; margin-top:12px; }
+.sponsor-deck-brand { padding:12px; background:#091b29; }
+.sponsor-deck-brand-heading { gap:10px; min-height:48px; margin-bottom:12px; }
+.sponsor-deck-brand h3 { font-size:14px; line-height:1.45; }
+.sponsor-deck-brand-heading img { width:40px; height:40px; padding:4px; background:#ffffff0a; border-radius:8px; }
+.sponsor-deck-brand button { font-size:12px; min-height:44px; line-height:1.4; padding:8px; }
+.sponsor-manual-controls { margin-top:18px; border-top:1px solid #2d465a; }
+.sponsor-manual-controls summary { padding:14px 0; min-height:44px; cursor:pointer; font-weight:700; font-size:13px; }
+.sponsor-manual-controls summary span { float:right; font-weight:400; color:#96aec2; }
+.deck > h2::before { width:8px; height:8px; border-radius:50%; }
+.preview-panel > h2 { font-size:16px; line-height:1.4; }
+.event-configuration .media-studio { grid-column:1/-1; margin-top:0; }
+@media(max-width:1200px) { .live-monitor-column { position:static; } }
+@media(max-width:760px) { .live-monitor-column { gap:12px; } .sponsor-deck header { flex-direction:row; align-items:center; } .sponsor-deck header button { width:auto; } .sponsor-deck-actions { grid-template-columns:1fr; } .sponsor-deck-grid { grid-template-columns:1fr; } }
+
+body { margin:0; padding:32px; background:#090f18; color:#edf3fa; font-family:Segoe UI,Arial,sans-serif; }
+h1 {font-size:26px;margin:0 0 8px} body>p{color:#9bafc3;margin:0 0 32px} h2 {font-size:16px;margin:0 0 12px} section{margin-bottom:28px}
+.stage{width:960px;height:540px;overflow:hidden;border:1px solid #ffffff20;background:repeating-linear-gradient(90deg,#293e36 0 120px,#2e463c 120px 240px);position:relative}
+.stage:before{content:'';position:absolute;inset:42px 60px;border:1px solid #ffffff25} .stage:after{content:'';position:absolute;left:50%;top:42px;bottom:42px;border-left:1px solid #ffffff25}
+.canvas{width:1920px;height:1080px;transform:scale(.5);transform-origin:top left;position:relative;z-index:1}
+</style><h1>Paquete gráfico · Copa de la Sierra</h1><p>Revisión visual con datos ficticios · lienzo 1920 × 1080 · fondo de referencia</p><section><h2>Marcador y gol</h2><div class="stage"><div class="canvas"><div class="tv-overlay-root tv-overlay-preview  " style="--primary:#173c58;--accent:#e9c46a;--background:#101c2a"><div class="tv-scorebug"><div class="tv-team-side"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>DNO</b></div><strong><span>2</span><i>:</i><span>1</span></strong><div class="tv-team-side tv-right"><b>AVA</b><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><span class="tv-clock"><b>67:12</b><small>2T</small></span></div><div class="tv-channel-bug">IMBABURA<br/><b>EN VIVO</b></div><section class="tv-graphic   " data-event="gol"><span class="tv-graphic-kicker">GOL</span><h1>A. Valencia</h1><p class="tv-graphic-detail">Deportivo del Norte</p><div class="tv-graphic-bar"></div></section></div></div></div></section><section><h2>Presentación</h2><div class="stage"><div class="canvas"><div class="tv-overlay-root tv-overlay-preview  " style="--primary:#173c58;--accent:#e9c46a;--background:#101c2a"><div class="tv-scorebug"><div class="tv-team-side"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>DNO</b></div><strong><span>2</span><i>:</i><span>1</span></strong><div class="tv-team-side tv-right"><b>AVA</b><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><span class="tv-clock"><b>67:12</b><small>2T</small></span></div><div class="tv-channel-bug">IMBABURA<br/><b>EN VIVO</b></div><section class="tv-opening-card"><span class="tv-opening-kicker">Jornada 08</span><p>Copa de la Sierra</p><div class="tv-opening-matchup"><div><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>Deportivo del Norte</b></div><strong>VS</strong><div><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>Atlético del Valle</b></div></div><footer>Estadio de la Sierra</footer></section></div></div></div></section><section><h2>Resultado final</h2><div class="stage"><div class="canvas"><div class="tv-overlay-root tv-overlay-preview  " style="--primary:#173c58;--accent:#e9c46a;--background:#101c2a"><div class="tv-scorebug"><div class="tv-team-side"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>DNO</b></div><strong><span>2</span><i>:</i><span>1</span></strong><div class="tv-team-side tv-right"><b>AVA</b><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><span class="tv-clock"><b>67:12</b><small>2T</small></span></div><div class="tv-channel-bug">IMBABURA<br/><b>EN VIVO</b></div><section class="tv-match-showcase-card tv-is-final"><header class="tv-match-showcase-header"><span>Copa de la Sierra</span><strong>RESULTADO FINAL</strong></header><div class="tv-match-showcase-body"><div class="tv-match-showcase-team"><div class="tv-match-showcase-crest"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><b>Deportivo del Norte</b></div><div class="tv-match-showcase-score"><strong>2</strong><div class="tv-match-showcase-divider"><i>—</i><b>FINAL</b></div><strong>1</strong><span>FINAL DEL PARTIDO</span></div><div class="tv-match-showcase-team"><div class="tv-match-showcase-crest"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><b>Atlético del Valle</b></div></div><footer class="tv-match-showcase-footer"><span>Jornada 08</span><b>Estadio de la Sierra</b></footer></section></div></div></div></section><section><h2>Estadísticas</h2><div class="stage"><div class="canvas"><div class="tv-overlay-root tv-overlay-preview  " style="--primary:#173c58;--accent:#e9c46a;--background:#101c2a"><div class="tv-scorebug"><div class="tv-team-side"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>DNO</b></div><strong><span>2</span><i>:</i><span>1</span></strong><div class="tv-team-side tv-right"><b>AVA</b><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><span class="tv-clock"><b>67:12</b><small>2T</small></span></div><div class="tv-channel-bug">IMBABURA<br/><b>EN VIVO</b></div><section class="tv-graphic tv-graphic-full"><span class="tv-graphic-kicker">ESTADÍSTICAS DEL PARTIDO</span><h1>Deportivo del Norte <em>vs</em> Atlético del Valle</h1><div class="tv-stat-board"><p><b>58%</b><span>Posesión</span><b>42%</b></p><p><b>12</b><span>Remates</span><b>8</b></p><p><b>6</b><span>Al arco</span><b>3</b></p><p><b>5</b><span>Corners</span><b>2</b></p><p><b>8</b><span>Faltas</span><b>11</b></p></div><div class="tv-graphic-bar"></div></section></div></div></div></section><section><h2>Alineación</h2><div class="stage"><div class="canvas"><div class="tv-overlay-root tv-overlay-preview  " style="--primary:#173c58;--accent:#e9c46a;--background:#101c2a"><div class="tv-scorebug"><div class="tv-team-side"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>DNO</b></div><strong><span>2</span><i>:</i><span>1</span></strong><div class="tv-team-side tv-right"><b>AVA</b><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><span class="tv-clock"><b>67:12</b><small>2T</small></span></div><div class="tv-channel-bug">IMBABURA<br/><b>EN VIVO</b></div><section class="tv-graphic tv-graphic-full  tv-lineup" data-event="alineacion_local"><span class="tv-graphic-kicker">ALINEACIÓN LOCAL</span><h1>Deportivo del Norte</h1><div class="tv-lineup-list"><span><b>1</b><span>D. Herrera</span></span><span><b>2</b><span>M. López</span></span><span><b>3</b><span>A. Andrade</span></span><span><b>4</b><span>J. Torres</span></span><span><b>5</b><span>R. Molina</span></span><span><b>6</b><span>S. Castro</span></span><span><b>7</b><span>E. Paredes</span></span><span><b>8</b><span>L. Cevallos</span></span><span><b>9</b><span>N. Rojas</span></span><span><b>10</b><span>A. Valencia</span></span><span><b>11</b><span>F. Benítez</span></span></div><div class="tv-graphic-bar"></div></section></div></div></div></section><section><h2>Identificación</h2><div class="stage"><div class="canvas"><div class="tv-overlay-root tv-overlay-preview  " style="--primary:#173c58;--accent:#e9c46a;--background:#101c2a"><div class="tv-scorebug"><div class="tv-team-side"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23315b96%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EDNO%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/><b>DNO</b></div><strong><span>2</span><i>:</i><span>1</span></strong><div class="tv-team-side tv-right"><b>AVA</b><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22120%22%20height%3D%22140%22%20viewBox%3D%220%200%20120%20140%22%3E%3Cpath%20fill%3D%22%23a3464c%22%20stroke%3D%22%23ffffff%22%20stroke-width%3D%223%22%20d%3D%22M6%206h108v76q-4%2036-54%2052Q10%20118%206%2082Z%22%2F%3E%3Cpath%20fill%3D%22%23ffffff%22%20opacity%3D%22.2%22%20d%3D%22M44%208h32v114H44z%22%2F%3E%3Ctext%20x%3D%2260%22%20y%3D%2278%22%20text-anchor%3D%22middle%22%20fill%3D%22white%22%20font-family%3D%22Arial%22%20font-size%3D%2224%22%20font-weight%3D%22bold%22%3EAVA%3C%2Ftext%3E%3C%2Fsvg%3E" alt=""/></div><span class="tv-clock"><b>67:12</b><small>2T</small></span></div><div class="tv-channel-bug">IMBABURA<br/><b>EN VIVO</b></div><section class="tv-graphic  tv-graphic-lower " data-event="narradores"><span class="tv-graphic-kicker">NARRACIÓN</span><h1>Equipo de transmisión</h1><div class="tv-graphic-bar"></div></section></div></div></div></section></html>

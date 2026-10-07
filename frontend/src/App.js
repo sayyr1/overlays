@@ -419,13 +419,7 @@ function ClockControl({ snapshot, control, disabled }) {
         <strong>{value}</strong>
         <small>{clock?.period || "Primer tiempo"}</small>
       </div>
-      <div className="clock-actions">
-        <button disabled={disabled} onClick={() => adjust(-60)}>
-          −1 min
-        </button>
-        <button disabled={disabled} onClick={() => adjust(-10)}>
-          −10 s
-        </button>
+      <div className="clock-primary">
         <button
           disabled={disabled}
           className={running ? "clock-running" : "clock-start"}
@@ -433,56 +427,68 @@ function ClockControl({ snapshot, control, disabled }) {
         >
           {running ? "Ⅱ Pausar" : "▶ Iniciar"}
         </button>
-        <button disabled={disabled} onClick={() => adjust(10)}>
-          +10 s
-        </button>
-        <button disabled={disabled} onClick={() => adjust(60)}>
-          +1 min
-        </button>
-        <button disabled={disabled} onClick={correct}>
-          Corregir
-        </button>
-        <button
-          disabled={disabled}
-          onClick={() => {
-            if (window.confirm("¿Reiniciar el cronómetro?"))
-              control("clock_reset");
-          }}
-        >
-          Reiniciar
-        </button>
       </div>
-      <div className="period-actions">
-        {[
-          ["Primer tiempo", "1T"],
-          ["Segundo tiempo", "2T"],
-          ["Prórroga", "Extra"],
-          ["Penales", "Penales"],
-        ].map(([period, label]) => (
+      <details className="clock-adjustments">
+        <summary>Ajustar tiempo y período</summary>
+        <div className="clock-actions">
+          <button disabled={disabled} onClick={() => adjust(-60)}>
+            −1 min
+          </button>
+          <button disabled={disabled} onClick={() => adjust(-10)}>
+            −10 s
+          </button>
+
+          <button disabled={disabled} onClick={() => adjust(10)}>
+            +10 s
+          </button>
+          <button disabled={disabled} onClick={() => adjust(60)}>
+            +1 min
+          </button>
+          <button disabled={disabled} onClick={correct}>
+            Corregir
+          </button>
           <button
-            key={period}
             disabled={disabled}
-            className={clock?.period === period ? "period-active" : ""}
+            onClick={() => {
+              if (window.confirm("¿Reiniciar el cronómetro?"))
+                control("clock_reset");
+            }}
+          >
+            Reiniciar
+          </button>
+        </div>
+        <div className="period-actions">
+          {[
+            ["Primer tiempo", "1T"],
+            ["Segundo tiempo", "2T"],
+            ["Prórroga", "Extra"],
+            ["Penales", "Penales"],
+          ].map(([period, label]) => (
+            <button
+              key={period}
+              disabled={disabled}
+              className={clock?.period === period ? "period-active" : ""}
+              onClick={() =>
+                control("period", {
+                  period,
+                  status: period === "Penales" ? "en_vivo" : "en_vivo",
+                })
+              }
+            >
+              {label}
+            </button>
+          ))}
+          <button
+            disabled={disabled}
+            className={clock?.addedTime ? "period-active" : ""}
             onClick={() =>
-              control("period", {
-                period,
-                status: period === "Penales" ? "en_vivo" : "en_vivo",
-              })
+              control("added_time", { minutes: clock?.addedTime ? 0 : 1 })
             }
           >
-            {label}
+            +{clock?.addedTime || 0}' añadido
           </button>
-        ))}
-        <button
-          disabled={disabled}
-          className={clock?.addedTime ? "period-active" : ""}
-          onClick={() =>
-            control("added_time", { minutes: clock?.addedTime ? 0 : 1 })
-          }
-        >
-          +{clock?.addedTime || 0}' añadido
-        </button>
-      </div>
+        </div>
+      </details>
     </section>
   );
 }
@@ -1199,23 +1205,6 @@ function Dashboard({ admin, setAdmin }) {
             <section className="live-layout">
               <div className="deck">
                 <h2>Control en vivo</h2>
-                <div className="scene-row">
-                  {[
-                    ["inicio", "Inicio"],
-                    ["juego", "Partido en juego"],
-                    ["descanso", "Medio tiempo"],
-                    ["segundo_tiempo", "Segundo tiempo"],
-                    ["final", "Final del partido"],
-                  ].map(([key, label]) => (
-                    <button
-                      key={key}
-                      className="scene"
-                      onClick={() => control("preset", { preset: key })}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
                 <ClockControl
                   snapshot={snapshot}
                   control={control}
@@ -1226,6 +1215,26 @@ function Dashboard({ admin, setAdmin }) {
                   control={control}
                   disabled={!activeMatch}
                 />
+                <details className="match-presets">
+                  <summary>Fases del partido</summary>
+                  <div className="scene-row">
+                    {[
+                      ["inicio", "Inicio"],
+                      ["juego", "Partido en juego"],
+                      ["descanso", "Medio tiempo"],
+                      ["segundo_tiempo", "Segundo tiempo"],
+                      ["final", "Final del partido"],
+                    ].map(([key, label]) => (
+                      <button
+                        key={key}
+                        className="scene"
+                        onClick={() => control("preset", { preset: key })}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </details>
                 <details className="secondary-controls">
                   <summary>Estadísticas del partido</summary>
                   <StatsControl snapshot={snapshot} control={control} disabled={!activeMatch} />
@@ -1233,7 +1242,7 @@ function Dashboard({ admin, setAdmin }) {
                 <section className="cue-console" aria-label="Cola de gráficos">
                   <div className="cue-console-heading">
                     <div>
-                      <span>VISTA PREVIA · SIGUIENTE GRAFICO</span>
+                      <span>SIGUIENTE GRÁFICO</span>
                       <h3>{selectedCue ? selectedCue.label : "Cola vacía"}</h3>
                     </div>
                     <b>{cueList.length} EN COLA</b>

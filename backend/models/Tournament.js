@@ -24,6 +24,11 @@ const tournamentSchema = new mongoose.Schema({
   startDate: Date,
   endDate: Date,
   logo: mediaSchema,
+  replayBranding: {
+    asset: { type: mongoose.Schema.Types.Mixed, default: null },
+    placement: { type: String, enum: ['corner', 'overlay', 'intro'], default: 'corner' },
+    showLabel: { type: Boolean, default: true },
+  },
   active: { type: Boolean, default: true },
   colors: {
     primary: { type: String, default: '#0B2E59' }, secondary: { type: String, default: '#FFFFFF' },

@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const command = new mongoose.Schema({ id: String, kind: { type: String, default: 'audio' }, action: String, clipId: String, tournamentId: String, inputName: String, muted: Boolean, volumePercent: Number, expiresAt: Date }, { _id: false });
+const command = new mongoose.Schema({ id: String, kind: { type: String, default: 'audio' }, action: String, clipId: String, tournamentId: String, branding: mongoose.Schema.Types.Mixed, inputName: String, muted: Boolean, volumePercent: Number, expiresAt: Date }, { _id: false });
 const schema = new mongoose.Schema({
   key: { type: String, default: 'home', unique: true },
   tokenHash: { type: String, select: false },

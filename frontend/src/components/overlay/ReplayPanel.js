@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './replay.css';
 
-export default function ReplayPanel({ tournament, api }) {
+export default function ReplayPanel({ tournament, api, onConfigure }) {
   const [status, setStatus] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -28,6 +28,7 @@ export default function ReplayPanel({ tournament, api }) {
   const clips = (replay.clips || []).filter(clip => clip.tournamentId === tournament._id);
   return <section className="replay-panel" aria-label="Control de repeticiones"><header><div><span className="eyebrow">REPETICIONES</span><h2>Jugada a jugada</h2></div><span className={`replay-signal ${replay.bufferActive ? 'is-active' : ''}`}>{!status?.connected ? 'Sin conexión' : !hasReplayStatus ? 'Estado no disponible' : replay.playingClipId ? 'REPETICIÓN EN AIRE' : replay.bufferActive ? 'Capturando' : 'Búfer detenido'}</span></header>
     {(error || replay.error) && <p className="brand-error" role="alert">{error || replay.error}</p>}
+    {onConfigure && <button className="outline replay-configure" onClick={onConfigure}>Logo y animación</button>}
     {!status?.connected && <p className="replay-help">{status?.message || 'Comprobando el puente de casa…'}</p>}
     {status?.connected && !hasReplayStatus && <p className="replay-help" role="status">El servidor o el puente de casa necesita actualizarse para informar las repeticiones. Si usas localhost, reinicia el backend con la versión actual.</p>}
     {status?.connected && replay.bufferAvailable === false && <p className="replay-help">Habilita el búfer de repetición en Ajustes → Salida de OBS. La duración se configura allí; recomendamos 20 segundos.</p>}

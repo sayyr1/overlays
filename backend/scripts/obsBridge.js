@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { OBSWebSocket, EventSubscription } from 'obs-websocket-js';
 import { ObsBridgeRuntime } from '../services/obsBridgeRuntime.js';
 import { ReplayControl } from '../services/obsReplay.js';
+import { cacheReplayAsset } from '../services/replayAssets.js';
 
 const backend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const configArg = process.argv.indexOf('--config');
@@ -74,7 +75,7 @@ async function main() {
     obs.once('ReplayBufferSaved', handler);
     timer = setTimeout(() => reject(new Error('OBS tardó demasiado en guardar la jugada.')), 12000);
     return { promise, cancel: () => { clearTimeout(timer); obs.off('ReplayBufferSaved', handler); } };
-  });
+  }, asset => cacheReplayAsset(asset, path.join(backend, '.obs-replay-assets')));
   // A previous pairing may have been replaced; restore first instead of applying
   // a cached advertisement from that pairing to a different production.
   const pairing = crypto.createHash('sha256').update(config.token).digest('hex');
@@ -87,7 +88,7 @@ async function main() {
       try {
         const [volume, mute] = await Promise.all([deadline(obs.call('GetInputVolume', { inputName: runtime.state.inputName })), deadline(obs.call('GetInputMute', { inputName: runtime.state.inputName }))]);
         return { connected: true, sourceAvailable: true, inputName: runtime.state.inputName, inputs: inputs.map(input => input.inputName), muted: mute.inputMuted, volumePercent: Math.round((runtime.state.restoreVolume ?? volume.inputVolumeMul) * 100), outputPercent: Math.round(volume.inputVolumeMul * 100), ducking: runtime.ducking() && runtime.state.restoreVolume != null, message, replay: await replay.report() };
-      } catch { return { connected: true, sourceAvailable: false, inputName: runtime.state.inputName, inputs: inputs.map(input => input.inputName), message: `No se encontró la fuente ${runtime.state.inputName}. Selecciónala desde la app.` }; }
+      } catch { return { connected: true, sourceAvailable: false, inputName: runtime.state.inputName, inputs: inputs.map(input => input.inputName), message: `No se encontró la fuente ${runtime.state.inputName}. Selecciónala desde la app.`, replay: await replay.report() }; }
     } catch (error) { return { connected: false, inputName: runtime.state.inputName, message: error.message }; }
   };
   const timer = setInterval(() => serial(async () => {

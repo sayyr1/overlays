@@ -29,3 +29,4 @@ Thumbs.db
 
 # OBS bridge credentials and recovery state stay on the home computer.
 backend/.obs-bridge*
+backend/.obs-replay-assets/

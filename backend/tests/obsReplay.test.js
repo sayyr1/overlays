@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ReplayControl } from '../services/obsReplay.js';
 
-function fixture(state = {}) {
+function fixture(state = {}, loadAsset) {
   let scene = 'LIVE', mediaState = 'OBS_MEDIA_STATE_PLAYING';
   const calls = [], saved = [];
   const replay = new ReplayControl(async (name, args) => {
@@ -20,7 +20,7 @@ function fixture(state = {}) {
     if (name === 'GetMediaInputStatus') return { mediaState, mediaDuration: 20000 };
     if (name === 'GetReplayBufferStatus') return { outputActive: true };
     return {};
-  }, async next => saved.push(next), state);
+  }, async next => saved.push(next), state, undefined, loadAsset);
   return { replay, calls, saved, scene: () => scene, changeScene: value => { scene = value; }, end: () => { mediaState = 'OBS_MEDIA_STATE_ENDED'; } };
 }
 async function clipFile(t) {
@@ -67,4 +67,35 @@ test('a disconnected OBS keeps the previous scene for recovery after restart', a
   assert.equal(f.replay.state.playback.previousScene, 'LIVE');
   f.replay.call = call; await f.replay.finish();
   assert.equal(f.scene(), 'LIVE');
+});
+
+test('custom graphics use cached local files, stay muted and hide duplicate labels', async t => {
+  const localPath = await clipFile(t);
+  const f = fixture({ clips: [{ id: 'clip', tournamentId: 'event', localPath }] }, async () => localPath);
+  await f.replay.play({ clipId: 'clip', tournamentId: 'event', branding: { asset: { kind: 'video' }, placement: 'overlay', showLabel: false } });
+  const input = f.calls.find(c => c.name === 'CreateInput' && c.args.inputName.includes('_MOTION_'));
+  assert.equal(input.args.inputSettings.local_file, localPath);
+  assert.equal(input.args.inputSettings.looping, true);
+  assert(f.calls.some(c => c.name === 'SetInputMute' && c.args.inputName.includes('_MOTION_') && c.args.inputMuted));
+  assert.equal(f.replay.state.playback.graphic.showLabel, false);
+});
+
+test('intro completes before the clip starts and clip completion returns to live', async t => {
+  const localPath = await clipFile(t);
+  const f = fixture({ clips: [{ id: 'clip', tournamentId: 'event', localPath }] }, async () => localPath);
+  await f.replay.play({ clipId: 'clip', tournamentId: 'event', branding: { asset: { kind: 'video', duration: 1 }, placement: 'intro', showLabel: false } });
+  assert.equal(f.replay.state.playback.stage, 'intro');
+  assert(!f.calls.some(c => c.name === 'TriggerMediaInputAction' && c.args.inputName === f.replay.source && c.args.mediaAction.endsWith('_RESTART')));
+  f.end(); await f.replay.tick();
+  assert.equal(f.replay.state.playback.stage, 'clip');
+  assert.equal(f.scene(), f.replay.scene);
+  assert(f.calls.some(c => c.name === 'TriggerMediaInputAction' && c.args.inputName === f.replay.source && c.args.mediaAction.endsWith('_RESTART')));
+  await f.replay.tick(); assert.equal(f.scene(), 'LIVE');
+});
+
+test('graphic download failure leaves the live scene and recovery state unchanged', async t => {
+  const localPath = await clipFile(t);
+  const f = fixture({ clips: [{ id: 'clip', tournamentId: 'event', localPath }] }, async () => { throw new Error('download failed'); });
+  await assert.rejects(f.replay.play({ clipId: 'clip', tournamentId: 'event', branding: { asset: { kind: 'video' } } }), /download failed/);
+  assert.equal(f.scene(), 'LIVE'); assert.equal(f.replay.state.playback, null);
 });

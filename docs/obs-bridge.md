@@ -49,6 +49,10 @@ En otras plataformas, o si OBS usa una configuración portable, define `OBS_WEBS
 
 ## Repeticiones
 
+En **Configuración del evento → Repeticiones** puedes subir un PNG/WebP/JPG o un WebM/MP4, reutilizar archivos de la biblioteca y guardar la identidad de ese evento. **Entrada** reproduce una animación de hasta 10 segundos antes de la jugada. **Gráfico sobre toda la repetición** usa el lienzo completo y repite el video durante el clip; exporta WebM con canal alfa para dejar visible la jugada. **Logo en la esquina** ajusta el recurso a 300 × 160 sin deformarlo. Desactiva el rótulo adicional de OBS si tu animación ya incluye “REPETICIÓN”. Los gráficos personalizados van silenciados, conservando el audio de la jugada.
+
+El puente descarga el gráfico de Cloudinary a `backend/.obs-replay-assets/` la primera vez que se utiliza y luego lo reproduce desde la PC. Una descarga fallida deja la escena de directo en aire y muestra el error en la web. Los cambios guardados se aplican en la siguiente reproducción; no modifican una repetición que ya esté en aire.
+
 En OBS habilita **Ajustes → Salida → Búfer de repetición**, configura la duración (por ejemplo, 20 segundos) y aplica. En la pestaña **Repeticiones** de la web, pulsa **Iniciar captura**. Después de una acción, **Guardar jugada** conserva los últimos segundos en la carpeta de grabaciones de OBS. Los archivos permanecen en la PC y la web muestra hasta 50 clips identificados por evento y hora; no se suben a Vercel ni se eliminan al salir del panel.
 
 **Reproducir** cambia a una escena propia del puente, ajusta el clip al lienzo de OBS y muestra «REPETICIÓN». Conserva el audio original del clip. El puente vuelve a la escena anterior al terminar o al pulsar **Volver al directo**, incluso sin nuevos mensajes de Vercel. Si cambias manualmente a otra escena en OBS, respeta esa elección. No permite guardar mientras reproduce para evitar capturar la misma repetición.

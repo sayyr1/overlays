@@ -6,12 +6,14 @@ import router from '../routes/obsReplay.js';
 import SportsAdmin from '../models/SportsAdmin.js';
 import Tournament from '../models/Tournament.js';
 import ObsBridge from '../models/ObsBridge.js';
+import MediaAsset from '../models/MediaAsset.js';
 
 test('replay commands are authenticated, event-scoped and never accept file paths', async t => {
   const previous = process.env.JWT_SECRET; process.env.JWT_SECRET = 'replay-route-test';
   t.after(() => { if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous; });
   t.mock.method(SportsAdmin, 'findById', async () => ({ active: true }));
   t.mock.method(Tournament, 'exists', async () => true);
+  t.mock.method(Tournament, 'findById', () => ({ lean: async () => ({ replayBranding: { placement: 'corner', showLabel: true } }) }));
   const event = '012345678901234567890123';
   const bridge = { heartbeatAt: new Date(), status: { connected: true, replay: { clips: [{ id: 'clip', tournamentId: event }] } }, commands: [] };
   let command;
@@ -33,4 +35,28 @@ test('replay commands are authenticated, event-scoped and never accept file path
   assert.equal(command.clipId, 'clip');
   assert.equal('localPath' in command, false);
   assert.equal('sceneName' in command, false);
+});
+
+test('event replay branding trusts library metadata and limits intro duration', async t => {
+  const previous = process.env.JWT_SECRET; process.env.JWT_SECRET = 'branding-test';
+  t.after(() => { if (previous === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previous; });
+  t.mock.method(SportsAdmin, 'findById', async () => ({ active: true }));
+  let duration = 15, saved;
+  const id = '012345678901234567890123';
+  t.mock.method(MediaAsset, 'findById', () => ({ lean: async () => ({ _id: id, name: 'Logo', format: 'mp4', kind: 'video', duration, secureUrl: 'trusted-library-url' }) }));
+  t.mock.method(Tournament, 'findByIdAndUpdate', (eventId, update) => ({ lean: async () => { saved = update.$set.replayBranding; return { replayBranding: saved }; } }));
+  const app = express(); app.use(express.json()); app.use(router);
+  const server = app.listen(0, '127.0.0.1'); await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const url = `http://127.0.0.1:${server.address().port}/tournaments/${id}/replay-branding`;
+  assert.equal((await fetch(url)).status, 401);
+  const headers = { Authorization: `Bearer ${jwt.sign({ sub: id }, process.env.JWT_SECRET)}`, 'Content-Type': 'application/json' };
+  const send = body => fetch(url, { method: 'PUT', headers, body: JSON.stringify(body) });
+  assert.equal((await send({ assetId: id, placement: 'intro', showLabel: false })).status, 400);
+  duration = 2;
+  assert.equal((await send({ assetId: id, placement: 'intro', showLabel: false, secureUrl: 'untrusted' })).status, 200);
+  assert.equal(saved.asset.secureUrl, 'trusted-library-url');
+  assert.equal(saved.showLabel, false);
+  assert.equal((await send({ assetId: null, placement: 'corner', showLabel: true })).status, 200);
+  assert.equal(saved.asset, null);
 });

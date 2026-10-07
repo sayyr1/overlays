@@ -128,6 +128,18 @@ export class ReplayControl {
       else if (command.action === 'save') await this.capture(command);
       else if (command.action === 'play') await this.play(command);
       else if (command.action === 'stop') await this.finish();
+      else if (['rename', 'delete'].includes(command.action)) {
+        const clip = this.state.clips.find(c => c.id === command.clipId && c.tournamentId === command.tournamentId);
+        if (!clip) throw new Error('La jugada ya no está disponible en este evento.');
+        if (command.action === 'rename') {
+          if (typeof command.name !== 'string' || !command.name.trim() || command.name.trim().length > 80) throw new Error('Escribe un nombre de 1 a 80 caracteres.');
+          await this.persist({ clips: this.state.clips.map(c => c === clip ? { ...c, name: command.name.trim() } : c) });
+        } else {
+          if (this.state.playback?.clipId === clip.id) throw new Error('Vuelve al directo antes de eliminar la jugada en aire.');
+          // Remove from the web library, retaining the original OBS recording.
+          await this.persist({ clips: this.state.clips.filter(c => c !== clip) });
+        }
+      }
       else throw new Error('Acción de repetición no válida.');
       await this.persist({ error: '' });
     } catch (error) { await this.persist({ error: /Replay buffer is not available/i.test(error.message) ? 'Habilita el búfer de repetición en Ajustes → Salida de OBS.' : error.message }); }
@@ -135,6 +147,6 @@ export class ReplayControl {
   async report() {
     let bufferAvailable = true, bufferActive = false;
     try { bufferActive = (await this.call('GetReplayBufferStatus')).outputActive; } catch { bufferAvailable = false; }
-    return { bufferAvailable, bufferActive, playingClipId: this.state.playback?.clipId || null, error: this.state.error, clips: this.state.clips.map(({ id, tournamentId, savedAt }) => ({ id, tournamentId, savedAt })) };
+    return { bufferAvailable, bufferActive, playingClipId: this.state.playback?.clipId || null, error: this.state.error, clips: this.state.clips.map(({ id, tournamentId, savedAt, name }) => ({ id, tournamentId, savedAt, name })) };
   }
 }

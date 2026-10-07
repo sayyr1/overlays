@@ -36,13 +36,16 @@ router.put('/tournaments/:id/replay-branding', requireSportsAdmin, async (req, r
 });
 router.post('/obs/replay/control', requireSportsAdmin, async (req, res, next) => {
   try {
-    const { action, tournamentId, clipId } = req.body || {};
-    if (!['start', 'stop_buffer', 'save', 'play', 'stop'].includes(action)) return res.status(400).json({ message: 'Acción de repetición no válida.' });
+    const { action, tournamentId, clipId, name } = req.body || {};
+    if (!['start', 'stop_buffer', 'save', 'play', 'stop', 'rename', 'delete'].includes(action)) return res.status(400).json({ message: 'Acción de repetición no válida.' });
+    if (action === 'rename' && (typeof name !== 'string' || !name.trim() || name.trim().length > 80)) return res.status(400).json({ message: 'Escribe un nombre de 1 a 80 caracteres.' });
     if (!/^[a-f\d]{24}$/i.test(String(tournamentId)) || !await Tournament.exists({ _id: tournamentId })) return res.status(400).json({ message: 'Evento no válido.' });
     const bridge = await getBridge();
     if (!bridgeFresh(bridge) || !bridge.status?.connected || !bridge.status.replay) return res.status(503).json({ message: 'El puente de repeticiones no está conectado. Comprueba OBS y actualiza el puente de casa.' });
-    if (action === 'play' && !(bridge.status.replay.clips || []).some(clip => clip.id === clipId && clip.tournamentId === tournamentId)) return res.status(400).json({ message: 'Selecciona una jugada guardada de este evento.' });
-    const command = { id: crypto.randomUUID(), kind: 'replay', action, tournamentId, ...(action === 'play' ? { clipId } : {}), expiresAt: new Date(Date.now() + 20000) };
+    const clipAction = ['play', 'rename', 'delete'].includes(action);
+    if (clipAction && !(bridge.status.replay.clips || []).some(clip => clip.id === clipId && clip.tournamentId === tournamentId)) return res.status(400).json({ message: 'Selecciona una jugada guardada de este evento.' });
+    if (action === 'delete' && bridge.status.replay.playingClipId === clipId) return res.status(409).json({ message: 'Vuelve al directo antes de eliminar la jugada en aire.' });
+    const command = { id: crypto.randomUUID(), kind: 'replay', action, tournamentId, ...(clipAction ? { clipId } : {}), ...(action === 'rename' ? { name: name.trim() } : {}), expiresAt: new Date(Date.now() + 20000) };
     if (action === 'play') command.branding = (await Tournament.findById(tournamentId).lean())?.replayBranding || null;
     const updated = await ObsBridge.findOneAndUpdate({ key: 'home' }, { $push: { commands: { $each: [command], $slice: -30 } } }, { new: true }).select('+tokenHash').lean();
     res.json(remoteAudioView(updated));

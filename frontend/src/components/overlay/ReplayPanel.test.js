@@ -27,3 +27,26 @@ test('saving and playing use the event and registered clip, with separate return
   fireEvent.click(screen.getByRole('button', { name: 'Volver al directo' }));
   await waitFor(() => expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(3));
 });
+
+test('clip menu renames a scoped clip and requires a second action to delete it', async () => {
+  const status = { connected: true, replay: { bufferAvailable: true, bufferActive: true, clips: [{ id: 'clip', name: 'Gol 24', tournamentId: 'event', savedAt: new Date().toISOString() }] } };
+  const api = jest.fn(async () => status);
+  render(<ReplayPanel tournament={{ _id: 'event' }} api={api} />);
+  await screen.findByText('Gol 24');
+  fireEvent.click(screen.getByRole('button', { name: 'Opciones de Gol 24' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Renombrar' }));
+  fireEvent.change(screen.getByLabelText('Nombre de la jugada'), { target: { value: '  Penal atajado  ' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Guardar nombre' }));
+  await waitFor(() => expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(1));
+  expect(JSON.parse(api.mock.calls.find(c => c[1]?.method)[1].body)).toEqual({ action: 'rename', tournamentId: 'event', clipId: 'clip', name: 'Penal atajado' });
+  await waitFor(() => expect(screen.queryByLabelText('Nombre de la jugada')).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button', { name: 'Opciones de Gol 24' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+  expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(1);
+  expect(screen.getByText(/El archivo original se conserva/)).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }));
+  await waitFor(() => expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(2));
+  expect(JSON.parse(api.mock.calls.filter(c => c[1]?.method)[1][1].body)).toEqual({ action: 'delete', tournamentId: 'event', clipId: 'clip' });
+});

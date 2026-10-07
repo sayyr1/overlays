@@ -9,7 +9,18 @@
 .replay-return { grid-column:1/-1; }
 .replay-help { color:#a9bed1; font-size:12px; line-height:1.6; }
 .replay-list { display:grid; gap:10px; max-height:360px; overflow:auto; }
-.replay-list article { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px; border:1px solid #2d465a; border-radius:10px; background:#091b29; }
+.replay-list article { display:block; padding:12px; border:1px solid #2d465a; border-radius:10px; background:#091b29; }
+.replay-clip-main { display:flex; align-items:center; gap:8px; }
+.replay-clip-title { flex:1; min-width:0; }
+.replay-clip-title strong { overflow-wrap:anywhere; }
+.replay-list .replay-more { width:44px; padding:0; flex-shrink:0; font-size:24px; }
+.replay-clip-options { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.replay-clip-options .replay-delete { color:#ff9b91; border-color:#a85251; }
+.replay-clip-edit { border-top:1px solid #2d465a; padding-top:12px; margin-top:12px; }
+.replay-clip-edit label { display:grid; gap:8px; font-size:12px; }
+.replay-clip-edit input { width:100%; box-sizing:border-box; }
+.replay-clip-edit p { font-size:13px; line-height:1.6; margin:0; overflow-wrap:anywhere; }
+.replay-clip-options .replay-delete-confirm { background:#e96153; color:#101c2a; }
 .replay-list article.is-on-air { border-color:#e6bb51; }
 .replay-list strong,.replay-list small { display:block; font-size:13px; }
 .replay-list small { color:#9cb2c5; margin-top:6px; }

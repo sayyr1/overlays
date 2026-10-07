@@ -35,6 +35,17 @@ test('replay commands are authenticated, event-scoped and never accept file path
   assert.equal(command.clipId, 'clip');
   assert.equal('localPath' in command, false);
   assert.equal('sceneName' in command, false);
+  assert.equal((await send({ action: 'rename', tournamentId: event, clipId: 'clip', name: '  Gol 24  ' })).status, 200);
+  assert.equal(command.name, 'Gol 24');
+  assert.equal((await send({ action: 'rename', tournamentId: event, clipId: 'clip', name: '  ' })).status, 400);
+  assert.equal((await send({ action: 'rename', tournamentId: event, clipId: 'clip', name: 'a'.repeat(81) })).status, 400);
+  assert.equal((await send({ action: 'delete', tournamentId: '112345678901234567890123', clipId: 'clip' })).status, 400);
+  bridge.status.replay.playingClipId = 'clip';
+  assert.equal((await send({ action: 'delete', tournamentId: event, clipId: 'clip' })).status, 409);
+  bridge.status.replay.playingClipId = null;
+  assert.equal((await send({ action: 'delete', tournamentId: event, clipId: 'clip', localPath: 'untrusted' })).status, 200);
+  assert.equal(command.action, 'delete');
+  assert.equal('localPath' in command, false);
 });
 
 test('event replay branding trusts library metadata and limits intro duration', async t => {

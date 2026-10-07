@@ -99,3 +99,22 @@ test('graphic download failure leaves the live scene and recovery state unchange
   await assert.rejects(f.replay.play({ clipId: 'clip', tournamentId: 'event', branding: { asset: { kind: 'video' } } }), /download failed/);
   assert.equal(f.scene(), 'LIVE'); assert.equal(f.replay.state.playback, null);
 });
+
+test('clip names persist across restarts and deletion removes only the registered library entry', async t => {
+  const localPath = await clipFile(t);
+  const f = fixture({ clips: [{ id: 'clip', tournamentId: 'event', localPath }, { id: 'other', tournamentId: 'other', localPath }] });
+  await f.replay.handle({ action: 'rename', clipId: 'clip', tournamentId: 'other', name: 'Wrong event' });
+  assert.equal(f.replay.state.clips[0].name, undefined);
+  await f.replay.handle({ action: 'rename', clipId: 'clip', tournamentId: 'event', name: '   Gol minuto 24   ' });
+  assert.equal((await f.replay.report()).clips[0].name, 'Gol minuto 24');
+  const restarted = fixture(f.saved.at(-1));
+  assert.equal((await restarted.replay.report()).clips[0].name, 'Gol minuto 24');
+  restarted.replay.state.playback = { clipId: 'clip' };
+  await restarted.replay.handle({ action: 'delete', clipId: 'clip', tournamentId: 'event' });
+  assert.equal(restarted.replay.state.clips.length, 2);
+  assert.match(restarted.replay.state.error, /en aire/);
+  restarted.replay.state.playback = null;
+  await restarted.replay.handle({ action: 'delete', clipId: 'clip', tournamentId: 'event' });
+  assert.deepEqual(restarted.replay.state.clips.map(c => c.id), ['other']);
+  assert.equal((await fs.stat(localPath)).isFile(), true);
+});

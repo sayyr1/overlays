@@ -1,5 +1,10 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
+export function replayBadgeLayout(width, height) {
+  const scale = Math.min(width / 1920, height / 1080);
+  const x = width - 96 * scale - 560 * scale, y = 64 * scale;
+  return { x, y, width: 560 * scale, height: 392 * scale, logoX: x + 20 * scale, logoY: y + 16 * scale, logoWidth: 520 * scale, logoHeight: 300 * scale, labelY: y + 328 * scale, labelHeight: 64 * scale, scale };
+}
 
 export class ReplayControl {
   constructor(call, save, state = {}, savedEvent, loadAsset) {
@@ -15,7 +20,7 @@ export class ReplayControl {
   }
   async prepareBranding(branding) {
     const { inputs } = await this.call('GetInputList');
-    for (const name of [`WEB_REPLAY_IMAGE_${this.state.suffix}`, `WEB_REPLAY_MOTION_${this.state.suffix}`]) {
+    for (const name of [`WEB_REPLAY_IMAGE_${this.state.suffix}`, `WEB_REPLAY_MOTION_${this.state.suffix}`, `WEB_REPLAY_PLATE_${this.state.suffix}`]) {
       if (inputs.some(i => i.inputName === name)) {
         await this.visible(name, false);
         if (name.includes('_MOTION_')) await this.call('TriggerMediaInputAction', { inputName: name, mediaAction: 'OBS_WEBSOCKET_MEDIA_INPUT_ACTION_STOP' });
@@ -32,9 +37,28 @@ export class ReplayControl {
     else await this.call('SetInputSettings', { inputName: sourceName, inputSettings: settings, overlay: true });
     if (video) await this.call('SetInputMute', { inputName: sourceName, inputMuted: true });
     const { baseWidth, baseHeight } = await this.call('GetVideoSettings');
+    const badge = replayBadgeLayout(baseWidth, baseHeight);
+    if (placement === 'corner') {
+      const plate = `WEB_REPLAY_PLATE_${this.state.suffix}`;
+      const { inputKinds } = await this.call('GetInputKindList');
+      const colorKind = inputKinds.find(kind => kind.startsWith('color_source'));
+      if (colorKind) {
+        const inputSettings = { color: 0xeb2a1c10, width: Math.round(badge.width), height: Math.round(branding.showLabel ? badge.height : 332 * badge.scale) };
+        if (!inputs.some(input => input.inputName === plate)) await this.call('CreateInput', { sceneName: this.scene, inputName: plate, inputKind: colorKind, inputSettings, sceneItemEnabled: false });
+        else await this.call('SetInputSettings', { inputName: plate, inputSettings, overlay: true });
+        const item = await this.call('GetSceneItemId', { sceneName: this.scene, sourceName: plate });
+        await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId: item.sceneItemId, sceneItemTransform: { positionX: badge.x, positionY: badge.y, alignment: 5, boundsType: 'OBS_BOUNDS_NONE', scaleX: 1, scaleY: 1 } });
+        await this.call('SetSceneItemIndex', { sceneName: this.scene, sceneItemId: item.sceneItemId, sceneItemIndex: 1 });
+        await this.visible(plate, true);
+      }
+    }
     const { sceneItemId } = await this.call('GetSceneItemId', { sceneName: this.scene, sourceName });
-    await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId, sceneItemTransform: { positionX: placement === 'corner' ? baseWidth - 360 : 0, positionY: placement === 'corner' ? 120 : 0, alignment: 5, boundsAlignment: 5, boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: placement === 'corner' ? 300 : baseWidth, boundsHeight: placement === 'corner' ? 160 : baseHeight } });
-    await this.call('SetSceneItemIndex', { sceneName: this.scene, sceneItemId, sceneItemIndex: 1 });
+    await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId, sceneItemTransform: { positionX: placement === 'corner' ? badge.logoX : 0, positionY: placement === 'corner' ? badge.logoY : 0, alignment: 5, boundsAlignment: placement === 'corner' ? 0 : 5, boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: placement === 'corner' ? badge.logoWidth : baseWidth, boundsHeight: placement === 'corner' ? badge.logoHeight : baseHeight } });
+    const { sceneItems } = await this.call('GetSceneItemList', { sceneName: this.scene });
+    await this.call('SetSceneItemIndex', { sceneName: this.scene, sceneItemId, sceneItemIndex: Math.max(1, sceneItems.length - 1) });
+    const label = await this.call('GetSceneItemId', { sceneName: this.scene, sourceName: `WEB_REPLAY_LABEL_${this.state.suffix}` });
+    await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId: label.sceneItemId, sceneItemTransform: { positionX: badge.x, positionY: placement === 'corner' ? badge.labelY : badge.y, alignment: 5, boundsAlignment: 0, boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: badge.width, boundsHeight: badge.labelHeight } });
+    await this.call('SetSceneItemIndex', { sceneName: this.scene, sceneItemId: label.sceneItemId, sceneItemIndex: Math.max(1, sceneItems.length - 1) });
     await this.visible(`WEB_REPLAY_LABEL_${this.state.suffix}`, placement !== 'intro' && branding.showLabel === true);
     return { sourceName, video, placement, showLabel: branding.showLabel === true, duration: branding.asset.duration };
   }
@@ -47,14 +71,16 @@ export class ReplayControl {
     const video = await this.call('GetVideoSettings');
     await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId, sceneItemTransform: { positionX: 0, positionY: 0, boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: video.baseWidth, boundsHeight: video.baseHeight, boundsAlignment: 5, alignment: 5 } });
     const label = `WEB_REPLAY_LABEL_${this.state.suffix}`;
+    const badge = replayBadgeLayout(video.baseWidth, video.baseHeight);
+    const labelSettings = { text: 'REPETICIÓN', font: { face: 'Segoe UI', size: Math.round(48 * badge.scale), flags: 1 }, color: 0xff2a1c10, color1: 0xff2a1c10, color2: 0xff2a1c10, opacity: 100, bk_color: 0xff05b7f2, bk_opacity: 100, extents: true, extents_cx: Math.round(badge.width), extents_cy: Math.round(badge.labelHeight), extents_wrap: false, align: 'center', valign: 'center', outline: false };
     if (!inputs.some(i => i.inputName === label)) {
       const { inputKinds } = await this.call('GetInputKindList');
       const textKind = inputKinds.find(kind => kind.startsWith('text_gdiplus')) || inputKinds.find(kind => kind.startsWith('text_ft2'));
       if (!textKind) throw new Error('OBS no tiene una fuente de texto para el rótulo de repetición.');
-      await this.call('CreateInput', { sceneName: this.scene, inputName: label, inputKind: textKind, inputSettings: { text: 'REPETICIÓN', font: { face: 'Segoe UI', size: 36, flags: 1 }, color: 0xffffffff, bk_color: 0xff101c2a, bk_opacity: 100 }, sceneItemEnabled: true });
-    }
+      await this.call('CreateInput', { sceneName: this.scene, inputName: label, inputKind: textKind, inputSettings: labelSettings, sceneItemEnabled: true });
+    } else await this.call('SetInputSettings', { inputName: label, inputSettings: labelSettings, overlay: true });
     const tag = await this.call('GetSceneItemId', { sceneName: this.scene, sourceName: label });
-    await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId: tag.sceneItemId, sceneItemTransform: { positionX: video.baseWidth - 360, positionY: 64 } });
+    await this.call('SetSceneItemTransform', { sceneName: this.scene, sceneItemId: tag.sceneItemId, sceneItemTransform: { positionX: badge.x, positionY: badge.y, alignment: 5, boundsAlignment: 0, boundsType: 'OBS_BOUNDS_SCALE_INNER', boundsWidth: badge.width, boundsHeight: badge.labelHeight } });
   }
   async capture(command) {
     if (this.state.playback) throw new Error('Vuelve al directo antes de guardar otra jugada.');

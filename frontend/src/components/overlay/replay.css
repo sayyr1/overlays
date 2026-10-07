@@ -67,8 +67,11 @@
 .replay-branding-preview { position:relative; aspect-ratio:16/9; background:repeating-linear-gradient(90deg,#193d34 0,#193d34 12.5%,#214a3e 12.5%,#214a3e 25%); border:1px solid #36546a; border-radius:12px; overflow:hidden; }
 .replay-branding-preview::before { content:''; position:absolute; inset:12%; border:1px solid #ffffff30; }
 .replay-branding-preview img,.replay-branding-preview video { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; }
-.replay-branding-preview.placement-corner img,.replay-branding-preview.placement-corner video { inset:11.1% 3.1% auto auto; width:15.625%; height:14.815%; }
-.replay-branding-preview strong { position:absolute; right:3.1%; top:5.9%; padding:5px 8px; font-size:clamp(8px,1.2vw,14px); color:white; background:#101c2a; }
+.replay-preview-plate { position:absolute; right:5%; top:5.926%; width:29.167%; height:30.741%; background:#101c2aeb; }
+.has-replay-label .replay-preview-plate { height:36.296%; }
+.replay-branding-preview.placement-corner img,.replay-branding-preview.placement-corner video { inset:7.407% 6.042% auto auto; width:27.083%; height:27.778%; }
+.replay-branding-preview strong { position:absolute; right:5%; top:5.926%; width:29.167%; height:5.926%; display:flex; align-items:center; justify-content:center; font-size:clamp(9px,1.3vw,18px); font-weight:800; letter-spacing:.025em; color:#101c2a; background:#f2b705; }
+.replay-branding-preview.placement-corner.has-replay-asset strong { top:36.296%; }
 .replay-preview-caption { position:absolute; left:12px; bottom:12px; color:#d6e7df; font-size:10px; }
 .replay-branding-buttons { display:flex; gap:10px; flex-wrap:wrap; }
 @media(max-width:760px) { .replay-branding { padding:16px; } .replay-branding-layout { grid-template-columns:1fr; } .replay-branding-layout > div:last-child { grid-row:1; } .replay-branding-buttons { display:grid; } }

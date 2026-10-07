@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { ReplayControl } from '../services/obsReplay.js';
+import { ReplayControl, replayBadgeLayout } from '../services/obsReplay.js';
 
 function fixture(state = {}, loadAsset) {
   let scene = 'LIVE', mediaState = 'OBS_MEDIA_STATE_PLAYING';
@@ -12,7 +12,8 @@ function fixture(state = {}, loadAsset) {
     calls.push({ name, args });
     if (name === 'GetSceneList') return { scenes: [] };
     if (name === 'GetInputList') return { inputs: [] };
-    if (name === 'GetInputKindList') return { inputKinds: ['text_gdiplus_v3', 'ffmpeg_source'] };
+    if (name === 'GetInputKindList') return { inputKinds: ['text_gdiplus_v3', 'ffmpeg_source', 'color_source_v3'] };
+    if (name === 'GetSceneItemList') return { sceneItems: [{}, {}, {}, {}] };
     if (name === 'GetSceneItemId') return { sceneItemId: 1 };
     if (name === 'GetVideoSettings') return { baseWidth: 1920, baseHeight: 1080 };
     if (name === 'GetCurrentProgramScene') return { currentProgramSceneName: scene };
@@ -29,6 +30,26 @@ async function clipFile(t) {
   t.after(() => fs.rm(dir, { recursive: true, force: true }));
   return file;
 }
+test('the prominent badge scales proportionally within the safe area', () => {
+  const large = replayBadgeLayout(1920, 1080), small = replayBadgeLayout(1280, 720);
+  assert.equal(large.logoWidth, 520); assert.equal(large.logoHeight, 300);
+  assert.equal(large.x + large.width, 1824);
+  assert.equal(large.labelY + large.labelHeight, large.y + large.height);
+  assert.equal(small.logoHeight, 200);
+});
+test('corner logos have a contrast panel and a prominent label above all media', async t => {
+  const localPath = await clipFile(t);
+  const f = fixture({ clips: [{ id: 'clip', tournamentId: 'event', localPath }] }, async () => localPath);
+  await f.replay.play({ clipId: 'clip', tournamentId: 'event', branding: { asset: { kind: 'image' }, placement: 'corner', showLabel: true } });
+  const plate = f.calls.find(c => c.name === 'CreateInput' && c.args.inputName.includes('_PLATE_'));
+  assert.equal(plate.args.inputKind, 'color_source_v3');
+  assert.equal(plate.args.inputSettings.width, 560);
+  const label = f.calls.find(c => c.name === 'CreateInput' && c.args.inputName.includes('_LABEL_'));
+  assert.equal(label.args.inputSettings.font.size, 48);
+  assert.equal(label.args.inputSettings.extents_cx, 560);
+  assert(f.calls.some(c => c.name === 'SetSceneItemTransform' && c.args.sceneItemTransform.boundsWidth === 520 && c.args.sceneItemTransform.boundsHeight === 300));
+  assert(f.calls.some(c => c.name === 'SetSceneItemIndex' && c.args.sceneItemIndex === 3));
+});
 test('plays only a clip registered for the event and returns locally at the end', async t => {
   const localPath = await clipFile(t);
   const f = fixture({ clips: [{ id: 'clip', tournamentId: 'event', localPath }] });

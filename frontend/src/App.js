@@ -1682,6 +1682,7 @@ function ThemeManager({ tournament, onSaved, say }) {
         <span>IDENTIDAD DE TRANSMISIÓN</span>
         <h2>Marca y tema del evento</h2>
         <p>Los colores y el logo se aplican a la fuente de OBS, a las pantallas y a todos los gráficos del torneo seleccionado.</p>
+        {(!tournament.mode || tournament.mode === 'sports') && <a className="football-gallery-link" href="/football-preview.html" target="_blank" rel="noreferrer">Ver diseños de fútbol</a>}
       </div>
       <div className="theme-presets" aria-label="Temas rápidos">
         {presets.map(([name, value]) => (

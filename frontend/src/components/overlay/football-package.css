@@ -1,0 +1,92 @@
+/* Original football broadcast package. Fixed 1920 × 1080 output; the operator
+   preview scales this canvas. Every selector is scoped to sports. */
+.football-gallery-link { display:inline-flex; align-items:center; min-height:44px; padding:10px 14px; margin-top:12px; border:1px solid #496277; border-radius:8px; color:#e9c46a; text-decoration:none; }
+.football-gallery-link:focus-visible { outline:2px solid #e9c46a; outline-offset:3px; }
+.tv-sports { --surface-tv:linear-gradient(110deg,var(--ink) 0%,var(--ink) 72%,var(--brand-tv) 145%); }
+.tv-sports .tv-scorebug { top:60px; height:58px; border-bottom:0; border-radius:3px; box-shadow:0 4px 14px #0004; overflow:hidden; }
+.tv-sports .tv-scorebug-brand { width:52px; padding:8px; }
+.tv-sports .tv-team-side { width:126px; gap:10px; padding:0 12px; background:var(--ink); border-bottom:5px solid var(--team-color); box-shadow:none; }
+.tv-sports .tv-team-side b { font-size:25px; letter-spacing:.035em; }
+.tv-sports .tv-team-side img { width:27px; height:30px; }
+.tv-sports .tv-scorebug > strong { min-width:106px; padding:0 14px; gap:12px; font-size:34px; font-weight:800; }
+.tv-sports .tv-scorebug > strong i { font-size:18px; }
+.tv-sports .tv-clock { padding:0 15px; gap:10px; border-left:1px solid #ffffff20; }
+.tv-sports .tv-clock > b { font-size:27px; letter-spacing:-.025em; }
+.tv-sports .tv-clock small { font-size:13px; padding:4px 6px; background:#ffffff0d; }
+.tv-sports .tv-clock em { padding:4px 6px; font-size:17px; }
+.tv-sports .tv-standalone-clock { top:60px; padding:14px 22px; font-weight:650; border-left-width:3px; }
+.tv-sports .tv-channel-bug { top:60px; padding:8px 13px; font-size:16px; background:#101c2abf; border-left-width:2px; }
+.tv-sports .tv-channel-bug b { font-size:10px; }
+
+/* Match introduction and final score use the same editorial header, generous
+   crest space and a single accent, leaving the camera visible around the plate. */
+.tv-sports .tv-opening-card,.tv-sports .tv-match-showcase-card { left:320px; top:250px; width:1280px; border:0; border-top:3px solid var(--accent-tv); box-shadow:0 12px 36px #0005; }
+.tv-sports .tv-opening-card { padding-top:30px; }
+.tv-sports .tv-opening-kicker { padding:0; background:none; color:var(--accent-tv); font-size:15px; letter-spacing:.18em; }
+.tv-sports .tv-opening-card > p { font-size:24px; font-weight:600; margin-top:10px; }
+.tv-sports .tv-opening-matchup { padding:40px 64px 36px; gap:32px; grid-template-columns:minmax(0,1fr) 108px minmax(0,1fr); }
+.tv-sports .tv-opening-matchup > div { gap:20px; }
+.tv-sports .tv-opening-matchup img { width:112px; height:112px; }
+.tv-sports .tv-opening-matchup b { font-size:30px; font-weight:700; line-height:1.2; max-width:100%; }
+.tv-sports .tv-opening-matchup > div::after { content:''; width:56px; height:4px; background:var(--team-color); }
+.tv-sports .tv-opening-matchup > strong { height:70px; border:0; color:var(--muted-tv); font-size:23px; letter-spacing:.08em; }
+.tv-sports .tv-opening-card footer { padding:17px 36px; font-size:15px; background:#00000026; border-top:1px solid #ffffff12; letter-spacing:.12em; }
+.tv-sports .tv-match-showcase-header { height:76px; padding:0 40px !important; gap:22px; }
+.tv-sports .tv-match-showcase-header > span { font-size:18px; letter-spacing:.05em; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tv-sports .tv-match-showcase-header img { width:42px; height:42px; }
+.tv-sports .tv-match-showcase-header > strong { font-size:14px; padding:10px 14px; }
+.tv-sports .tv-match-showcase-body { grid-template-columns:minmax(0,1fr) 340px minmax(0,1fr); min-height:300px; gap:30px; padding:34px 48px; }
+.tv-sports .tv-match-showcase-crest { width:116px; height:116px; border:0; border-radius:0; background:none; }
+.tv-sports .tv-match-showcase-crest img { width:108px; height:108px; }
+.tv-sports .tv-match-showcase-team { gap:18px; }
+.tv-sports .tv-match-showcase-team > b { font-size:27px; line-height:1.25; }
+.tv-sports .tv-match-showcase-team::after { content:''; width:56px; height:4px; background:var(--team-color); }
+.tv-sports .tv-match-showcase-score > strong { font-size:112px; }
+.tv-sports .tv-match-showcase-divider i { font-size:26px; }
+.tv-sports .tv-match-showcase-score > span { font-size:12px; margin-top:18px; padding-top:13px; }
+.tv-sports .tv-match-showcase-footer { padding:15px 40px !important; min-height:52px; font-size:14px; line-height:1.4; }
+.tv-sports .tv-match-showcase-footer > * { min-width:0; overflow-wrap:anywhere; }
+
+/* Player and incident straps stay inside the lower safe area. Two simultaneous
+   straps retain their separate left/right positions; advertisements have priority. */
+.tv-sports .tv-graphic:not(.tv-graphic-full) { width:800px; min-height:112px; padding-top:22px; padding-bottom:24px; border-left-width:4px; box-shadow:0 6px 22px #0004; }
+.tv-sports .tv-graphic-kicker { font-size:15px; letter-spacing:.13em; }
+.tv-sports .tv-graphic:not(.tv-graphic-full) h1 { font-size:33px; margin-top:9px; line-height:1.2; }
+.tv-sports .tv-graphic .tv-graphic-detail { font-size:19px; margin-top:8px; color:var(--muted-tv); }
+.tv-sports .tv-graphic[data-event='gol'] { border-left-color:var(--accent-tv); }
+.tv-sports .tv-graphic[data-event='gol'] .tv-graphic-kicker { color:var(--accent-tv); font-size:24px; }
+.tv-sports .tv-graphic[data-event='var'] { border-left-color:#a3c5e9; }
+.tv-sports .tv-graphic[data-event='substitution'] { border-left-color:#71d7aa; }
+.tv-sports .tv-graphic[data-event='yellow_card'] .tv-graphic-kicker { color:#f4d44b; }
+.tv-sports .tv-graphic[data-event='red_card'] .tv-graphic-kicker { color:#ff8390; }
+.tv-sports .tv-team-event-crest { width:60px; height:60px; top:24px; }
+.tv-sports .tv-event-mark { width:52px; height:52px; top:24px; right:30px; }
+.tv-sports .tv-graphic.tv-event-branded { padding-right:106px; }
+
+/* A structured team sheet rather than a modal; names can wrap without clipping. */
+.tv-sports .tv-graphic.tv-graphic-full { left:360px; top:208px; width:1200px; padding:32px 44px; border-top-width:3px; }
+.tv-sports .tv-graphic-full h1 { font-size:31px; margin-top:14px; margin-bottom:26px; }
+.tv-sports .tv-graphic.tv-graphic-full.tv-event-branded { padding-right:106px; }
+.tv-sports .tv-lineup-identity { gap:20px; padding-bottom:20px; border-bottom:1px solid #ffffff22; }
+.tv-sports .tv-lineup-identity img { width:72px; height:72px; }
+.tv-sports .tv-lineup-list { gap:0 28px; }
+.tv-sports .tv-lineup-list > span { min-height:59px; padding:11px 0; gap:16px; font-size:22px; line-height:1.25; }
+.tv-sports .tv-lineup-list > span > b { flex-basis:38px; color:var(--paper); background:#ffffff0b; font-size:20px; border-left:2px solid var(--accent-tv); }
+.tv-sports .tv-lineup-footer { margin-top:24px; padding-top:16px; border-top:1px solid #ffffff22; display:flex; justify-content:space-between; gap:20px; color:var(--muted-tv); font-size:12px; letter-spacing:.12em; }
+.tv-sports .tv-match-identity { gap:22px; }
+.tv-sports .tv-match-identity > span { gap:14px; font-size:26px; }
+.tv-sports .tv-match-identity img { width:54px; height:54px; }
+.tv-sports .tv-stat-board p { position:relative; min-height:72px; padding:13px 0 17px; background:none; border-top:1px solid #ffffff15; }
+.tv-sports .tv-stat-board p::after { content:''; position:absolute; bottom:7px; left:140px; right:140px; height:3px; background:linear-gradient(to right,var(--accent-tv) 0%,var(--accent-tv) var(--home-share),#8596a9 var(--home-share),#8596a9 100%); opacity:.85; }
+.tv-sports .tv-stat-board b { font-size:29px; font-weight:700; }
+.tv-sports .tv-stat-board span { font-size:19px; }
+
+/* Brief, coherent reveals. Score updates never remount or animate the clock. */
+.tv-sports .tv-scorebug { animation:football-score-in 220ms ease-out both; }
+.tv-sports .tv-opening-card,.tv-sports .tv-match-showcase-card,.tv-sports .tv-graphic-full { animation:football-plate-in 300ms cubic-bezier(.2,.7,.2,1) both; }
+.tv-sports .tv-graphic:not(.tv-graphic-full) { animation:football-strap-in 240ms cubic-bezier(.2,.7,.2,1) both; }
+@keyframes football-score-in { from { opacity:0; transform:translateX(-12px); } to { opacity:1; transform:none; } }
+@keyframes football-plate-in { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
+@keyframes football-strap-in { from { opacity:0; clip-path:inset(0 100% 0 0); } to { opacity:1; clip-path:inset(0); } }
+.tv-overlay-preview.tv-sports * { animation:none !important; }
+@media(prefers-reduced-motion:reduce) { .tv-sports * { animation:none !important; } }

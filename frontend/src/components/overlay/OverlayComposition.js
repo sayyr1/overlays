@@ -4,6 +4,7 @@ import "./broadcast.css";
 import MediaComposition from "./MediaComposition";
 import { sponsorPlayback } from '../../utils/sponsorPlayback';
 import './sponsor-deck.css';
+import './football-package.css';
 
 const seconds = (clock, now) =>
   (clock?.elapsedSeconds || 0) +
@@ -16,6 +17,11 @@ const seconds = (clock, now) =>
 const clockText = (clock, now) => {
   const value = seconds(clock, now);
   return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+};
+export const statShare = (home, away) => {
+  const value = input => Number.isFinite(Number(input)) ? Math.max(0, Number(input)) : 0;
+  const a = value(home), b = value(away);
+  return a + b ? Math.round(a / (a + b) * 100) : 50;
 };
 
 export default function OverlayComposition({ snapshot, preview = false }) {
@@ -41,7 +47,7 @@ export default function OverlayComposition({ snapshot, preview = false }) {
     );
   return (
     <div
-      className={`tv-overlay-root ${preview ? "tv-overlay-preview" : ""} ${advertising.active ? 'tv-ad-active' : ''} ${graphics.sponsorBugVisible && snapshot?.sponsors?.length ? "tv-with-sponsor" : ""}`}
+      className={`tv-overlay-root ${general ? '' : 'tv-sports'} ${preview ? "tv-overlay-preview" : ""} ${advertising.active ? 'tv-ad-active' : ''} ${graphics.sponsorBugVisible && snapshot?.sponsors?.length ? "tv-with-sponsor" : ""}`}
       style={{
         "--primary": colors.primary,
         "--secondary": colors.secondary,
@@ -61,7 +67,7 @@ export default function OverlayComposition({ snapshot, preview = false }) {
               alt=""
             />
           )}
-          <div className="tv-team-side">
+          <div className="tv-team-side" style={{ '--team-color': match.homeTeam?.primaryColor || '#4478AE' }}>
             {match.homeTeam && (
               <img src={teamCrest(match.homeTeam)} alt="" />
             )}
@@ -70,7 +76,7 @@ export default function OverlayComposition({ snapshot, preview = false }) {
           <strong>
             <span>{match.score.home}</span><i>:</i><span>{match.score.away}</span>
           </strong>
-          <div className="tv-team-side tv-right">
+          <div className="tv-team-side tv-right" style={{ '--team-color': match.awayTeam?.primaryColor || '#C75461' }}>
             <b>{match.awayTeam?.code || match.awayTeam?.shortName || "VIS"}</b>
             {match.awayTeam && (
               <img src={teamCrest(match.awayTeam)} alt="" />
@@ -246,7 +252,7 @@ function RenderGraphic(props) {
         <MatchIdentity match={match} />
         <div className="tv-stat-board">
           {rows.map(([name, field, suffix]) => (
-            <p key={field}>
+            <p key={field} style={{ '--home-share': `${statShare(match.stats?.home?.[field], match.stats?.away?.[field])}%` }}>
               <b>
                 {match.stats?.home?.[field] ?? 0}
                 {suffix}
@@ -293,7 +299,7 @@ function RenderGraphic(props) {
         <span className="tv-opening-kicker">{match.round || "EL PARTIDO"}</span>
         <p>{props.tournament?.name || "FUTBOL EN VIVO"}</p>
         <div className="tv-opening-matchup">
-          <div>
+          <div style={{ '--team-color': match.homeTeam?.primaryColor || '#4478AE' }}>
             {match.homeTeam ? (
               <img src={teamCrest(match.homeTeam)} alt="" />
             ) : null}
@@ -302,7 +308,7 @@ function RenderGraphic(props) {
             </b>
           </div>
           <strong>VS</strong>
-          <div>
+          <div style={{ '--team-color': match.awayTeam?.primaryColor || '#C75461' }}>
             {match.awayTeam ? (
               <img src={teamCrest(match.awayTeam)} alt="" />
             ) : null}
@@ -323,7 +329,7 @@ function MatchScoreCard({ match, tournament, final }) {
   const minute = final ? "FINAL" : "DESCANSO";
   const teamName = (team, fallback) => team?.shortName || team?.name || fallback;
   const Team = ({ team, fallback }) => (
-    <div className="tv-match-showcase-team">
+    <div className="tv-match-showcase-team" style={{ '--team-color': team?.primaryColor || '#4478AE' }}>
       <div className="tv-match-showcase-crest">
         {team ? (
           <img src={teamCrest(team)} alt="" />
@@ -379,6 +385,11 @@ function Graphic({ graphic, match, tournament, kind }) {
       yellow_card: "TARJETA AMARILLA",
       red_card: "TARJETA ROJA",
       substitution: "SUSTITUCIÓN",
+      penal: "PENAL CONVERTIDO",
+      penalty_missed: "PENAL FALLADO",
+      var: "REVISIÓN VAR",
+      injury: "ATENCIÓN MÉDICA",
+      jugador_destacado: "JUGADOR DESTACADO",
       patrocinador: "PRESENTADO POR",
       aviso: "AVISO INFORMATIVO",
       rotulo_jugador: "JUGADOR",
@@ -433,6 +444,7 @@ function Graphic({ graphic, match, tournament, kind }) {
                 </span>
               ))}
           </div>
+          <footer className="tv-lineup-footer"><span>ONCE INICIAL</span><span>{match.round || 'PARTIDO OFICIAL'}</span></footer>
         </>
       )}
       {!full && <h1>{title}</h1>}

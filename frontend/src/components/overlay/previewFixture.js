@@ -1,6 +1,6 @@
 // Fictional data for component checks and the offline design review.
 const team = (id, name, code, color) => ({
-  id, name, shortName: name, code,
+  id, name, shortName: name, code, primaryColor: color,
   crest: { secureUrl: 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="120" height="140" viewBox="0 0 120 140"><path fill="${color}" stroke="#ffffff" stroke-width="3" d="M6 6h108v76q-4 36-54 52Q10 118 6 82Z"/><path fill="#ffffff" opacity=".2" d="M44 8h32v114H44z"/><text x="60" y="78" text-anchor="middle" fill="white" font-family="Arial" font-size="24" font-weight="bold">${code}</text></svg>`) },
 });
 const players = Array.from({ length: 11 }, (_, index) => ({

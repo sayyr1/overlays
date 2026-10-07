@@ -24,7 +24,7 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && node -e \"require('fs').copyFileSync('public/static.json','build/static.json')\"",
+    "build": "node scripts/renderFootballPreview.cjs && react-scripts build && node -e \"require('fs').copyFileSync('public/static.json','build/static.json')\"",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

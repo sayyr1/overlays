@@ -1,7 +1,29 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react';
-import OverlayComposition, { graphicTeam } from './OverlayComposition';
+import OverlayComposition, { graphicTeam, statShare } from './OverlayComposition';
 import { previewSnapshot } from './previewFixture';
+
+test('el paquete deportivo conserva los colores del evento y distingue ambos equipos', () => {
+  const { container, rerender } = render(<OverlayComposition snapshot={previewSnapshot} />);
+  const root = container.querySelector('.tv-overlay-root');
+  expect(root).toHaveClass('tv-sports');
+  expect(root.style.getPropertyValue('--primary')).toBe(previewSnapshot.tournament.colors.primary);
+  const teams = container.querySelectorAll('.tv-team-side');
+  expect(teams[0].style.getPropertyValue('--team-color')).toBe(previewSnapshot.match.homeTeam.primaryColor);
+  expect(teams[1].style.getPropertyValue('--team-color')).toBe(previewSnapshot.match.awayTeam.primaryColor);
+  rerender(<OverlayComposition snapshot={{ mode: 'general', tournament: {}, graphics: {} }} />);
+  expect(container.querySelector('.tv-overlay-root')).not.toHaveClass('tv-sports');
+});
+test('las barras de estadísticas corresponden a los valores del partido y son neutrales sin datos', () => {
+  expect(statShare(58, 42)).toBe(58);
+  expect(statShare(12, 8)).toBe(60);
+  expect(statShare(0, 0)).toBe(50);
+  expect(statShare(undefined, undefined)).toBe(50);
+  expect(statShare(-1, 10)).toBe(0);
+  expect(statShare(Infinity, 10)).toBe(0);
+  const { container } = render(<OverlayComposition snapshot={{ ...previewSnapshot, graphics: { main: { type: 'estadisticas' } } }} />);
+  expect(container.querySelector('.tv-stat-board p').style.getPropertyValue('--home-share')).toBe('58%');
+});
 
 const football = {
   ...previewSnapshot,

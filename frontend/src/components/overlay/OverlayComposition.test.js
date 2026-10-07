@@ -3,6 +3,16 @@ import { render, screen } from '@testing-library/react';
 import OverlayComposition from './OverlayComposition';
 import { previewSnapshot } from './previewFixture';
 
+test.each(['presentacion', 'estadisticas', 'alineacion_local', 'gol'])('el logo del evento se reutiliza en el gráfico deportivo %s', type => {
+  const logo = '/logo-del-evento.png';
+  const { container } = render(<OverlayComposition snapshot={{ ...previewSnapshot, tournament: { ...previewSnapshot.tournament, logo: { secureUrl: logo } }, graphics: { main: { type, data: {} } } }} />);
+  expect(container.querySelector('.tv-event-mark')).toHaveAttribute('src', logo);
+});
+test.each(['opening', 'speaker', 'announcement'])('el logo del evento se reutiliza en la plantilla general %s', type => {
+  render(<OverlayComposition snapshot={{ mode: 'general', tournament: { name: 'Mi evento', logo: { secureUrl: '/mi-logo.png' } }, graphics: { main: { type: `broadcast_${type}`, data: { title: 'Texto' } } } }} />);
+  expect(screen.getByAltText('Logo de Mi evento')).toHaveAttribute('src', '/mi-logo.png');
+});
+
 test('la salida sin partido o sin auspiciantes no emite instrucciones del panel', () => {
   const { rerender, container } = render(<OverlayComposition snapshot={null} />);
   expect(container).not.toHaveTextContent('Esperando partido activo');

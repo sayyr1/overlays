@@ -1,6 +1,33 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import App from './App';
+import * as eventLogo from './components/overlay/EventLogoField';
+
+test('el logo subido se guarda en el evento nuevo y puede usarse en sus overlays', async () => {
+  const logo = { publicId: 'eventos/copa', secureUrl: 'https://res.cloudinary.com/demo/image/upload/copa.png' };
+  jest.spyOn(eventLogo, 'uploadEventLogo').mockResolvedValue(logo);
+  const original = global.fetch;
+  global.fetch = jest.fn(async (url, options) => url.endsWith('/tournaments') && options?.method === 'POST' ? { ok: true, status: 201, json: async () => ({ tournament: { _id: 'new', name: 'Copa nueva' }, overlayUrl: '/overlay/programa?token=test' }) } : original(url, options));
+  render(<App />);
+  const name = await screen.findByLabelText('Nombre de la transmisión');
+  fireEvent.change(name, { target: { value: 'Copa nueva' } });
+  fireEvent.submit(name.closest('form'));
+  await waitFor(() => expect(global.fetch.mock.calls.some(([url, options]) => url.endsWith('/tournaments') && options?.method === 'POST')).toBe(true));
+  const request = global.fetch.mock.calls.find(([url, options]) => url.endsWith('/tournaments') && options?.method === 'POST');
+  expect(JSON.parse(request[1].body)).toMatchObject({ name: 'Copa nueva', logo });
+});
+
+test('si falla la carga del logo, conserva el formulario y permite reintentar sin crear el evento', async () => {
+  jest.spyOn(eventLogo, 'uploadEventLogo').mockRejectedValue(new Error('No se pudo subir el logo'));
+  render(<App />);
+  const name = await screen.findByLabelText('Nombre de la transmisión');
+  fireEvent.change(name, { target: { value: 'Mi campeonato' } });
+  fireEvent.submit(name.closest('form'));
+  expect(await screen.findByText('No se pudo subir el logo')).toBeInTheDocument();
+  expect(name).toHaveValue('Mi campeonato');
+  expect(global.fetch.mock.calls.some(([url, options]) => url.endsWith('/tournaments') && options?.method === 'POST')).toBe(false);
+  expect(within(name.closest('form')).getByRole('button', { name: 'Guardar' })).toBeEnabled();
+});
 
 beforeEach(() => {
   window.scrollTo = jest.fn();

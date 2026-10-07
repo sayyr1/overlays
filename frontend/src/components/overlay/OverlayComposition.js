@@ -132,13 +132,16 @@ export default function OverlayComposition({ snapshot, preview = false }) {
   );
 }
 
+function EventMark({ tournament }) {
+  return tournament?.logo?.secureUrl ? <img className="tv-event-mark" src={tournament.logo.secureUrl} alt={`Logo de ${tournament.name}`} /> : null;
+}
 function BroadcastGraphic({ graphic, now, tournament }) {
   const type = graphic.type.replace('broadcast_', '');
   const full = ['opening', 'break', 'ending', 'countdown'].includes(type);
   const labels = { opening: 'BIENVENIDOS', break: 'PAUSA', ending: 'HASTA PRONTO', countdown: 'COMENZAMOS EN', speaker: 'EN CONVERSACIÓN', topic: 'AHORA', location: 'DESDE', social: 'CONECTA', announcement: 'INFORMACIÓN' };
   const remaining = Math.max(0, Math.ceil(((new Date(graphic.activatedAt).getTime() || now) + (graphic.data?.seconds || 300) * 1000 - now) / 1000));
   return <section className={`tv-broadcast-card ${full ? 'tv-broadcast-full' : type === 'announcement' ? 'tv-broadcast-notice' : 'tv-broadcast-lower'}`}>
-    {full && <div className="tv-broadcast-brand">{tournament?.logo?.secureUrl && <img src={tournament.logo.secureUrl} alt="" />}<span>{tournament?.name}</span></div>}
+    {(full || tournament?.logo?.secureUrl) && <div className="tv-broadcast-brand">{tournament?.logo?.secureUrl && <img src={tournament.logo.secureUrl} alt={`Logo de ${tournament.name}`} />}<span>{tournament?.name}</span></div>}
     <span className="tv-graphic-kicker">{labels[type] || 'EN VIVO'}</span>
     <h1>{graphic.data?.title}</h1>
     {graphic.data?.subtitle && <p>{graphic.data.subtitle}</p>}
@@ -222,7 +225,8 @@ function RenderGraphic(props) {
       ["Faltas", "fouls", ""],
     ];
     return (
-      <section className="tv-graphic tv-graphic-full">
+      <section className={`tv-graphic tv-graphic-full ${props.tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}>
+        <EventMark tournament={props.tournament} />
         <span className="tv-graphic-kicker">ESTADÍSTICAS DEL PARTIDO</span>
         <h1>
           {match.homeTeam?.shortName} <em>vs</em> {match.awayTeam?.shortName}
@@ -248,7 +252,8 @@ function RenderGraphic(props) {
   }
   if (graphic.type === "tabla_vivo")
     return (
-      <section className="tv-graphic tv-graphic-full">
+      <section className={`tv-graphic tv-graphic-full ${props.tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}>
+        <EventMark tournament={props.tournament} />
         <span className="tv-graphic-kicker">TABLA EN VIVO</span>
         <h1>
           {match.homeTeam?.name}{" "}
@@ -263,7 +268,8 @@ function RenderGraphic(props) {
     );
   if (graphic.type === "arbitros")
     return (
-      <section className="tv-graphic tv-graphic-full">
+      <section className={`tv-graphic tv-graphic-full ${props.tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}>
+        <EventMark tournament={props.tournament} />
         <span className="tv-graphic-kicker">CUERPO ARBITRAL</span>
         <h1>{match.officials?.referee || "Árbitro por confirmar"}</h1>
         <p>
@@ -275,7 +281,8 @@ function RenderGraphic(props) {
     );
   if (["presentacion", "enfrentamiento"].includes(graphic.type))
     return (
-      <section className="tv-opening-card">
+      <section className={`tv-opening-card ${props.tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}>
+        <EventMark tournament={props.tournament} />
         <span className="tv-opening-kicker">{match.round || "EL PARTIDO"}</span>
         <p>{props.tournament?.name || "FUTBOL EN VIVO"}</p>
         <div className="tv-opening-matchup">
@@ -379,9 +386,10 @@ function Graphic({ graphic, match, tournament, kind }) {
   const lineupItems = isHome ? match.lineups?.home : match.lineups?.away;
   return (
     <section
-      className={`tv-graphic ${full ? "tv-graphic-full" : ""} ${kind === "lower" ? "tv-graphic-lower" : ""} ${lineup ? "tv-lineup" : ""}`}
+      className={`tv-graphic ${full ? "tv-graphic-full" : ""} ${kind === "lower" ? "tv-graphic-lower" : ""} ${lineup ? "tv-lineup" : ""} ${tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}
       data-event={graphic.type}
     >
+      <EventMark tournament={tournament} />
       <span className="tv-graphic-kicker">{label}</span>
       {full && !lineup && (
         <>

@@ -11,6 +11,7 @@ import ControlIcon from './components/overlay/ControlIcon';
 import LiveConsole from './components/overlay/LiveConsole';
 import OutputSettings from './components/overlay/OutputSettings';
 import ReplayBranding from './components/overlay/ReplayBranding';
+import { uploadEventLogo } from './components/overlay/EventLogoField';
 import { sponsorPlayback } from './utils/sponsorPlayback';
 import OverlayComposition from "./components/overlay/OverlayComposition";
 import { BroadcastControls, BroadcastEditor, TransmissionFields } from "./components/overlay/BroadcastStudio";
@@ -621,6 +622,9 @@ function Dashboard({ admin, setAdmin }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
+  const [createEventError, setCreateEventError] = useState('');
+  const createEventLock = useRef(false);
   const [deleteError, setDeleteError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [broadcastBusy, setBroadcastBusy] = useState(false);
@@ -912,8 +916,12 @@ function Dashboard({ admin, setAdmin }) {
   };
   const createTournament = async (e) => {
     e.preventDefault();
-    const form = new FormData(e.target);
+    if (createEventLock.current) return;
+    const element = e.currentTarget;
+    const form = new FormData(element);
+    createEventLock.current = true; setCreatingEvent(true); setCreateEventError('');
     try {
+      const logo = await uploadEventLogo(form.get('eventLogo'), API);
       const result = await api("/tournaments", {
         method: "POST",
         body: JSON.stringify({
@@ -922,17 +930,18 @@ function Dashboard({ admin, setAdmin }) {
           season: form.get("season"),
           slug: form.get("slug"),
           teamIds: form.getAll('teamIds'),
+          logo,
         }),
       });
-      e.target.reset();
+      element.reset();
       setSelectedId(result.tournament._id);
       setTab('setup');
       setCreatedLink(`${window.location.origin}${result.overlayUrl}`);
       await load();
       say("Evento creado. Envíalo a la salida de OBS cuando esté listo.");
     } catch (err) {
-      say(err.message);
-    }
+      setCreateEventError(err.message);
+    } finally { createEventLock.current = false; setCreatingEvent(false); }
   };
   const deleteTournament = async () => {
     if (deleteBusy || deleteConfirmation.trim() !== selected.name) return;
@@ -1082,7 +1091,7 @@ function Dashboard({ admin, setAdmin }) {
           {tab === 'teams' ? <TeamLibrary api={api} apiBase={API} onSaved={load} /> : tab === 'sponsors' ? <SponsorLibrary api={api} apiBase={API} onSaved={load} /> : <>
             <div className="section-heading"><div><h2>Organiza tu próxima transmisión</h2><p>Configura cada evento, elige sus auspiciantes y abre el control cuando estés listo para emitir.</p></div><span className="brand-count">{tournaments.length} eventos</span></div>
             {tournaments.length ? <div className="event-card-grid">{tournaments.map(event => <article className="event-card" key={event._id}><span className="eyebrow">{!event.mode || event.mode === 'sports' ? 'CAMPEONATO' : 'EVENTO'}</span><h2>{event.name}</h2><p>{event.season || 'Producción independiente'}</p><div className="event-card-actions"><button onClick={() => { setSelectedId(event._id); setTab('setup'); }}>Configurar evento</button><button className="outline" onClick={() => { setSelectedId(event._id); setTab('live'); }}>Control en vivo</button></div></article>)}</div> : <div className="brand-empty"><h3>Crea tu primer evento</h3><p>Puedes preparar tus marcas en Auspiciantes antes de organizar una transmisión.</p></div>}
-            <details className="event-create" open={!tournaments.length || undefined}><summary>+ Crear evento o campeonato</summary><Config title="Nuevo evento" onSubmit={createTournament}><TransmissionFields /><TeamSelection api={api} /></Config></details>
+            <details className="event-create" open={!tournaments.length || undefined}><summary>+ Crear evento o campeonato</summary><Config title="Nuevo evento" onSubmit={createTournament} busy={creatingEvent} error={createEventError}><TransmissionFields /><TeamSelection api={api} /></Config></details>
           </>}
         </section>
       </main>
@@ -1604,13 +1613,14 @@ function Dashboard({ admin, setAdmin }) {
   );
 }
 
-function Config({ title, children, onSubmit }) {
+function Config({ title, children, onSubmit, busy = false, error = '' }) {
   return (
     <section className="resource">
       <h2>{title}</h2>
       <form onSubmit={onSubmit}>
-        {children}
-        <button>Guardar</button>
+        <fieldset className="config-fields" disabled={busy}>{children}
+        {error && <p className="brand-error" role="alert">{error}</p>}
+        <button>{busy ? 'Guardando…' : 'Guardar'}</button></fieldset>
       </form>
     </section>
   );
@@ -1649,20 +1659,7 @@ function ThemeManager({ tournament, onSaved, say }) {
     ["Cancha", { primary: "#123D2A", secondary: "#FFFFFF", accent: "#E7C14A", text: "#FFFFFF", background: "#081C14" }],
     ["Clásico", { primary: "#24164E", secondary: "#FFFFFF", accent: "#E93E52", text: "#FFFFFF", background: "#130D29" }],
   ];
-  const uploadLogo = async () => {
-    if (!logoFile) return logo;
-    const form = new FormData();
-    form.append("file", logoFile);
-    form.append("folder", `torneos-${tournament.slug}`);
-    const response = await fetch(`${API}/api/sports/upload`, {
-      method: "POST",
-      credentials: "include",
-      body: form,
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || "No se pudo subir el logo.");
-    return data;
-  };
+  const uploadLogo = async () => logoFile ? uploadEventLogo(logoFile, API) : logo;
   const save = async (event) => {
     event.preventDefault();
     try {
@@ -1683,7 +1680,7 @@ function ThemeManager({ tournament, onSaved, say }) {
     <section className="theme-manager">
       <div className="theme-intro">
         <span>IDENTIDAD DE TRANSMISIÓN</span>
-        <h2>Marca y tema del torneo</h2>
+        <h2>Marca y tema del evento</h2>
         <p>Los colores y el logo se aplican a la fuente de OBS, a las pantallas y a todos los gráficos del torneo seleccionado.</p>
       </div>
       <div className="theme-presets" aria-label="Temas rápidos">
@@ -1718,7 +1715,7 @@ function ThemeManager({ tournament, onSaved, say }) {
             ))}
           </div>
           <label className="file-field">
-            Logo del torneo
+            Logo del evento
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/svg+xml"

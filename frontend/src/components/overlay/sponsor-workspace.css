@@ -20,6 +20,11 @@
 .team-create-choice .team-avatar { width:40px; height:44px; flex-shrink:0; }
 .team-create-selection { grid-column:1/-1; }
 .team-create-selection summary { cursor:pointer; padding:12px 0; }
+.config-fields { display:contents; border:0; padding:0; margin:0; min-width:0; }
+.event-logo-field { grid-column:1/-1; min-width:0; }
+.event-logo-field > p { color:#a9bdcf; font-size:13px; line-height:1.6; }
+.event-logo-preview { display:flex; align-items:center; gap:18px; margin-top:14px; }
+.event-logo-preview img { width:88px; height:88px; object-fit:contain; padding:8px; border-radius:12px; background:#172c3d; border:1px solid #304759; }
 .team-create-selection p { color:#a9bdcf; font-size:13px; line-height:1.5; }
 .brand-tags { display:flex; flex-wrap:wrap; gap:7px; }
 .brand-tags span,.brand-count { font-size:11px; padding:6px 9px; border-radius:20px; background:#24394b; color:#c2d6e6; }

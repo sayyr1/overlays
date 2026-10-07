@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import './studio.css';
+import EventLogoField from './EventLogoField';
 
 const types = { opening: 'Inicio', break: 'Pausa', ending: 'Cierre', countdown: 'Cuenta regresiva', speaker: 'Nombre e invitado', topic: 'Tema', location: 'Ubicación', social: 'Redes y contacto', announcement: 'Aviso' };
 const layerFor = type => ['opening', 'break', 'ending', 'countdown'].includes(type) ? 'main' : type === 'announcement' ? 'temporary' : 'lower';
@@ -92,5 +93,6 @@ export function TransmissionFields() {
     <input name="name" aria-label="Nombre de la transmisión" placeholder="Nombre de la transmisión" maxLength={120} required />
     <input name="season" aria-label="Edición o temporada" placeholder="Edición o temporada (opcional)" />
     <input name="slug" aria-label="Nombre del enlace" placeholder="Nombre del enlace (opcional)" />
+    <EventLogoField />
   </>;
 }

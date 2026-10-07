@@ -6,6 +6,7 @@ import { SponsorLibrary, EventSponsors } from "./components/overlay/SponsorWorks
 import SponsorDeck from './components/overlay/SponsorDeck';
 import ObsAudioPanel from './components/overlay/ObsAudioPanel';
 import ReplayPanel from './components/overlay/ReplayPanel';
+import ControlIcon from './components/overlay/ControlIcon';
 import ReplayBranding from './components/overlay/ReplayBranding';
 import { sponsorPlayback } from './utils/sponsorPlayback';
 import OverlayComposition from "./components/overlay/OverlayComposition";
@@ -1157,7 +1158,7 @@ function Dashboard({ admin, setAdmin }) {
           </div>
         </header>
         {menuOpen && <section id="workspace-menu" className="workspace-menu" aria-label={general ? "Transmisión y sesión" : "Torneo y sesión"}>
-          <label htmlFor="mobile-tournament">{general ? "Transmisión activa" : "Torneo activo"}</label>
+          <div className="mobile-workspace-links"><button className="outline" onClick={() => { setTab('events'); setMenuOpen(false); }}>Eventos</button><button className="outline" onClick={() => { setTab('setup'); setMenuOpen(false); }}>Configurar evento</button><button className="outline" onClick={() => { setTab('sponsors'); setMenuOpen(false); }}>Auspiciantes</button></div><label htmlFor="mobile-tournament">{general ? "Transmisión activa" : "Torneo activo"}</label>
           <select id="mobile-tournament" value={selected._id} onChange={event => { setSelectedId(event.target.value); setMenuOpen(false); }}>
             {tournaments.map(t => <option key={t._id} value={t._id}>{t.name} {t.season}</option>)}
           </select>
@@ -1166,7 +1167,7 @@ function Dashboard({ admin, setAdmin }) {
           <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
           <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
         </section>}
-        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['match', general ? 'Evento' : 'Partido'], ['graphics', 'Gráficos'], ['ads', 'Publicidad'], ['replay', 'Repeticiones'], ['output', 'Salida']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={event => { setMobileLiveScreen(screen); event.currentTarget.parentElement.scrollIntoView?.({ block: 'start', behavior: 'auto' }); }}>{label}{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
+        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['match', general ? 'Evento' : 'Partido'], ['graphics', 'Gráficos'], ['ads', 'Publicidad'], ['replay', 'Repeticiones'], ['output', 'Salida']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={() => { setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }}><ControlIcon name={screen === 'match' ? 'match' : screen} /><span>{label}</span>{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
         {tab === "live" && general ? (
           <section className="live-layout">
             <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>

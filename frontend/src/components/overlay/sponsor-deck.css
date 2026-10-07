@@ -6,6 +6,7 @@
 .sponsor-deck-status { display:grid; gap:7px; padding:16px; margin:18px 0; background:#071727; border-left:3px solid #e6bb51; border-radius:8px; }
 .sponsor-deck-status span,.sponsor-deck-status small { color:#b6cddd; }
 .sponsor-deck-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.sponsor-deck-actions button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
 .sponsor-deck-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px; margin-top:20px; }
 .sponsor-deck-brand { padding:16px; border:1px solid #36546a; border-radius:10px; }
 .sponsor-deck-brand.is-on-air { border-color:#e6bb51; background:#e6bb510a; }

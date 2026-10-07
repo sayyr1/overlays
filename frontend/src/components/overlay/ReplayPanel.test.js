@@ -17,11 +17,11 @@ test('saving and playing use the event and registered clip, with separate return
   const api = jest.fn(async (url, options) => options ? { ...status, replay: { ...status.replay, playingClipId: JSON.parse(options.body).action === 'play' ? 'clip' : null } } : status);
   render(<ReplayPanel tournament={{ _id: 'event' }} api={api} />);
   await screen.findByText('Última jugada');
-  expect(screen.getAllByRole('button', { name: 'Reproducir' })).toHaveLength(1);
+  expect(screen.getAllByRole('button', { name: 'Reproducir Última jugada' })).toHaveLength(1);
   fireEvent.click(screen.getByRole('button', { name: 'Guardar jugada' }));
   await waitFor(() => expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(1));
   expect(JSON.parse(api.mock.calls.find(c => c[1]?.method)[1].body)).toEqual({ action: 'save', tournamentId: 'event' });
-  fireEvent.click(screen.getByRole('button', { name: 'Reproducir' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir Última jugada' }));
   await screen.findByText('REPETICIÓN EN AIRE');
   expect(screen.getByRole('button', { name: 'Guardar jugada' })).toBeDisabled();
   fireEvent.click(screen.getByRole('button', { name: 'Volver al directo' }));
@@ -49,4 +49,18 @@ test('clip menu renames a scoped clip and requires a second action to delete it'
   fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }));
   await waitFor(() => expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(2));
   expect(JSON.parse(api.mock.calls.filter(c => c[1]?.method)[1][1].body)).toEqual({ action: 'delete', tournamentId: 'event', clipId: 'clip' });
+});
+
+test('the deck pages clips and the latest shortcut always sends the newest registered clip', async () => {
+  const status = { connected: true, replay: { bufferAvailable: true, bufferActive: true, clips: Array.from({ length: 8 }, (_, i) => ({ id: `clip${i}`, name: `Clip ${i}`, tournamentId: 'event', savedAt: new Date().toISOString() })) } };
+  const api = jest.fn(async () => status);
+  render(<ReplayPanel tournament={{ _id: 'event' }} api={api} />);
+  await screen.findByText('Clip 0');
+  expect(screen.queryByText('Clip 6')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Anteriores →' }));
+  expect(screen.getByText('Clip 6')).toBeInTheDocument();
+  expect(screen.queryByText('Clip 0')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Reproducir última' }));
+  await waitFor(() => expect(api.mock.calls.filter(c => c[1]?.method)).toHaveLength(1));
+  expect(JSON.parse(api.mock.calls.find(c => c[1]?.method)[1].body)).toEqual({ action: 'play', tournamentId: 'event', clipId: 'clip0' });
 });

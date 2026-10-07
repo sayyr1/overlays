@@ -143,3 +143,36 @@
   .event-sponsors { padding: 12px; }
   .brand-selection-footer { margin-right: -12px; margin-left: -12px; padding-right: 12px; padding-left: 12px; }
 }
+
+/* A single live navigation bar and compact pads keep the phone in operator mode. */
+@media (max-width:760px) {
+  .app-shell[data-mobile-live-screen] > aside { display:none; }
+  .app-shell[data-mobile-live-screen] .workspace { padding:14px 14px 20px; }
+  .app-shell[data-mobile-live-screen] .workspace > header { flex-wrap:nowrap; margin-bottom:16px; align-items:center; }
+  .app-shell[data-mobile-live-screen] .workspace > header > div:first-child { min-width:0; flex:1; }
+  .app-shell[data-mobile-live-screen] .workspace > header h1 { margin:4px 0 0; font-size:16px; line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .app-shell[data-mobile-live-screen] .workspace > header .eyebrow { font-size:9px; }
+  .app-shell[data-mobile-live-screen] .workspace-tools > .status { display:none; }
+  .app-shell[data-mobile-live-screen] .mobile-menu-toggle { font-size:12px; min-height:44px; }
+  .app-shell[data-mobile-live-screen] .mobile-live-navigation { position:fixed; top:auto; bottom:0; left:0; right:0; margin:0; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); border:0; border-top:1px solid #30465b; background:#081725f5; box-shadow:0 -8px 28px #0005; gap:4px; }
+  .app-shell[data-mobile-live-screen] .mobile-live-navigation button { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; min-height:58px; padding:6px 2px; border-radius:12px; font-size:9px; }
+  .mobile-live-navigation .control-icon { width:22px; height:22px; }
+  .app-shell[data-mobile-live-screen] .mobile-live-navigation .mobile-live-active { background:#203b4f; border-color:#4f6b80; color:#ffe19a; }
+  .mobile-workspace-links { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:16px; }
+  .app-shell[data-mobile-live-screen] .live-operator-bar { padding:10px 12px; margin-bottom:16px; }
+  .app-shell[data-mobile-live-screen] .live-operator-bar > div:first-child { display:none; }
+  .app-shell[data-mobile-live-screen] .operator-signals { flex-wrap:nowrap; overflow-x:auto; width:100%; }
+  .app-shell[data-mobile-live-screen] .operator-signals span { white-space:nowrap; flex-shrink:0; }
+  .app-shell[data-mobile-live-screen="ads"] .obs-audio-panel { display:none; }
+  .app-shell[data-mobile-live-screen="output"] .obs-audio-panel { margin-bottom:16px; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck { border:0; background:transparent; padding:0; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck-actions { grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck-actions button { min-height:100px; padding:12px 6px; font-size:11px; border-radius:14px; box-shadow:inset 0 1px 0 #ffffff18,0 4px 0 #040f1b; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck-brand { padding:12px; border-radius:14px; background:#132a3f; box-shadow:inset 0 1px 0 #ffffff0b,0 4px 0 #040f1b; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck-brand > div:last-child { grid-template-columns:1fr; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck-brand-heading { flex-direction:row; }
+  .app-shell[data-mobile-live-screen] .sponsor-deck-brand small { font-size:10px; }
+  .app-shell[data-mobile-live-screen] .graphics-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .app-shell[data-mobile-live-screen] .graphics-grid .deck-key { min-height:112px; border-radius:14px; box-shadow:inset 0 1px 0 #ffffff0b,0 4px 0 #040f1b; background:#132a3f; border-color:#3a556e; }
+  .app-shell[data-mobile-live-screen] .graphics-grid .deck-key.on-air { background:#143a32; border-color:#66d4a6; }
+}

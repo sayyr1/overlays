@@ -4,24 +4,48 @@
 .replay-signal { font-size:11px; color:#a9bed1; }
 .replay-signal.is-active { color:#79e6bc; }
 .replay-configure { margin-top:14px; min-height:44px; font-size:12px; }
-.replay-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0 12px; }
-.replay-actions button { min-height:50px; font-size:13px; }
-.replay-return { grid-column:1/-1; }
+.replay-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:18px 0 12px; }
+.replay-actions button { display:flex; flex-direction:column; justify-content:center; align-items:center; gap:10px; min-height:110px; font-size:13px; line-height:1.4; padding:12px 8px; }
+.replay-actions .control-icon { width:30px; height:30px; }
+.replay-actions .replay-return:not(:disabled) { border-color:#69dcb6; background:#113c32; color:#a4f3d8; }
+.replay-start { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; }
 .replay-help { color:#a9bed1; font-size:12px; line-height:1.6; }
-.replay-list { display:grid; gap:10px; max-height:360px; overflow:auto; }
-.replay-list article { display:block; padding:12px; border:1px solid #2d465a; border-radius:10px; background:#091b29; }
-.replay-clip-main { display:flex; align-items:center; gap:8px; }
+.replay-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+.replay-list article { position:relative; display:block; padding:0; border:1px solid #3a556e; border-radius:14px; background:#132a3f; box-shadow:inset 0 1px 0 #ffffff0b,0 4px 0 #040f1b; overflow:hidden; min-width:0; }
+.replay-clip-main { position:relative; }
+.replay-list .replay-clip-pad { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; width:100%; min-height:132px; padding:16px 12px; border:0; border-radius:0; background:transparent; color:#e5f0fa; text-align:left; gap:8px; }
+.replay-list .replay-clip-pad:disabled { opacity:.55; }
+.replay-list .is-on-air .replay-clip-pad { opacity:1; color:#9af0ca; }
+.replay-pad-symbol { display:flex; align-items:center; gap:7px; color:#7cb9ec; padding-right:38px; }
+.replay-pad-symbol > span { font-size:9px; letter-spacing:1px; }
+.replay-list .replay-clip-pad strong { line-height:1.4; overflow-wrap:anywhere; }
+.replay-list .replay-clip-pad small { margin:0; font-size:11px; }
+.replay-list .replay-clip-pad:hover:not(:disabled) { background:#21415c; }
+.replay-list .replay-clip-pad:active:not(:disabled) { background:#315777; }
 .replay-clip-title { flex:1; min-width:0; }
 .replay-clip-title strong { overflow-wrap:anywhere; }
-.replay-list .replay-more { width:44px; padding:0; flex-shrink:0; font-size:24px; }
+.replay-list .replay-more { position:absolute; top:4px; right:4px; width:44px; padding:0; font-size:24px; border:0; background:transparent; color:#adc3d6; }
+.replay-list article.is-editing { grid-column:1/-1; }
+.replay-list article.is-editing .replay-clip-pad { min-height:90px; }
 .replay-clip-options { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.replay-list article > .replay-clip-options,.replay-clip-edit { padding:0 12px 12px; }
 .replay-clip-options .replay-delete { color:#ff9b91; border-color:#a85251; }
 .replay-clip-edit { border-top:1px solid #2d465a; padding-top:12px; margin-top:12px; }
 .replay-clip-edit label { display:grid; gap:8px; font-size:12px; }
 .replay-clip-edit input { width:100%; box-sizing:border-box; }
 .replay-clip-edit p { font-size:13px; line-height:1.6; margin:0; overflow-wrap:anywhere; }
 .replay-clip-options .replay-delete-confirm { background:#e96153; color:#101c2a; }
-.replay-list article.is-on-air { border-color:#e6bb51; }
+.replay-list article.is-on-air { border-color:#66d4a6; background:#143a32; box-shadow:inset 0 0 20px #4fbd9320,0 4px 0 #06251b; }
+.replay-library-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:20px 0 12px; }
+.replay-library-heading h3 { font-size:13px; margin:0; }
+.replay-library-heading h3 span { display:inline-block; margin-left:6px; color:#94b3cc; }
+.replay-library-heading > small { font-size:10px; color:#a5bdd0; }
+.replay-pages { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:16px; }
+.replay-pages button { font-size:11px; padding:8px 10px; }
+.replay-pages span { font-size:12px; color:#99b6cd; white-space:nowrap; }
+.replay-deck-settings { margin-top:20px; border-top:1px solid #2d465a; }
+.replay-deck-settings summary { cursor:pointer; padding:14px 0; font-size:12px; color:#a9bed1; }
+.replay-deck-settings button { margin:0 8px 12px 0; }
 .replay-list strong,.replay-list small { display:block; font-size:13px; }
 .replay-list small { color:#9cb2c5; margin-top:6px; }
 .replay-list button { min-height:44px; font-size:12px; }
@@ -49,3 +73,4 @@
 .replay-branding-buttons { display:flex; gap:10px; flex-wrap:wrap; }
 @media(max-width:760px) { .replay-branding { padding:16px; } .replay-branding-layout { grid-template-columns:1fr; } .replay-branding-layout > div:last-child { grid-row:1; } .replay-branding-buttons { display:grid; } }
 @media(max-width:760px) { .replay-panel { padding:16px; } .mobile-live-navigation { grid-template-columns:repeat(5,minmax(0,1fr)); } .mobile-live-navigation button { font-size:11px; } .app-shell[data-mobile-live-screen]:not([data-mobile-live-screen="replay"]) .replay-panel { display:none; } .app-shell[data-mobile-live-screen="replay"] .live-layout > .deck,.app-shell[data-mobile-live-screen="replay"] .preview-panel,.app-shell[data-mobile-live-screen="replay"] .sponsor-deck,.app-shell[data-mobile-live-screen="replay"] .obs-audio-panel { display:none; } }
+@media(max-width:760px) { .replay-panel { background:transparent; border:0; padding:0; } .replay-panel h2 { font-size:20px; } .replay-signal { padding:6px 9px; background:#12283b; border-radius:20px; font-size:10px; } .replay-signal.is-active { background:#14362d; } .replay-actions { gap:8px; margin-top:16px; } .replay-actions button { min-height:102px; border-radius:14px; font-size:11px; box-shadow:inset 0 1px 0 #ffffff18,0 4px 0 #040f1b; } .replay-list { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .replay-list .replay-clip-pad { min-height:112px; } .replay-panel .replay-more { min-height:44px; } }

@@ -662,7 +662,6 @@ function Dashboard({ admin, setAdmin }) {
     graphics.lowerThird,
     (graphics.sponsorBugVisible || sponsorOnAir) && { type: "Auspiciantes" },
   ].filter(Boolean);
-  const onAirLabel = onAirLayers[0]?.type?.replace(/_/g, " ") || "Sin grafico";
   const overlaySeenAt = snapshot?.overlayLastSeenAt
     ? new Date(snapshot.overlayLastSeenAt).getTime()
     : 0;
@@ -677,37 +676,6 @@ function Dashboard({ admin, setAdmin }) {
         lastTakenCue.duration - Math.floor((cueNow - lastTakenCue.takenAt) / 1000),
       )
     : null;
-  const cuePreviewSnapshot = useMemo(() => {
-    if (!snapshot) return snapshot;
-    const nextGraphics = {
-      scoreboardVisible: false,
-      clockVisible: false,
-      channelBugVisible: false,
-      sponsorBugVisible: false,
-      main: null,
-      temporary: null,
-      lowerThird: null,
-    };
-    if (!selectedCue) return { ...snapshot, graphics: nextGraphics };
-    const previewGraphic = {
-      id: `cue-${selectedCue.id}`,
-      type: selectedCue.type,
-      data:
-        selectedCue.data ||
-        (selectedCue.layer === "event"
-          ? { message: selectedCue.label.replace(/^[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+/, "") }
-          : {}),
-    };
-    if (selectedCue.type === "scoreboard") {
-      nextGraphics.scoreboardVisible = true;
-      nextGraphics.clockVisible = true;
-    }
-    else if (selectedCue.type === "sponsors") nextGraphics.sponsorBugVisible = true;
-    else if (selectedCue.layer === "main") nextGraphics.main = previewGraphic;
-    else if (selectedCue.layer === "lower") nextGraphics.lowerThird = previewGraphic;
-    else nextGraphics.temporary = previewGraphic;
-    return { ...snapshot, graphics: nextGraphics };
-  }, [selectedCue, snapshot]);
   const say = (text) => {
     setNotice(text);
     window.setTimeout(() => setNotice(""), 3000);
@@ -1189,18 +1157,18 @@ function Dashboard({ admin, setAdmin }) {
           <select id="mobile-tournament" value={selected._id} onChange={event => { setSelectedId(event.target.value); setMenuOpen(false); }}>
             {tournaments.map(t => <option key={t._id} value={t._id}>{t.name} {t.season}</option>)}
           </select>
-          {tab === 'live' && <div className="mobile-workspace-links"><button className="outline" onClick={() => { setMobileLiveScreen('graphics'); setMenuOpen(false); }}>Gráficos</button><button className="outline" onClick={() => { setMobileLiveScreen('output'); setMenuOpen(false); }}>Ver salida de OBS</button><button className="outline" onClick={() => { setSetupSection('output'); setTab('setup'); setMenuOpen(false); }}>Enlace fijo de OBS</button></div>}
+          {tab === 'live' && <div className="mobile-workspace-links"><button className="outline" onClick={() => { setMobileLiveScreen('graphics'); setMenuOpen(false); }}>Gráficos</button><button className="outline" onClick={() => { setPreviewOpen(true); setMenuOpen(false); }}>Ver salida de OBS</button><button className="outline" onClick={() => { setSetupSection('output'); setTab('setup'); setMenuOpen(false); }}>Enlace fijo de OBS</button></div>}
           <p>Copiar el enlace de OBS mantiene la misma dirección. El enlace remoto tiene su propia configuración.</p>
           <button className="outline" onClick={copyUrl}>Copiar enlace fijo de OBS</button>
           <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
           <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
         </section>}
-        {tab === 'live' && <LiveConsole key={`console-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSnapshot={next => setSnapshot(previous => previous?.tournamentId && previous.tournamentId !== next.tournamentId ? previous : next)} onNavigate={screen => { setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }} />}
+        {tab === 'live' && <LiveConsole key={`console-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSnapshot={next => setSnapshot(previous => previous?.tournamentId && previous.tournamentId !== next.tournamentId ? previous : next)} onNavigate={screen => { if (screen === 'output') { setPreviewOpen(true); return; } setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }} />}
         {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['favorites', 'Inicio'], ['match', general ? 'Evento' : 'Partido'], ['ads', 'Publicidad'], ['replay', 'Repeticiones'], ['audio', 'Audio']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={() => { setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }}><ControlIcon name={screen} /><span>{label}</span>{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
         {tab === "live" && general ? (
           <section className="live-layout">
             <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>
-            <div className="live-monitor-column"><div className="preview-panel"><h2>Salida de la transmisión</h2><ResponsivePreview snapshot={snapshot} className="preview-frame" /><p>Vista previa de la misma composición de OBS.</p></div>{sponsorDeckPanel}</div>
+            <div className="live-monitor-column">{sponsorDeckPanel}</div>
           </section>
         ) : tab === "live" ? (
           <>
@@ -1436,55 +1404,7 @@ function Dashboard({ admin, setAdmin }) {
                   </div>
                 </section>
               </div>
-              <div className="live-monitor-column"><div className="preview-panel">
-                <h2>Vista previa · misma composición OBS</h2>
-                <div className="cue-preview-header">
-                  <span>PREVISUALIZACION · SIGUIENTE</span>
-                  <b>{selectedCue ? selectedCue.label : "SELECCIONA UN GRAFICO"}</b>
-                </div>
-                <ResponsivePreview snapshot={cuePreviewSnapshot} className="preview-frame cue-preview-frame" />
-                <div className="program-preview-header">
-                  <span>PROGRAMA · SALIDA OBS</span>
-                  <b>{onAirLabel}</b>
-                </div>
-                <ResponsivePreview snapshot={snapshot} className="preview-frame" />
-                <div className="program-strip">
-                  <span>EN AIRE</span>
-                  <strong>{onAirLabel}</strong>
-                  <b>
-                    {lastTakenRemaining !== null
-                      ? `00:${String(lastTakenRemaining).padStart(2, "0")}`
-                      : onAirLayers.length
-                        ? "ACTIVO"
-                        : "LIMPIO"}
-                  </b>
-                </div>
-                <div className="preview-tools">
-                  <span>
-                    EN AIRE:{" "}
-                    <b>
-                      {snapshot?.graphics?.main?.type ||
-                        snapshot?.graphics?.temporary?.type ||
-                        snapshot?.graphics?.lowerThird?.type ||
-                        (snapshot?.graphics?.scoreboardVisible
-                          ? "marcador"
-                          : "sin gráfico")}
-                    </b>
-                  </span>
-                  <button
-                    className="outline preview-expand"
-                    onClick={() => setPreviewOpen(true)}
-                  >
-                    Ampliar salida
-                  </button>
-                </div>
-                <p>
-                  {activeMatch
-                    ? `${activeMatch.homeTeam?.name} vs ${activeMatch.awayTeam?.name}`
-                    : "Sin partido activo"}{" "}
-                  · {snapshot?.generatedAt ? "Estado recibido a las " + new Date(snapshot.generatedAt).toLocaleTimeString() : "Esperando estado"}
-                </p>
-              </div>{sponsorDeckPanel}</div>
+              <div className="live-monitor-column">{sponsorDeckPanel}</div>
             </section>
             <section className="history">
               <div className="history-heading">
@@ -1581,11 +1501,11 @@ function Dashboard({ admin, setAdmin }) {
       {deleteOpen && <div className="delete-event-backdrop"><section className="delete-event-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-event-title"><h2 id="delete-event-title">Eliminar {selected.name}</h2><p>Esta acción es irreversible. Se eliminaran los partidos e historial del evento. Tus equipos, jugadores, auspiciantes y archivos compartidos se conservan.</p><form onSubmit={event => { event.preventDefault(); deleteTournament(); }}><label>Escribe el nombre del evento para confirmar<input autoFocus value={deleteConfirmation} disabled={deleteBusy} onChange={event => setDeleteConfirmation(event.target.value)} autoComplete="off" /></label><p className="delete-event-name">{selected.name}</p>{deleteError && <p className="brand-error" role="alert">{deleteError}</p>}<div className="delete-event-actions"><button type="button" className="outline" disabled={deleteBusy} onClick={() => setDeleteOpen(false)}>Cancelar</button><button type="submit" className="danger" disabled={deleteBusy || deleteConfirmation.trim() !== selected.name}>{deleteBusy ? 'Eliminando…' : 'Eliminar definitivamente'}</button></div></form></section></div>}
       {previewOpen && (
         <div className="preview-modal" onClick={() => setPreviewOpen(false)}>
-          <section onClick={(event) => event.stopPropagation()}>
+          <section role="dialog" aria-modal="true" aria-labelledby="graphics-check-title" onClick={(event) => event.stopPropagation()}>
             <header>
               <div>
-                <span className="eyebrow">PREVISUALIZACION DE OPERADOR</span>
-                <h2>Salida 1920 × 1080</h2>
+                <span className="eyebrow">COMPROBACIÓN OPCIONAL</span>
+                <h2 id="graphics-check-title">Gráficos de OBS · 1920 × 1080</h2>
               </div>
               <button className="outline" onClick={() => setPreviewOpen(false)}>
                 Cerrar
@@ -1593,8 +1513,8 @@ function Dashboard({ admin, setAdmin }) {
             </header>
             <ResponsivePreview snapshot={snapshot} className="preview-modal-frame" />
             <p>
-              La misma composición de OBS, ampliada para verificar gráficos y
-              posición.
+              Comprueba la posición de los gráficos. El video y el audio de la
+              transmisión se supervisan en OBS.
             </p>
           </section>
         </div>

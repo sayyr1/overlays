@@ -45,6 +45,38 @@ beforeEach(() => {
 });
 afterEach(() => { jest.restoreAllMocks(); });
 
+test('el control deportivo no monta monitores y permite comprobar gráficos solo a pedido', async () => {
+  const { container } = render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));
+  expect(container.querySelector('.preview-panel')).toBeNull();
+  expect(container.querySelector('.preview-frame')).toBeNull();
+  expect(screen.getByRole('region', { name: 'Control de publicidad' })).toBeInTheDocument();
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Más' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Ver salida de OBS' }));
+  const dialog = screen.getByRole('dialog', { name: 'Gráficos de OBS · 1920 × 1080' });
+  expect(dialog).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Cerrar' }));
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  expect(global.fetch.mock.calls.some(([, options]) => options?.method && options.method !== 'GET')).toBe(false);
+});
+
+test('el control de eventos generales también elimina la vista previa permanente', async () => {
+  const original = global.fetch;
+  global.fetch = jest.fn(async (url, options) => {
+    if (url.endsWith('/tournaments')) return { ok: true, status: 200, json: async () => [{ _id: 'cup', name: 'Evento de prueba', mode: 'general' }] };
+    if (url.endsWith('/overlay-state')) return { ok: true, status: 200, json: async () => ({ mode: 'general', graphics: {}, broadcast: { scenes: [] } }) };
+    return original(url, options);
+  });
+  const { container } = render(<App />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));
+  expect(container.querySelector('.preview-panel')).toBeNull();
+  expect(screen.queryByRole('heading', { name: 'Salida de la transmisión' })).not.toBeInTheDocument();
+  expect(screen.getByRole('region', { name: 'Control de publicidad' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /Salida OBS/ }));
+  expect(screen.getByRole('dialog', { name: 'Gráficos de OBS · 1920 × 1080' })).toBeInTheDocument();
+});
+
 test('el control móvil cambia de pantalla sin perder el evento activo', async () => {
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));

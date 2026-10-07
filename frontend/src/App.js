@@ -7,6 +7,8 @@ import SponsorDeck from './components/overlay/SponsorDeck';
 import ObsAudioPanel from './components/overlay/ObsAudioPanel';
 import ReplayPanel from './components/overlay/ReplayPanel';
 import ControlIcon from './components/overlay/ControlIcon';
+import LiveConsole from './components/overlay/LiveConsole';
+import OutputSettings from './components/overlay/OutputSettings';
 import ReplayBranding from './components/overlay/ReplayBranding';
 import { sponsorPlayback } from './utils/sponsorPlayback';
 import OverlayComposition from "./components/overlay/OverlayComposition";
@@ -85,20 +87,34 @@ function Overlay() {
   const [error, setError] = useState("");
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const token = params.get("token") || "";
+  const permanent = window.location.pathname.replace(/\/+$/, '') === '/overlay/programa';
+  const outputRevision = useRef(-1);
+  const observed = useRef(null);
+  const request = useRef(0);
+  const fetching = useRef(false);
   const slug = window.location.pathname.split("/").filter(Boolean).pop();
   const refresh = useCallback(async () => {
+    if (fetching.current) return;
+    fetching.current = true;
+    const version = ++request.current;
     try {
       const data = await api(
-        `/overlay/tournaments/${encodeURIComponent(slug)}?token=${encodeURIComponent(token)}`,
+        permanent ? `/overlay/output?token=${encodeURIComponent(token)}` : `/overlay/tournaments/${encodeURIComponent(slug)}?token=${encodeURIComponent(token)}`,
       );
-      setSnapshot((previous) =>
-        !previous || data.revision >= previous.revision ? data : previous,
-      );
+      if (version !== request.current) return;
+      const next = permanent ? data.snapshot : data;
+      if (permanent) outputRevision.current = data.outputRevision;
+      setSnapshot(previous => {
+        const value = !previous || !next || previous.tournamentId !== next.tournamentId || next.revision >= previous.revision ? next : previous;
+        observed.current = value; return value;
+      });
       setError("");
     } catch (e) {
+      if (version !== request.current) return;
       setError(e.message);
-    }
-  }, [slug, token]);
+      if (permanent && e.message.includes('HTTP 403')) { observed.current = null; setSnapshot(null); }
+    } finally { fetching.current = false; }
+  }, [slug, token, permanent]);
   // Pusher entrega el cambio inmediato; este sondeo corto es la recuperación cuando
   // Pusher no está configurado o se pierde una notificación.
   useEffect(() => {
@@ -110,13 +126,13 @@ function Overlay() {
     if (!slug || !token) return undefined;
     const heartbeat = () =>
       api(
-        `/overlay/tournaments/${encodeURIComponent(slug)}/heartbeat?token=${encodeURIComponent(token)}`,
-        { method: "POST" },
+        permanent ? `/overlay/output/heartbeat?token=${encodeURIComponent(token)}` : `/overlay/tournaments/${encodeURIComponent(slug)}/heartbeat?token=${encodeURIComponent(token)}`,
+        { method: "POST", ...(permanent ? { body: JSON.stringify({ outputRevision: outputRevision.current, tournamentId: observed.current?.tournamentId, stateRevision: observed.current?.revision }) } : {}) },
       ).catch(() => undefined);
     heartbeat();
-    const id = window.setInterval(heartbeat, 12000);
+    const id = window.setInterval(heartbeat, permanent ? 4000 : 12000);
     return () => window.clearInterval(id);
-  }, [slug, token]);
+  }, [slug, token, permanent]);
   useEffect(() => {
     const key = process.env.REACT_APP_PUSHER_KEY || window.__VITE_PUSHER_KEY__;
     const cluster =
@@ -125,7 +141,7 @@ function Overlay() {
     const pusher = new Pusher(key, {
       cluster,
       channelAuthorization: {
-        endpoint: `${API}/api/sports/overlay/auth?slug=${encodeURIComponent(slug)}&token=${encodeURIComponent(token)}`,
+        endpoint: permanent ? `${API}/api/sports/overlay/output/auth?token=${encodeURIComponent(token)}` : `${API}/api/sports/overlay/auth?slug=${encodeURIComponent(slug)}&token=${encodeURIComponent(token)}`,
         transport: "ajax",
       },
     });
@@ -133,11 +149,12 @@ function Overlay() {
       `private-overlay-${snapshot.tournamentId}`,
     );
     channel.bind("overlay-invalidated", refresh);
-    channel.bind("overlay-state", (next) =>
-      setSnapshot((old) => (!old || next.revision > old.revision ? next : old)),
-    );
+    channel.bind("overlay-state", next => setSnapshot(old => {
+      const value = old?.tournamentId === next.tournamentId && next.revision > old.revision ? next : old;
+      observed.current = value; return value;
+    }));
     return () => pusher.disconnect();
-  }, [snapshot?.tournamentId, slug, token, refresh]);
+  }, [snapshot?.tournamentId, slug, token, refresh, permanent]);
   return error && !snapshot ? (
     <div className="overlay-error">Enlace del overlay no válido.</div>
   ) : (
@@ -598,7 +615,7 @@ function StatsControl({ snapshot, control, disabled }) {
 
 function Dashboard({ admin, setAdmin }) {
   const [tab, setTab] = useState("events");
-  const [mobileLiveScreen, setMobileLiveScreen] = useState('match');
+  const [mobileLiveScreen, setMobileLiveScreen] = useState('favorites');
   const [setupSection, setSetupSection] = useState('sponsors');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
@@ -910,7 +927,7 @@ function Dashboard({ admin, setAdmin }) {
       setTab('setup');
       setCreatedLink(`${window.location.origin}${result.overlayUrl}`);
       await load();
-      say("Transmisión creada. Tu enlace de OBS está disponible en el panel.");
+      say("Evento creado. Envíalo a la salida de OBS cuando esté listo.");
     } catch (err) {
       say(err.message);
     }
@@ -982,16 +999,13 @@ function Dashboard({ admin, setAdmin }) {
     say("Partido activo actualizado; OBS mantiene la misma URL.");
   };
   const copyUrl = async () => {
-    if (!window.confirm("Esto invalida la URL anterior de OBS. ¿Continuar?"))
-      return;
     try {
-      const data = await api(`/tournaments/${selected._id}/overlay-token`, {
-        method: "POST",
-      });
+      const data = await api('/obs/output');
+      setCreatedLink(`${window.location.origin}${data.overlayUrl}`);
       await navigator.clipboard.writeText(
         `${window.location.origin}${data.overlayUrl}`,
       );
-      say("Nueva URL de OBS copiada.");
+      say("Enlace fijo de OBS copiado. La dirección se conserva.");
     } catch (e) {
       say(e.message);
     }
@@ -1105,7 +1119,7 @@ function Dashboard({ admin, setAdmin }) {
           Marca y tema
         </button>
         <button className="outline sidebar-action" onClick={copyUrl}>
-          Regenerar enlace OBS
+          Copiar enlace fijo de OBS
         </button>
         <button className="outline sidebar-action" onClick={copyRemoteUrl}>
           Regenerar enlace remoto
@@ -1136,7 +1150,7 @@ function Dashboard({ admin, setAdmin }) {
         {notice && <div className="toast" role="status">{notice}</div>}
         <nav className="workspace-breadcrumb" aria-label="Ubicación"><button className="link" onClick={() => setTab('events')}>Eventos</button><span>/</span><span>{selected.name}</span><span>/</span><span>{tab === 'live' ? 'Control en vivo' : tab === 'theme' ? 'Marca y tema' : 'Configuración'}</span></nav>
         {createdLink && <section className="workspace-menu" aria-label="Enlace de la nueva transmisión">
-          <strong>Guarda el enlace de OBS de tu nueva transmisión</strong>
+          <strong>Enlace permanente de OBS · el mismo para todos tus eventos</strong>
           <input aria-label="Enlace OBS" readOnly value={createdLink} onFocus={event => event.target.select()} />
           <button className="outline" onClick={async () => { try { await navigator.clipboard.writeText(createdLink); say('Enlace copiado.'); } catch { say('Selecciona el enlace y cópialo manualmente.'); } }}>Copiar enlace</button>
           <button className="outline" onClick={() => setCreatedLink('')}>Ya lo guardé</button>
@@ -1162,12 +1176,14 @@ function Dashboard({ admin, setAdmin }) {
           <select id="mobile-tournament" value={selected._id} onChange={event => { setSelectedId(event.target.value); setMenuOpen(false); }}>
             {tournaments.map(t => <option key={t._id} value={t._id}>{t.name} {t.season}</option>)}
           </select>
-          <p>Regenerar un enlace invalida el anterior. Actualiza OBS o el dispositivo remoto después.</p>
-          <button className="outline" onClick={copyUrl}>Regenerar enlace OBS</button>
+          {tab === 'live' && <div className="mobile-workspace-links"><button className="outline" onClick={() => { setMobileLiveScreen('graphics'); setMenuOpen(false); }}>Gráficos</button><button className="outline" onClick={() => { setMobileLiveScreen('output'); setMenuOpen(false); }}>Ver salida de OBS</button><button className="outline" onClick={() => { setSetupSection('output'); setTab('setup'); setMenuOpen(false); }}>Enlace fijo de OBS</button></div>}
+          <p>Copiar el enlace de OBS mantiene la misma dirección. El enlace remoto tiene su propia configuración.</p>
+          <button className="outline" onClick={copyUrl}>Copiar enlace fijo de OBS</button>
           <button className="outline" onClick={copyRemoteUrl}>Regenerar enlace remoto</button>
           <button className="outline" onClick={async () => { await api("/auth/logout", { method: "POST" }); setAdmin(null); }}>Cerrar sesión</button>
         </section>}
-        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['match', general ? 'Evento' : 'Partido'], ['graphics', 'Gráficos'], ['ads', 'Publicidad'], ['replay', 'Repeticiones'], ['output', 'Salida']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={() => { setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }}><ControlIcon name={screen === 'match' ? 'match' : screen} /><span>{label}</span>{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
+        {tab === 'live' && <LiveConsole key={`console-${selected._id}`} tournament={selected} snapshot={snapshot} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSnapshot={next => setSnapshot(previous => previous?.tournamentId && previous.tournamentId !== next.tournamentId ? previous : next)} onNavigate={screen => { setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }} />}
+        {tab === 'live' && <nav className="mobile-live-navigation" aria-label="Pantallas de control en vivo">{[['favorites', 'Inicio'], ['match', general ? 'Evento' : 'Partido'], ['ads', 'Publicidad'], ['replay', 'Repeticiones'], ['audio', 'Audio']].map(([screen, label]) => <button key={screen} aria-pressed={mobileLiveScreen === screen} className={mobileLiveScreen === screen ? 'mobile-live-active' : ''} onClick={() => { setMobileLiveScreen(screen); window.scrollTo({ top: 0, behavior: 'auto' }); }}><ControlIcon name={screen} /><span>{label}</span>{screen === 'ads' && sponsorOnAir && <span className="mobile-live-dot" />}</button>)}</nav>}
         {tab === "live" && general ? (
           <section className="live-layout">
             <div className="deck"><BroadcastControls snapshot={snapshot} send={sendBroadcast} busy={broadcastBusy} /></div>
@@ -1485,9 +1501,9 @@ function Dashboard({ admin, setAdmin }) {
           <ThemeManager key={selected._id} tournament={selected} onSaved={load} say={say} />
         ) : (
           <section className="event-configuration">
-            <nav className="configuration-tabs" aria-label="Configuración del evento"><button aria-pressed={setupSection === 'sponsors'} className={setupSection === 'sponsors' ? '' : 'outline'} onClick={() => setSetupSection('sponsors')}>Auspiciantes del evento</button><button aria-pressed={setupSection === 'production'} className={setupSection === 'production' ? '' : 'outline'} onClick={() => setSetupSection('production')}>{general ? 'Gráficos del evento' : 'Equipos y partidos'}</button><button aria-pressed={setupSection === 'media'} className={setupSection === 'media' ? '' : 'outline'} onClick={() => setSetupSection('media')}>Archivos y capas</button><button aria-pressed={setupSection === 'replay'} className={setupSection === 'replay' ? '' : 'outline'} onClick={() => setSetupSection('replay')}>Repeticiones</button><button className="outline" onClick={() => setTab('theme')}>Marca y tema</button></nav>
+            <nav className="configuration-tabs" aria-label="Configuración del evento"><button aria-pressed={setupSection === 'sponsors'} className={setupSection === 'sponsors' ? '' : 'outline'} onClick={() => setSetupSection('sponsors')}>Auspiciantes del evento</button><button aria-pressed={setupSection === 'production'} className={setupSection === 'production' ? '' : 'outline'} onClick={() => setSetupSection('production')}>{general ? 'Gráficos del evento' : 'Equipos y partidos'}</button><button aria-pressed={setupSection === 'media'} className={setupSection === 'media' ? '' : 'outline'} onClick={() => setSetupSection('media')}>Archivos y capas</button><button aria-pressed={setupSection === 'replay'} className={setupSection === 'replay' ? '' : 'outline'} onClick={() => setSetupSection('replay')}>Repeticiones</button><button aria-pressed={setupSection === 'output'} className={setupSection === 'output' ? '' : 'outline'} onClick={() => setSetupSection('output')}>Salida OBS</button><button className="outline" onClick={() => setTab('theme')}>Marca y tema</button></nav>
             <section className="setup-grid">
-            {setupSection === 'replay' ? <ReplayBranding key={selected._id} tournament={selected} api={api} /> : setupSection === 'media' ? <MediaStudio initiallyOpen key={selected._id} tournament={selected} snapshot={snapshot} api={api} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={setSnapshot} /> : setupSection === 'sponsors' ? <EventSponsors key={selected._id} tournament={selected} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSaved={load} onOpenLibrary={() => setTab('sponsors')} /> : general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
+            {setupSection === 'output' ? <OutputSettings api={api} /> : setupSection === 'replay' ? <ReplayBranding key={selected._id} tournament={selected} api={api} /> : setupSection === 'media' ? <MediaStudio initiallyOpen key={selected._id} tournament={selected} snapshot={snapshot} api={api} preview={<ResponsivePreview snapshot={snapshot} className="preview-frame" />} onSnapshot={setSnapshot} /> : setupSection === 'sponsors' ? <EventSponsors key={selected._id} tournament={selected} sponsors={sponsorEventId === selected._id ? sponsors : []} api={api} onSaved={load} onOpenLibrary={() => setTab('sponsors')} /> : general ? <BroadcastEditor key={selected._id} tournament={selected} api={api} onSaved={load} onCreated={result => { setSelectedId(result.tournament._id); setCreatedLink(`${window.location.origin}${result.overlayUrl}`); }} /> : <>
             <Config title="Equipos" onSubmit={(e) => create(e, "teams")}>
               <input name="name" placeholder="Nombre" required />
               <input name="shortName" placeholder="Nombre corto" required />
@@ -1792,7 +1808,7 @@ function EventPicker({ title, teams, players, onCancel, onSubmit, submitLabel })
 }
 
 export default function App() {
-  const overlay = window.location.pathname.startsWith("/overlay/torneo/");
+  const overlay = window.location.pathname.startsWith("/overlay/torneo/") || window.location.pathname.replace(/\/+$/, '') === '/overlay/programa';
   const remote = window.location.pathname.startsWith("/control-remoto/");
   const [admin, setAdmin] = useState(undefined);
   useEffect(() => {

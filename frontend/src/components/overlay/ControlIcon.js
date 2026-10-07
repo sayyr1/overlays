@@ -1,6 +1,8 @@
 import React from 'react';
 
 const paths = {
+  favorites: <path d="m12 3 3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1Z" />,
+  audio: <><path d="M4 9h4l5-4v14l-5-4H4Z" /><path d="M17 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14" /></>,
   save: <><path d="M12 3v12m-5-5 5 5 5-5" /><path d="M4 16v4h16v-4" /></>,
   play: <path d="m9 5 11 7-11 7Z" />,
   back: <><path d="m8 4-5 5 5 5M3 9h11a6 6 0 0 1 0 12h-3" /></>,

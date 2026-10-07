@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import App from './App';
 
 beforeEach(() => {
@@ -21,12 +21,14 @@ afterEach(() => { jest.restoreAllMocks(); });
 test('el control móvil cambia de pantalla sin perder el evento activo', async () => {
   render(<App />);
   fireEvent.click(await screen.findByRole('button', { name: 'Control en vivo' }));
+  expect(within(screen.getByRole('navigation', { name: 'Pantallas de control en vivo' })).getByRole('button', { name: 'Inicio' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Partido' }));
   expect(screen.getByRole('button', { name: 'Partido' })).toHaveAttribute('aria-pressed', 'true');
   fireEvent.click(screen.getByRole('button', { name: 'Publicidad' }));
   expect(screen.getByRole('button', { name: 'Publicidad' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('region', { name: 'Control de publicidad' })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole('button', { name: 'Salida' }));
-  expect(screen.getByRole('button', { name: 'Salida' })).toHaveAttribute('aria-pressed', 'true');
+  fireEvent.click(screen.getByRole('button', { name: 'Audio' }));
+  expect(screen.getByRole('button', { name: 'Audio' })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('heading', { name: 'Copa de prueba' })).toBeInTheDocument();
 });
 
@@ -121,7 +123,7 @@ test('el menú permite acceder a torneo, enlaces y cierre de sesión', async () 
   expect(more).toHaveAttribute('aria-expanded', 'false');
   fireEvent.click(more);
   expect(screen.getByLabelText('Torneo activo')).toHaveValue('cup');
-  expect(screen.getByRole('region', { name: 'Torneo y sesión' })).toHaveTextContent('Regenerar un enlace invalida el anterior');
+  expect(screen.getByRole('region', { name: 'Torneo y sesión' })).toHaveTextContent('Copiar el enlace de OBS mantiene la misma dirección');
   fireEvent.click(more);
   expect(screen.queryByLabelText('Torneo activo')).not.toBeInTheDocument();
 });

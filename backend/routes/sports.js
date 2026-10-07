@@ -16,6 +16,8 @@ import mediaRouter from './media.js';
 import obsAudioRouter from './obsAudio.js';
 import obsBridgeRouter from './obsBridge.js';
 import obsReplayRouter from './obsReplay.js';
+import obsOutputRouter from './obsOutput.js';
+import { getOutput } from '../services/obsOutput.js';
 import { requireSportsAdmin, createSportsSession, sportsCookieOptions } from '../middleware/sportsAuth.js';
 import { currentElapsedSeconds, pauseClock, startClock } from '../services/sportsClock.js';
 import { authenticateOverlayChannel, overlayChannel } from '../services/sportsRealtime.js';
@@ -59,7 +61,8 @@ router.post('/tournaments', requireSportsAdmin, asyncRoute(async (req, res) => {
   const mode = req.body?.mode || 'sports';
   const tournament = await Tournament.create({ ...pick(req.body || {}, ['name', 'season', 'startDate', 'endDate', 'logo', 'active', 'colors', 'branding']), mode, broadcast: req.body?.broadcast || { scenes: defaultBroadcastScenes(mode, req.body.name) }, slug, overlayTokenHash: hashOverlayToken(token), overlayTokenPrefix: token.slice(0, 8) });
   await OverlayState.create({ tournament: tournament._id, scoreboardVisible: mode === 'sports', clockVisible: mode === 'sports' });
-  res.status(201).json({ tournament, overlayToken: token, overlayUrl: `/overlay/torneo/${slug}?token=${token}` });
+  const output = await getOutput();
+  res.status(201).json({ tournament, overlayToken: token, overlayUrl: `/overlay/programa?token=${output.token}`, legacyOverlayUrl: `/overlay/torneo/${slug}?token=${token}` });
 }));
 router.get('/tournaments/:id', requireSportsAdmin, asyncRoute(async (req, res) => { if (invalidId(res, req.params.id)) return; const tournament = await Tournament.findById(req.params.id).populate('activeMatch'); if (!tournament) return res.status(404).json({ message: 'Torneo no encontrado.' }); res.json(tournament); }));
 router.put('/tournaments/:id/broadcast', requireSportsAdmin, asyncRoute(async (req, res) => {
@@ -239,6 +242,7 @@ router.get('/overlay/tournaments/:slug', asyncRoute(async (req, res) => { const 
 router.post('/overlay/tournaments/:slug/heartbeat', asyncRoute(async (req, res) => { const tournament = await findTournamentByOverlayToken(req.params.slug, req.query.token || req.body?.token); if (!tournament) return res.status(403).json({ message: 'El enlace del overlay no es válido.' }); await recordOverlayHeartbeat(tournament._id); res.status(204).end(); }));
 router.post('/overlay/auth', asyncRoute(async (req, res) => { const slug = req.body?.slug || req.query?.slug; const token = req.body?.token || req.query?.token; const tournament = await findTournamentByOverlayToken(slug, token); const expected = tournament && overlayChannel(tournament._id); if (!tournament || req.body?.channel_name !== expected || !req.body?.socket_id) return res.status(403).json({ message: 'No autorizado.' }); res.json(authenticateOverlayChannel(req.body.socket_id, req.body.channel_name)); }));
 
+router.use(obsOutputRouter);
 router.use(obsBridgeRouter);
 router.use(obsReplayRouter);
 router.use(obsAudioRouter);

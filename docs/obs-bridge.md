@@ -60,3 +60,15 @@ En OBS habilita **Ajustes → Salida → Búfer de repetición**, configura la d
 **Reproducir** cambia a una escena propia del puente, ajusta el clip al lienzo de OBS y muestra «REPETICIÓN». Conserva el audio original del clip. El puente vuelve a la escena anterior al terminar o al pulsar **Volver al directo**, incluso sin nuevos mensajes de Vercel. Si cambias manualmente a otra escena en OBS, respeta esa elección. No permite guardar mientras reproduce para evitar capturar la misma repetición.
 
 El búfer de OBS graba la salida del programa, incluidos los gráficos y anuncios visibles en ese momento. No es una grabación aislada de BELABOX. La web no sirve una vista previa de los archivos locales; permite elegirlos por evento y hora. Actualiza y reinicia el puente al instalar esta función; conserva su archivo de vinculación.
+
+## Enlace permanente y control móvil
+
+En **Configuración del evento → Salida OBS**, copia el **enlace permanente** y pégalo una sola vez en la fuente de navegador de OBS (1920 × 1080). La misma dirección sirve para todos los eventos. Copiarla, recargar la aplicación o crear otro campeonato no la cambia. Los enlaces anteriores de cada evento siguen funcionando; la actualización inicial de la fuente a la salida permanente se hace una sola vez.
+
+En **Control en vivo**, el estado superior indica el evento asignado a esa salida. **Enviar este evento a OBS** selecciona explícitamente la producción; cambiar el evento que estás configurando no modifica la salida. Si ya hay un evento asignado, se pide confirmar el cambio. Esta selección también mueve el control de ambiente del puente al nuevo evento, conservando su fuente y sus ajustes de audio.
+
+La fuente de navegador informa qué evento y revisión recibió. **Overlay confirmado** aparece solo con una señal reciente que reconoce la versión vigente. Un cambio aún no reconocido se muestra como **actualizando**. La conexión del puente WebSocket y la señal del overlay se muestran por separado. Un enlace abierto fuera de OBS también puede informar su recepción; el estado no confirma que una transmisión esté iniciada ni que haya espectadores.
+
+En el celular, **Inicio → Editar teclas** permite elegir hasta ocho acciones favoritas. Se conservan en ese dispositivo para ese evento. **Audio** da acceso al mute y al volumen; **Más** contiene Gráficos, vista de salida y configuración. Las órdenes de audio y repeticiones distinguen el envío de la confirmación de casa. Si falla la conexión con la web, las teclas de operación se bloquean mientras se recupera, sin reenviar automáticamente las pulsaciones.
+
+**Reemplazar enlace** está dentro de ajustes avanzados y exige escribir `REEMPLAZAR ENLACE OBS`. Revoca la dirección permanente anterior y requiere volver a pegar la nueva en OBS. No se usa para el cambio habitual de eventos. La clave de visualización se recupera únicamente mediante la sesión de administrador y se excluye de las consultas ordinarias del modelo; las rutas públicas validan su hash y no dan acceso al control.

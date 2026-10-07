@@ -146,6 +146,7 @@
 
 /* A single live navigation bar and compact pads keep the phone in operator mode. */
 @media (max-width:760px) {
+  .app-shell[data-mobile-live-screen="favorites"] .live-layout { display:none; }
   .app-shell[data-mobile-live-screen] > aside { display:none; }
   .app-shell[data-mobile-live-screen] .workspace { padding:14px 14px 20px; }
   .app-shell[data-mobile-live-screen] .workspace > header { flex-wrap:nowrap; margin-bottom:16px; align-items:center; }

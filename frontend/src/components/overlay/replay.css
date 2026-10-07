@@ -9,6 +9,7 @@
 .replay-actions .control-icon { width:30px; height:30px; }
 .replay-actions .replay-return:not(:disabled) { border-color:#69dcb6; background:#113c32; color:#a4f3d8; }
 .replay-start { display:flex; align-items:center; justify-content:center; gap:10px; width:100%; }
+.replay-start.replay-stop-capture { color:#ffc4b9; border-color:#a9645f; background:#422626; }
 .replay-help { color:#a9bed1; font-size:12px; line-height:1.6; }
 .replay-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .replay-list article { position:relative; display:block; padding:0; border:1px solid #3a556e; border-radius:14px; background:#132a3f; box-shadow:inset 0 1px 0 #ffffff0b,0 4px 0 #040f1b; overflow:hidden; min-width:0; }

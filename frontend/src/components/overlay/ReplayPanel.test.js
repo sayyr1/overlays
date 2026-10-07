@@ -2,6 +2,25 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ReplayPanel from './ReplayPanel';
 
+test('capture control is visible outside settings and switches after OBS confirms the buffer state', async () => {
+  let status = { connected: true, replay: { bufferAvailable: true, bufferActive: true, clips: [] } };
+  const api = jest.fn(async (url, options) => {
+    if (options) status = { ...status, replay: { ...status.replay, bufferActive: JSON.parse(options.body).action === 'start' } };
+    return status;
+  });
+  render(<ReplayPanel tournament={{ _id: 'event' }} api={api} />);
+  const stop = await screen.findByRole('button', { name: 'Detener captura' });
+  expect(stop.closest('details')).toBeNull();
+  expect(stop).toBeEnabled();
+  fireEvent.click(stop);
+  await waitFor(() => expect(api).toHaveBeenCalledWith('/obs/replay/control', { method: 'POST', body: JSON.stringify({ action: 'stop_buffer', tournamentId: 'event' }) }));
+  const start = await screen.findByRole('button', { name: 'Iniciar captura' });
+  expect(screen.getByRole('button', { name: 'Guardar jugada' })).toBeDisabled();
+  fireEvent.click(start);
+  await waitFor(() => expect(api).toHaveBeenCalledWith('/obs/replay/control', { method: 'POST', body: JSON.stringify({ action: 'start', tournamentId: 'event' }) }));
+  expect(await screen.findByRole('button', { name: 'Detener captura' })).toBeEnabled();
+});
+
 test('a legacy server response explains missing replay support without claiming OBS buffer is stopped', async () => {
   const api = jest.fn(async () => ({ connected: true, mode: 'bridge' }));
   render(<ReplayPanel tournament={{ _id: 'event' }} api={api} />);

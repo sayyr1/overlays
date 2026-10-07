@@ -130,9 +130,17 @@ body:has(.tv-overlay-root:not(.tv-overlay-preview)) { background: transparent; }
 .tv-broadcast-lower .tv-broadcast-brand,.tv-broadcast-notice .tv-broadcast-brand { margin-bottom:12px; font-size:18px; gap:12px; }
 .tv-broadcast-lower .tv-broadcast-brand img,.tv-broadcast-notice .tv-broadcast-brand img { width:32px; height:32px; }
 .tv-event-mark { position:absolute; top:24px; right:28px; width:64px; height:64px; object-fit:contain; }
-.tv-event-branded { padding-right:116px; }
+.tv-event-branded,.tv-graphic.tv-event-branded { padding-right:116px; }
 .tv-opening-card.tv-event-branded { padding-right:0; }
 .tv-opening-card.tv-event-branded > p { margin-left:116px; margin-right:116px; }
+.tv-match-identity { display:flex; align-items:center; justify-content:space-between; gap:24px; }
+.tv-match-identity > span { display:flex; align-items:center; gap:18px; min-width:0; flex:1; overflow-wrap:anywhere; }
+.tv-match-identity > span:last-child { justify-content:flex-end; text-align:right; }
+.tv-match-identity img,.tv-lineup-identity img { width:64px; height:64px; object-fit:contain; flex-shrink:0; }
+.tv-match-identity > em { flex-shrink:0; }
+.tv-lineup-identity { display:flex; align-items:center; gap:22px; }
+.tv-team-event { padding-left:116px; min-height:122px; }
+.tv-team-event-crest { position:absolute; left:28px; top:24px; width:64px; height:64px; object-fit:contain; }
 .tv-broadcast-countdown { display: block; font-size: 88px; font-weight: 600; color: var(--accent-tv); line-height: 1.1; margin-top: 18px; }
 .tv-broadcast-notice { left: auto; right: 96px; bottom: auto; top: 64px; width: 650px; }
 .tv-broadcast-notice h1 { font-size: 31px; }

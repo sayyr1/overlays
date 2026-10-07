@@ -135,6 +135,21 @@ export default function OverlayComposition({ snapshot, preview = false }) {
 function EventMark({ tournament }) {
   return tournament?.logo?.secureUrl ? <img className="tv-event-mark" src={tournament.logo.secureUrl} alt={`Logo de ${tournament.name}`} /> : null;
 }
+function MatchIdentity({ match, score = false }) {
+  return <h1 className="tv-match-identity"><span>{match.homeTeam && <img src={teamCrest(match.homeTeam)} alt={`Escudo de ${match.homeTeam.name}`} />}{match.homeTeam?.shortName || match.homeTeam?.name || 'Local'}</span><em>{score ? `${match.score.home} - ${match.score.away}` : 'vs'}</em><span>{match.awayTeam?.shortName || match.awayTeam?.name || 'Visitante'}{match.awayTeam && <img src={teamCrest(match.awayTeam)} alt={`Escudo de ${match.awayTeam.name}`} />}</span></h1>;
+}
+export function graphicTeam(graphic, match) {
+  const data = graphic.data || {};
+  const teams = [match.homeTeam, match.awayTeam].filter(Boolean);
+  if (data.team || data.teamId) return teams.find(team => String(team.id || team._id) === String(data.team || data.teamId)) || null;
+  if (data.side === 'home') return match.homeTeam;
+  if (data.side === 'away') return match.awayTeam;
+  if (data.teamName) {
+    const candidates = teams.filter(team => [team.name, team.shortName].includes(data.teamName));
+    if (candidates.length === 1) return candidates[0];
+  }
+  return null;
+}
 function BroadcastGraphic({ graphic, now, tournament }) {
   const type = graphic.type.replace('broadcast_', '');
   const full = ['opening', 'break', 'ending', 'countdown'].includes(type);
@@ -228,9 +243,7 @@ function RenderGraphic(props) {
       <section className={`tv-graphic tv-graphic-full ${props.tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}>
         <EventMark tournament={props.tournament} />
         <span className="tv-graphic-kicker">ESTADÍSTICAS DEL PARTIDO</span>
-        <h1>
-          {match.homeTeam?.shortName} <em>vs</em> {match.awayTeam?.shortName}
-        </h1>
+        <MatchIdentity match={match} />
         <div className="tv-stat-board">
           {rows.map(([name, field, suffix]) => (
             <p key={field}>
@@ -255,13 +268,7 @@ function RenderGraphic(props) {
       <section className={`tv-graphic tv-graphic-full ${props.tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}>
         <EventMark tournament={props.tournament} />
         <span className="tv-graphic-kicker">TABLA EN VIVO</span>
-        <h1>
-          {match.homeTeam?.name}{" "}
-          <em>
-            {match.score.home} - {match.score.away}
-          </em>{" "}
-          {match.awayTeam?.name}
-        </h1>
+        <MatchIdentity match={match} score />
         <p>Resultado provisional de la jornada</p>
         <div className="tv-graphic-bar" />
       </section>
@@ -384,12 +391,16 @@ function Graphic({ graphic, match, tournament, kind }) {
     graphic.type.includes("alineacion") || graphic.type.includes("formacion");
   const isHome = graphic.type.endsWith("local");
   const lineupItems = isHome ? match.lineups?.home : match.lineups?.away;
+  const team = lineup ? (isHome ? match.homeTeam : match.awayTeam) : graphicTeam(graphic, match);
+  const title = graphic.data?.playerName || graphic.data?.name || graphic.data?.message || graphic.data?.teamName || team?.shortName || team?.name || tournament?.name;
+  const teamName = team?.shortName || team?.name || graphic.data?.teamName;
   return (
     <section
-      className={`tv-graphic ${full ? "tv-graphic-full" : ""} ${kind === "lower" ? "tv-graphic-lower" : ""} ${lineup ? "tv-lineup" : ""} ${tournament?.logo?.secureUrl ? 'tv-event-branded' : ''}`}
+      className={`tv-graphic ${full ? "tv-graphic-full" : ""} ${kind === "lower" ? "tv-graphic-lower" : ""} ${lineup ? "tv-lineup" : ""} ${tournament?.logo?.secureUrl ? 'tv-event-branded' : ''} ${team && !full ? 'tv-team-event' : ''}`}
       data-event={graphic.type}
     >
       <EventMark tournament={tournament} />
+      {team && !full && <img className="tv-team-event-crest" src={teamCrest(team)} alt={`Escudo de ${team.name}`} />}
       <span className="tv-graphic-kicker">{label}</span>
       {full && !lineup && (
         <>
@@ -411,7 +422,7 @@ function Graphic({ graphic, match, tournament, kind }) {
       )}
       {lineup && (
         <>
-          <h1>{isHome ? match.homeTeam?.name : match.awayTeam?.name}</h1>
+          <h1 className="tv-lineup-identity">{team && <img src={teamCrest(team)} alt={`Escudo de ${team.name}`} />}{team?.name}</h1>
           <div className="tv-lineup-list">
             {(lineupItems || [])
               .filter((item) => item.starter)
@@ -424,16 +435,8 @@ function Graphic({ graphic, match, tournament, kind }) {
           </div>
         </>
       )}
-      {!full && (
-        <h1>
-          {graphic.data?.playerName ||
-            graphic.data?.name ||
-            graphic.data?.message ||
-            graphic.data?.teamName ||
-            tournament?.name}
-        </h1>
-      )}
-      {!full && graphic.data?.teamName && graphic.data.teamName !== (graphic.data?.playerName || graphic.data?.name || graphic.data?.message || graphic.data?.teamName || tournament?.name) && <p className="tv-graphic-detail">{graphic.data.teamName}</p>}
+      {!full && <h1>{title}</h1>}
+      {!full && teamName && teamName !== title && <p className="tv-graphic-detail">{teamName}</p>}
       <div className="tv-graphic-bar" />
     </section>
   );

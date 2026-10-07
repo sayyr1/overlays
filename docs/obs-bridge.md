@@ -14,7 +14,7 @@ El puente consulta las órdenes por HTTPS cada 1,5 segundos, además del tiempo 
 
 1. Publica esta versión de la app y API en Vercel, con las variables existentes de MongoDB y autenticación. El modo puente se selecciona automáticamente cuando `VERCEL` está definido. Para probarlo localmente usa `OBS_CONTROL_MODE=bridge` en el backend.
 2. En OBS de casa, abre **Herramientas → Ajustes del servidor WebSocket**, activa el servidor y conserva la autenticación.
-3. En la app publicada, abre **Control en vivo → Publicidad → Audio del campo → Conectar computadora de casa** y pulsa **Descargar vinculación**.
+3. En la app publicada, abre **Control en vivo → Audio → Conectar computadora de casa** y pulsa **Descargar vinculación**.
 4. Guarda `obs-bridge.json` en la computadora de casa. El puente requiere Node.js 20 o posterior y las dependencias del backend:
 
    ```powershell
@@ -25,12 +25,12 @@ El puente consulta las órdenes por HTTPS cada 1,5 segundos, además del tiempo 
    O inícialo en segundo plano desde la carpeta del proyecto:
 
    ```powershell
-   powershell -ExecutionPolicy Bypass -File backend\scripts\Start-ObsBridge.ps1 -ConfigPath "C:\Users\TU_USUARIO\Downloads\obs-bridge.json"
+   powershell -ExecutionPolicy Bypass -File backend\scripts\Start-ObsBridge.ps1 -AutoStart -ConfigPath "C:\Users\TU_USUARIO\Downloads\obs-bridge.json"
    ```
 
 5. Comprueba **OBS conectado**, selecciona la fuente `BELABOX_SRT` y activa **Bajar ambiente durante anuncios** en el evento que transmitirás. El valor inicial es 15 %; se puede ajustar.
 
-El puente y OBS deben estar funcionando cuando salgas. La aplicación del celular puede cerrarse sin detenerlos. El script de segundo plano escribe sus mensajes en `backend/obs-bridge.log` y `backend/obs-bridge.error.log`; no registra la clave de vinculación ni la contraseña de OBS. Si reinicias Windows, vuelve a iniciar el puente.
+El puente y OBS deben estar funcionando cuando salgas. La aplicación del celular puede cerrarse sin detenerlos. El supervisor reinicia el proceso si se cierra inesperadamente y evita supervisores duplicados. Con `-AutoStart`, se instala un acceso directo en Inicio de la cuenta actual: al iniciar sesión en Windows, el puente arranca oculto y espera a que abras OBS. El script escribe sus mensajes en `backend/obs-bridge.log` y `backend/obs-bridge.error.log`; no registra la clave de vinculación ni la contraseña de OBS. Mantén la computadora encendida y sin suspensión mientras transmites.
 
 ## Comportamiento del audio
 
